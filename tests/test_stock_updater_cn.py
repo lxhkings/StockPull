@@ -40,3 +40,32 @@ def test_update_prices_batch_skips_already_synced(mock_conn, mock_fetch):
     result = update_prices_batch(["600519.SH"])
     assert result["600519.SH"] == "skipped"
     mock_fetch.assert_not_called()
+
+
+def _efinance_hist_df():
+    """Simulate efinance get_quote_history return (后复权)."""
+    return pd.DataFrame({
+        "股票名称": ["贵州茅台", "贵州茅台"],
+        "股票代码": ["600519", "600519"],
+        "日期": ["2024-01-02", "2024-01-03"],
+        "开盘": [9500.0, 9400.0],
+        "收盘": [9550.0, 9600.0],
+        "最高": [9600.0, 9650.0],
+        "最低": [9450.0, 9380.0],
+        "成交量": [8000, 9000],
+        "成交额": [76000000, 86400000],
+        "振幅": [1.5, 2.0],
+        "涨跌幅": [0.5, 0.5],
+        "涨跌额": [50.0, 50.0],
+        "换手率": [0.1, 0.12],
+    })
+
+
+@patch("data.stock_updater_cn.ef.stock.get_quote_history")
+def test_fetch_prices_efinance_normalizes_columns(mock_ef):
+    from data.stock_updater_cn import _fetch_prices_efinance
+    mock_ef.return_value = _efinance_hist_df()
+    df = _fetch_prices_efinance("600519.SH", "20240101", "20240105")
+    assert set(df.columns) == {"date", "open", "high", "low", "close", "volume"}
+    assert len(df) == 2
+    assert df["close"].iloc[0] == 9550.0

@@ -18,6 +18,7 @@ from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
 
 import akshare as ak
+import efinance as ef
 import pandas as pd
 
 from config import (
@@ -153,6 +154,43 @@ def _fetch_prices_cn(
 
     log.error(f"[{ticker}] akshare 拉取失败: {last_exc}")
     return None
+
+
+def _fetch_prices_efinance(
+    ticker: str, start: str, end: str
+) -> Optional[pd.DataFrame]:
+    """
+    从 efinance 拉取单只 A-share 后复权日线 (交叉验证用)
+
+    Args:
+        ticker: canonical 形式 (如 "600519.SH")
+        start:  "YYYYMMDD"
+        end:    "YYYYMMDD"
+
+    Returns:
+        DataFrame [date, open, high, low, close, volume] 或 None
+    """
+    code = to_akshare_a(ticker)
+    try:
+        raw = ef.stock.get_quote_history(
+            code, beg=start, end=end, klt=101, fqt=2
+        )
+        if raw is None or raw.empty:
+            return None
+
+        df = pd.DataFrame({
+            "date":   pd.to_datetime(raw["日期"]).dt.date,
+            "open":   raw["开盘"].astype(float),
+            "high":   raw["最高"].astype(float),
+            "low":    raw["最低"].astype(float),
+            "close":  raw["收盘"].astype(float),
+            "volume": raw["成交量"].astype(float),
+        })
+        return df
+
+    except Exception as e:
+        log.warning(f"[{ticker}] efinance 拉取失败: {e}")
+        return None
 
 
 def _save_prices(conn, ticker: str, df: pd.DataFrame) -> int:
