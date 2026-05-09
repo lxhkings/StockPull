@@ -1,69 +1,72 @@
-"""Two-source price reconciliation.
+"""Two-source reconciliation for A-share / HK daily-K data.
 
-Compares close prices from a primary and secondary source for the same
-(ticker, date) pairs.  Mismatches beyond a configurable tolerance are
-returned as a DataFrame for logging / alerting.
-
-Usage:
-    mismatches = reconcile_prices(primary_df, secondary_df, tolerance=0.005)
-    if not mismatches.empty:
-        log.warning(...)
+Strategy:
+  - For each (ticker, date) row, compare close.
+  - Within tolerance: take primary's row.
+  - Beyond tolerance: log mismatch, still take primary's row.
+  - Only one source has the row: pass through.
 """
 
 from __future__ import annotations
 
 import logging
+from typing import List, Tuple
 
 import pandas as pd
+
+from config import RECONCILE_PRICE_TOLERANCE
 
 log = logging.getLogger(__name__)
 
 
-def reconcile_prices(
+def reconcile_two_sources(
     primary: pd.DataFrame,
     secondary: pd.DataFrame,
-    tolerance: float = 0.005,
-) -> pd.DataFrame:
-    """Compare close prices between two sources.
-
-    Both DataFrames must have columns: ``ticker``, ``date``, ``close``.
-
-    Args:
-        primary:   prices from the authoritative source (e.g. akshare hfq).
-        secondary: prices from the cross-check source (e.g. efinance).
-        tolerance: maximum relative difference considered a match (default 0.5 %).
+    tolerance: float = RECONCILE_PRICE_TOLERANCE,
+) -> Tuple[pd.DataFrame, List[dict]]:
+    """Merge two daily-K DataFrames by (ticker, date), preferring primary.
 
     Returns:
-        DataFrame of mismatched rows with an extra ``diff_pct`` column,
-        ordered by descending absolute difference.  Empty DataFrame when
-        all prices agree within tolerance.
+      (merged_df, mismatches)  — mismatches: list of {ticker, date, primary, secondary}
     """
-    required = {"ticker", "date", "close"}
-    for name, df in [("primary", primary), ("secondary", secondary)]:
-        missing = required - set(df.columns)
-        if missing:
-            raise ValueError(f"{name} DataFrame missing columns: {missing}")
+    cols = ["ticker", "date", "open", "high", "low", "close", "volume"]
 
-    merged = primary.merge(
-        secondary,
-        on=["ticker", "date"],
-        suffixes=("_primary", "_secondary"),
-        how="inner",
-    )
+    if primary.empty and secondary.empty:
+        return pd.DataFrame(columns=cols), []
 
-    if merged.empty:
-        return pd.DataFrame(columns=["ticker", "date", "close_primary",
-                                     "close_secondary", "diff_pct"])
+    if primary.empty:
+        return secondary[cols].reset_index(drop=True), []
 
-    merged["diff_pct"] = (
-        (merged["close_primary"] - merged["close_secondary"]).abs()
-        / merged["close_primary"].abs().clip(lower=1e-9)
-    )
+    if secondary.empty:
+        return primary[cols].reset_index(drop=True), []
 
-    mismatches = merged[merged["diff_pct"] > tolerance].copy()
-    mismatches = mismatches.sort_values("diff_pct", ascending=False).reset_index(drop=True)
+    p = primary.set_index(["ticker", "date"])
+    s = secondary.set_index(["ticker", "date"])
 
-    if not mismatches.empty:
-        log.warning(f"Reconcile: {len(mismatches)} mismatches (tolerance={tolerance})")
+    common = p.index.intersection(s.index)
+    only_secondary = s.index.difference(p.index)
 
-    return mismatches
+    mismatches: List[dict] = []
+    for idx in common:
+        p_close = float(p.loc[idx, "close"])
+        s_close = float(s.loc[idx, "close"])
+        if p_close == 0:
+            continue
+        if abs(p_close - s_close) / p_close > tolerance:
+            ticker, dt = idx
+            log.warning(
+                f"[reconcile] {ticker} {dt}: primary close={p_close} vs secondary={s_close} "
+                f"(diff {abs(p_close-s_close)/p_close*100:.2f}%)"
+            )
+            mismatches.append({
+                "ticker": ticker, "date": dt,
+                "primary": p_close, "secondary": s_close,
+            })
+
+    # Build merged: all primary + secondary-only
+    merged = pd.concat([
+        p,
+        s.loc[only_secondary] if len(only_secondary) > 0 else pd.DataFrame(),
+    ])
+    merged = merged.reset_index().sort_values(["ticker", "date"]).reset_index(drop=True)
+    return merged[cols], mismatches

@@ -55,9 +55,7 @@ def update_hsi() -> None:
 
 
 def _fetch_hsi() -> pd.DataFrame:
-    """Fetch HSI constituents via akshare index_stock_cons (sina source)."""
     raw = ak.index_stock_cons(symbol="HSI")
-    # sina returns columns: 品种代码, 品种名称, ...
     df = pd.DataFrame({
         "ticker": [from_akshare_hk(str(c).zfill(5)) for c in raw["品种代码"]],
         "name":   raw["品种名称"],

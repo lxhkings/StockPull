@@ -1,8 +1,4 @@
-"""CN market module: thin adapter exposing the MarketModule protocol.
-
-Wraps index_updater_cn.update_csi800() and stock_updater_cn.update_prices_batch()
-into the Pipeline contract.
-"""
+"""A-share market module: adapts CN ingest to Pipeline protocol."""
 
 from __future__ import annotations
 
@@ -11,8 +7,8 @@ from datetime import date
 from typing import Optional
 
 import akshare as ak
+import pandas as pd
 
-from config import START_DATE_CN, AKSHARE_RETRY_COUNT, AKSHARE_RETRY_DELAY
 from db import get_conn, get_index_tickers, query, execute
 from data import index_updater_cn
 from data import stock_updater_cn
@@ -24,10 +20,9 @@ market_id = "cn"
 
 
 def update_index() -> tuple[list[str], int, int]:
-    """Run CSI800 snapshot + change detection. Returns (new_added_tickers, inserted, removed)."""
     conn = get_conn()
     try:
-        prev_tickers = set(_latest_snapshot_tickers(conn, "CSI800"))
+        prev = set(_latest_snapshot_tickers(conn, "CSI800"))
     finally:
         conn.close()
 
@@ -35,13 +30,11 @@ def update_index() -> tuple[list[str], int, int]:
 
     conn = get_conn()
     try:
-        curr_tickers = set(_latest_snapshot_tickers(conn, "CSI800"))
+        curr = set(_latest_snapshot_tickers(conn, "CSI800"))
     finally:
         conn.close()
-
-    new_added = sorted(curr_tickers - prev_tickers)
-    removed = len(prev_tickers - curr_tickers)
-    return new_added, len(curr_tickers), removed
+    new_added = sorted(curr - prev)
+    return new_added, len(curr), len(prev - curr)
 
 
 def list_active_tickers() -> list[str]:
@@ -49,8 +42,6 @@ def list_active_tickers() -> list[str]:
 
 
 def backfill_new(new_tickers: list[str]) -> dict[str, str]:
-    """Backfill = full HISTORY_YEARS_CN pull. Same code path as incremental
-    because sync_log will be empty for these tickers."""
     if not new_tickers:
         return {}
     return stock_updater_cn.update_prices_batch(new_tickers)
@@ -63,42 +54,27 @@ def incremental(tickers: list[str]) -> dict[str, str]:
 
 
 def update_index_price() -> int:
-    """Pull CSI800 ETF (510800) daily close from akshare, write to index_prices."""
+    """中证800 指数 close via akshare (sh000906)."""
     last = query(
         "SELECT MAX(date) AS d FROM index_prices WHERE index_id=%s", ("CSI800",)
     )
     last_date = last[0]["d"] if last and last[0]["d"] else None
 
-    start = (last_date.strftime("%Y%m%d") if last_date else "20100101")
-    end = date.today().strftime("%Y%m%d")
-
-    try:
-        raw = ak.fund_etf_hist_em(
-            symbol="510800",
-            period="daily",
-            start_date=start,
-            end_date=end,
-            adjust="hfq",
-        )
-    except Exception as e:
-        log.error(f"[CSI800] ETF 拉取失败: {e}")
-        return 0
-
+    raw = ak.stock_zh_index_daily(symbol="sh000906")
     if raw is None or raw.empty:
         return 0
 
-    rows = []
-    for _, r in raw.iterrows():
-        d = r["日期"]
-        if hasattr(d, "date"):
-            d = d.date()
-        if last_date and d <= last_date:
-            continue
-        rows.append((d, "CSI800", to_float(r.get("收盘"))))
+    df = pd.DataFrame({
+        "date":  pd.to_datetime(raw["date"]).dt.date,
+        "close": raw["close"].astype(float),
+    })
+    if last_date:
+        df = df[df["date"] > last_date]
 
-    if not rows:
+    if df.empty:
         return 0
 
+    rows = [(r.date, "CSI800", to_float(r.close)) for r in df.itertuples(index=False)]
     return execute(
         "INSERT IGNORE INTO index_prices (date, index_id, close) VALUES (%s,%s,%s)",
         rows, many=True,
@@ -106,10 +82,9 @@ def update_index_price() -> int:
 
 
 def rebase(tickers: Optional[list[str]] = None) -> dict[str, str]:
-    """Full re-pull from START_DATE_CN for hfq rebase."""
-    if tickers is None:
-        tickers = list_active_tickers()
-    return stock_updater_cn.update_prices_batch(tickers)
+    """Full re-pull from START_DATE_CN to fix hfq drift."""
+    targets = tickers if tickers else list_active_tickers()
+    return stock_updater_cn.update_prices_batch(targets, full_rebase=True)
 
 
 def _latest_snapshot_tickers(conn, index_id: str) -> list[str]:
@@ -118,6 +93,6 @@ def _latest_snapshot_tickers(conn, index_id: str) -> list[str]:
            WHERE index_id=%s AND snapshot_date = (
              SELECT MAX(snapshot_date) FROM index_constituents WHERE index_id=%s
            )""",
-        (index_id, index_id),
+        (index_id, index_id)
     )
     return [r["ticker"] for r in rows]
