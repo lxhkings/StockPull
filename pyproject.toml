@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "project-b"
 version = "0.1.0"
 description = "Unified daily-K ingest (US + A-share + HK) writing into shared NAS MariaDB"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "pymysql>=1.0.3",
     "yfinance>=0.2.40",
@@ -28,3 +28,4 @@ exclude = ["sql*", "logs*", "backups*", "scripts*", "tests*"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v"
+
