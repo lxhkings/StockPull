@@ -26,13 +26,14 @@ HISTORY_YEARS_HK = 15
 START_DATE_CN    = "2010-01-01"
 START_DATE_HK    = "2010-01-01"
 
-# yfinance (carried over from stock_system)
-YF_BATCH_SIZE    = 20
+# yfinance (效率优先配置)
+YF_BATCH_SIZE    = 40       # 每批 40 只
 YF_RETRY_COUNT   = 3
-YF_TIMEOUT       = 30
+YF_TIMEOUT       = 60
 YF_LOOKBACK_DAYS = 7
-YF_THREADS       = False
-YF_BATCH_DELAY   = 2.0
+YF_THREADS       = False    # 单线程避免限速
+YF_BATCH_DELAY_BASE = 15.0  # batch 基础间隔 15 秒
+YF_BATCH_DELAY_JITTER = 3.0 # ±3 秒随机波动
 
 # A-share / HK source delays (akshare is sometimes flaky; serial)
 AKSHARE_RETRY_COUNT = 5

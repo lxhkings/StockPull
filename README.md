@@ -4,29 +4,41 @@ Daily-K ingest for US (yfinance) + A-share (akshare/efinance) + HK (akshare/efin
 
 See `docs/superpowers/plans/` for the implementation plan.
 
+## Requirements
+
+- Python 3.12+ (`.python-version` 指定 3.12)
+- MariaDB on NAS (192.168.8.9:3306)
+- uv (Python 包管理器)
+
 ## Quick start
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+# 使用 uv 管理 Python 版本和依赖
+uv venv --python 3.12
+source .venv/bin/activate
 cp .env.example .env  # fill DB_PASSWORD
-python main.py init      # one-time: insert CSI800/HSI rows into indices table
-python main.py daily     # run all markets
+
+uv run main.py init      # one-time: insert CSI800/HSI rows into indices table
+uv run main.py daily     # run all markets
 ```
 
 ## CLI
 
 ```bash
-python main.py daily [us|cn|hk|all]   # daily incremental (default: all)
-python main.py init                     # one-time index metadata seed
-python main.py rebase [us|cn|hk|all]   # full hfq re-pull from START_DATE
-python main.py status                   # DB sync summary
+uv run main.py daily --market us   # US market incremental
+uv run main.py daily --market cn   # CN market incremental
+uv run main.py daily --market hk   # HK market incremental
+uv run main.py daily               # all markets (default)
+
+uv run main.py init                # one-time index metadata seed
+uv run main.py rebase --market cn  # full hfq re-pull from START_DATE
+uv run main.py status              # DB sync summary
 
 # Tushare 一次性回填（独立子系统）
-python main.py tushare-backfill --dry-run                       # 预检 + 预算估算
-python main.py tushare-backfill --scope lists                   # 仅列表
-python main.py tushare-backfill --scope prices --market hk      # 仅 HK 日 K
-python main.py tushare-backfill                                  # 全量（约 30–60 分钟）
+uv run main.py tushare-backfill --dry-run                       # 预检 + 预算估算
+uv run main.py tushare-backfill --scope lists                   # 仅列表
+uv run main.py tushare-backfill --scope prices --market hk      # 仅 HK 日 K
+uv run main.py tushare-backfill                                  # 全量（约 30–60 分钟）
 ```
 
 ## Architecture
@@ -71,9 +83,18 @@ efinance for A-share data.
 ## Cron setup
 
 ```bash
-# Daily at 18:00 CST (after market close)
+# 北京时间每日 18:00 运行（美股收盘后）
 0 18 * * 1-5 /path/to/project/scripts/daily_update.sh >> /var/log/stocks.log 2>&1
 ```
+
+**北京时间美股收盘说明：**
+
+美股收盘时间为北京时间凌晨 5:00。程序自动计算最近已收盘的交易日：
+- 周一凌晨 5:00 前 → 回补上周五数据
+- 周一凌晨 5:00 后 → 回补上周五数据（等待周一收盘）
+- 周六/周日 → 回补周五数据
+- 周二至周五凌晨 5:00 前 → 回补前一天数据
+- 周二至周五凌晨 5:00 后 → 回补前一天数据（等待当天收盘）
 
 Logs are written to `logs/daily_YYYY-MM-DD.log`.
 
@@ -88,6 +109,7 @@ All secrets live in `.env` (see `.env.example`):
 | DB_USER | root | MariaDB user |
 | DB_PASSWORD | (required) | MariaDB password |
 | DB_NAME | stocks | Database name |
+| TUSHARE_TOKEN | (optional) | Tushare API token for backfill |
 
 History depths are configured in `config.py`:
 - US: 5 years
@@ -96,7 +118,7 @@ History depths are configured in `config.py`:
 ## Tests
 
 ```bash
-pytest tests/ -v
+uv run pytest tests/ -v
 ```
 
 44 tests covering ticker utils, config, DB smoke, pipeline, index updaters,
