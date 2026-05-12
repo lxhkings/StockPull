@@ -21,6 +21,12 @@ python main.py daily [us|cn|hk|all]   # daily incremental (default: all)
 python main.py init                     # one-time index metadata seed
 python main.py rebase [us|cn|hk|all]   # full hfq re-pull from START_DATE
 python main.py status                   # DB sync summary
+
+# Tushare 一次性回填（独立子系统）
+python main.py tushare-backfill --dry-run                       # 预检 + 预算估算
+python main.py tushare-backfill --scope lists                   # 仅列表
+python main.py tushare-backfill --scope prices --market hk      # 仅 HK 日 K
+python main.py tushare-backfill                                  # 全量（约 30–60 分钟）
 ```
 
 ## Architecture

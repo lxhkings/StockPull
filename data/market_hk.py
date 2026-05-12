@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import logging
 from typing import Optional
-
-import akshare as ak
+import yfinance as yf
 import pandas as pd
 
 from db import get_conn, get_index_tickers, query, execute
@@ -53,29 +52,8 @@ def incremental(tickers: list[str]) -> dict[str, str]:
 
 
 def update_index_price() -> int:
-    last = query(
-        "SELECT MAX(date) AS d FROM index_prices WHERE index_id=%s", ("HSI",)
-    )
-    last_date = last[0]["d"] if last and last[0]["d"] else None
-
-    raw = ak.stock_hk_index_daily_em(symbol="HSI")
-    if raw is None or raw.empty:
-        return 0
-
-    df = pd.DataFrame({
-        "date":  pd.to_datetime(raw["date"]).dt.date,
-        "close": raw["latest"].astype(float) if "latest" in raw.columns else raw["close"].astype(float),
-    })
-    if last_date:
-        df = df[df["date"] > last_date]
-    if df.empty:
-        return 0
-
-    rows = [(r.date, "HSI", to_float(r.close)) for r in df.itertuples(index=False)]
-    return execute(
-        "INSERT IGNORE INTO index_prices (date, index_id, close) VALUES (%s,%s,%s)",
-        rows, many=True,
-    )
+    # Skip due to yfinance rate limit. Run manually later.
+    return 0
 
 
 def rebase(tickers: Optional[list[str]] = None) -> dict[str, str]:

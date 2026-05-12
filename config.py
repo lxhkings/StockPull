@@ -35,9 +35,9 @@ YF_THREADS       = False
 YF_BATCH_DELAY   = 2.0
 
 # A-share / HK source delays (akshare is sometimes flaky; serial)
-AKSHARE_RETRY_COUNT = 3
-AKSHARE_RETRY_DELAY = 2.0
-AKSHARE_REQUEST_DELAY = 0.5  # between per-stock calls
+AKSHARE_RETRY_COUNT = 5
+AKSHARE_RETRY_DELAY = 3.0
+AKSHARE_REQUEST_DELAY = 1.5  # between per-stock calls
 
 # Reconcile tolerance for two-source comparison
 RECONCILE_PRICE_TOLERANCE = 0.005   # 0.5%
@@ -70,3 +70,10 @@ INDEX_CONFIG = {
 }
 
 INDEX_DELAY = 2.0   # delay between index updates (carried over)
+
+# Tushare
+TUSHARE_TOKEN = os.getenv("TUSHARE_TOKEN", "")
+TUSHARE_RATE_INTERVAL = float(os.getenv("TUSHARE_RATE_INTERVAL", "0.25"))  # ~240/min
+TUSHARE_BACKFILL_START = "20100101"  # YYYYMMDD for Tushare APIs
+TUSHARE_RETRY_COUNT = 3
+TUSHARE_RETRY_DELAY = 5.0

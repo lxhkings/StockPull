@@ -18,6 +18,7 @@ pytest tests/test_reconcile.py::test_both_sources_agree_uses_primary  # single t
 # CLI
 python main.py init                 # one-time: seed index metadata
 python main.py daily                # all markets
+python main.py daily --market us
 python main.py daily --market cn    # single market
 python main.py daily --market cn --code 600519.SH  # single ticker (debug)
 python main.py rebase --market cn   # full hfq re-pull

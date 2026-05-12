@@ -4,7 +4,18 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
+
+# Bypass all proxy settings (including macOS system proxy) to avoid connection issues
+# Must happen before any library imports that use requests/urllib3
+_PROXY_KEYS = [
+    "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
+    "ALL_PROXY", "all_proxy",
+]
+for _key in _PROXY_KEYS:
+    os.environ.pop(_key, None)
+os.environ["NO_PROXY"] = "*"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,6 +41,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_rebase.add_argument("--code", action="append", default=None)
 
     sub.add_parser("status", help="Print ingest status summary")
+
+    p_ts = sub.add_parser("tushare-backfill", help="Tushare 一次性回填三市场底层数据")
+    p_ts.add_argument("--scope", choices=("all", "lists", "prices", "derive", "financial"),
+                      default="all")
+    p_ts.add_argument("--market", choices=("all", "cn", "hk", "us"), default="all")
+    p_ts.add_argument("--dry-run", action="store_true")
 
     return p
 
@@ -86,6 +103,13 @@ def cmd_rebase(market: str, codes: list[str] | None) -> int:
     return 0
 
 
+def cmd_tushare_backfill(scope: str, market: str, dry_run: bool) -> int:
+    from ts_ingest.orchestrator import run_full_backfill
+    rep = run_full_backfill(scope=scope, market=market, dry_run=dry_run)
+    print(rep.render())
+    return 0
+
+
 def _import_market(market: str):
     if market == "us":
         from data import market_us as m
@@ -108,6 +132,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_daily(args.market, args.code)
     if args.cmd == "rebase":
         return cmd_rebase(args.market, args.code)
+    if args.cmd == "tushare-backfill":
+        return cmd_tushare_backfill(args.scope, args.market, args.dry_run)
     return 1
 
 

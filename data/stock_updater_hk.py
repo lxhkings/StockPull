@@ -1,27 +1,20 @@
-"""HK daily-K updater via akshare (post-adjusted, hfq).
-
-akshare's stock_hk_daily does NOT accept start/end; pull all and filter locally.
-"""
+"""HK daily-K updater via yfinance."""
 
 from __future__ import annotations
 
 import logging
 import time
 from datetime import date, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List
 
-import akshare as ak
-import efinance as ef
+import yfinance as yf
 import pandas as pd
 
 from config import (
-    HISTORY_YEARS_HK, START_DATE_HK, YF_LOOKBACK_DAYS,
-    AKSHARE_RETRY_COUNT, AKSHARE_RETRY_DELAY, AKSHARE_REQUEST_DELAY,
+    START_DATE_HK, YF_LOOKBACK_DAYS,
 )
 from db import get_conn, get_last_sync, set_sync_ok, set_sync_error
 from data.base import to_float, to_int
-from data.ticker_utils import to_akshare_hk, to_efinance_hk
-from data.reconcile import reconcile_two_sources
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +32,6 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False) -> Dict[s
             try:
                 if full_rebase:
                     start = date.fromisoformat(START_DATE_HK)
-                    last = None
                 else:
                     last = get_last_sync(conn, t, "price")
                     if last is None:
@@ -47,22 +39,9 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False) -> Dict[s
                     else:
                         start = last - timedelta(days=YF_LOOKBACK_DAYS)
 
-                df_a = _fetch_one_akshare_with_retry(t, start, end)
-                is_backfill = full_rebase or last is None
-                if is_backfill:
-                    try:
-                        df_b = _fetch_one_efinance(t, start, end)
-                    except Exception as e:
-                        log.warning(f"[{t}] efinance failed: {e}")
-                        df_b = pd.DataFrame(columns=df_a.columns)
-                    df, mismatches = reconcile_two_sources(df_a, df_b)
-                    if mismatches:
-                        log.warning(f"[{t}] {len(mismatches)} reconcile mismatches")
-                else:
-                    df = df_a
-
+                df = _fetch_one_yfinance(t, start, end)
                 if df is None or df.empty:
-                    set_sync_error(conn, t, "price", "akshare/efinance: no data")
+                    set_sync_error(conn, t, "price", "yfinance: no data")
                     result[t] = "no_data"
                     continue
 
@@ -70,7 +49,7 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False) -> Dict[s
                 set_sync_ok(conn, t, "price", df["date"].max(), rows)
                 result[t] = "ok"
                 log.info(f"[{t}] 写入 {rows} 行，{df['date'].min()} → {df['date'].max()}")
-                time.sleep(AKSHARE_REQUEST_DELAY)
+                time.sleep(1)  # yfinance rate limit
             except Exception as e:
                 log.error(f"[{t}] 失败: {e}")
                 set_sync_error(conn, t, "price", str(e))
@@ -80,57 +59,20 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False) -> Dict[s
         conn.close()
 
 
-def _fetch_one_akshare_with_retry(ticker: str, start: date, end: date) -> pd.DataFrame:
-    last_exc = None
-    for attempt in range(AKSHARE_RETRY_COUNT):
-        try:
-            return _fetch_one_akshare(ticker, start, end)
-        except Exception as e:
-            last_exc = e
-            if attempt < AKSHARE_RETRY_COUNT - 1:
-                time.sleep(AKSHARE_RETRY_DELAY * (2 ** attempt))
-    raise last_exc
-
-
-def _fetch_one_akshare(ticker: str, start: date, end: date) -> pd.DataFrame:
-    code = to_akshare_hk(ticker)
-    raw = ak.stock_hk_daily(symbol=code, adjust="hfq")
-    if raw is None or len(raw) == 0:
+def _fetch_one_yfinance(ticker: str, start: date, end: date) -> pd.DataFrame:
+    """Fetch HK stock via yfinance."""
+    t = yf.Ticker(ticker)
+    df = t.history(start=start.isoformat(), end=end.isoformat())
+    if df is None or df.empty:
         return pd.DataFrame(columns=["ticker", "date", "open", "high", "low", "close", "volume"])
 
-    df = pd.DataFrame({
-        "ticker": ticker,
-        "date":   pd.to_datetime(raw["date"]).dt.date,
-        "open":   raw["open"].astype(float),
-        "high":   raw["high"].astype(float),
-        "low":    raw["low"].astype(float),
-        "close":  raw["close"].astype(float),
-        "volume": raw["volume"].astype("int64"),
+    df = df.reset_index()
+    df["date"] = df["Date"].dt.date
+    df = df.rename(columns={
+        "Open": "open", "High": "high", "Low": "low",
+        "Close": "close", "Volume": "volume"
     })
-    df = df[(df["date"] >= start) & (df["date"] <= end)]
-    return df[["ticker", "date", "open", "high", "low", "close", "volume"]].reset_index(drop=True)
-
-
-def _fetch_one_efinance(ticker: str, start: date, end: date) -> pd.DataFrame:
-    code = to_efinance_hk(ticker)
-    raw = ef.stock.get_quote_history(
-        stock_codes=code,
-        beg=start.strftime("%Y%m%d"),
-        end=end.strftime("%Y%m%d"),
-        klt=101, fqt=2,
-    )
-    if raw is None or len(raw) == 0:
-        return pd.DataFrame(columns=["ticker", "date", "open", "high", "low", "close", "volume"])
-
-    df = pd.DataFrame({
-        "ticker": ticker,
-        "date":   pd.to_datetime(raw["日期"]).dt.date,
-        "open":   raw["开盘"].astype(float),
-        "high":   raw["最高"].astype(float),
-        "low":    raw["最低"].astype(float),
-        "close":  raw["收盘"].astype(float),
-        "volume": raw["成交量"].astype("int64"),
-    })
+    df["ticker"] = ticker
     return df[["ticker", "date", "open", "high", "low", "close", "volume"]]
 
 
