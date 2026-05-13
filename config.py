@@ -74,7 +74,7 @@ INDEX_DELAY = 2.0   # delay between index updates (carried over)
 
 # Tushare
 TUSHARE_TOKEN = os.getenv("TUSHARE_TOKEN", "")
-TUSHARE_RATE_INTERVAL = float(os.getenv("TUSHARE_RATE_INTERVAL", "0.25"))  # ~240/min
+TUSHARE_RATE_INTERVAL = float(os.getenv("TUSHARE_RATE_INTERVAL", "0.15"))  # 0.15=400/min, 0.08=800/min
 TUSHARE_BACKFILL_START = "20100101"  # YYYYMMDD for Tushare APIs
 TUSHARE_RETRY_COUNT = 3
 TUSHARE_RETRY_DELAY = 5.0

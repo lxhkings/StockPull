@@ -1,4 +1,4 @@
-"""A-share market module: adapts CN ingest to Pipeline protocol."""
+"""A-share market module: 全量A股 via tushare stock_basic."""
 
 from __future__ import annotations
 
@@ -9,10 +9,10 @@ from typing import Optional
 import akshare as ak
 import pandas as pd
 
-from db import get_conn, get_index_tickers, query, execute
-from data import index_updater_cn
-from data import stock_updater_cn
+from db import get_conn, query, execute
+from data import stock_updater_cn_tushare as stock_updater_cn
 from data.base import to_float
+from ts_ingest.backfill_lists import backfill_stocks_a
 
 log = logging.getLogger(__name__)
 
@@ -20,25 +20,45 @@ market_id = "cn"
 
 
 def update_index() -> tuple[list[str], int, int]:
+    """更新全量A股列表（从tushare stock_basic）。"""
     conn = get_conn()
     try:
-        prev = set(_latest_snapshot_tickers(conn, "CSI800"))
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT COUNT(*) FROM stocks "
+            "WHERE ticker LIKE '%%.SH' OR ticker LIKE '%%.SZ' OR ticker LIKE '%%.BJ'"
+        )
+        prev_count = cur.fetchone()[0]
     finally:
         conn.close()
 
-    index_updater_cn.update_csi800()
+    inserted = backfill_stocks_a()
 
     conn = get_conn()
     try:
-        curr = set(_latest_snapshot_tickers(conn, "CSI800"))
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT COUNT(*) FROM stocks "
+            "WHERE ticker LIKE '%%.SH' OR ticker LIKE '%%.SZ' OR ticker LIKE '%%.BJ'"
+        )
+        curr_count = cur.fetchone()[0]
     finally:
         conn.close()
-    new_added = sorted(curr - prev)
-    return new_added, len(curr), len(prev - curr)
+
+    added = curr_count - prev_count
+    log.info(f"[cn] stocks表更新: prev={prev_count}, curr={curr_count}, added={added}")
+    # new_tickers返回空，因为list_active_tickers直接读stocks表
+    return [], inserted, 0
 
 
 def list_active_tickers() -> list[str]:
-    return get_index_tickers("CSI800")
+    """返回全量A股ticker（从stocks表）。"""
+    rows = query(
+        "SELECT ticker FROM stocks "
+        "WHERE ticker LIKE '%%.SH' OR ticker LIKE '%%.SZ' OR ticker LIKE '%%.BJ' "
+        "ORDER BY ticker"
+    )
+    return [r["ticker"] for r in rows]
 
 
 def backfill_new(new_tickers: list[str]) -> dict[str, str]:
@@ -85,14 +105,3 @@ def rebase(tickers: Optional[list[str]] = None) -> dict[str, str]:
     """Full re-pull from START_DATE_CN to fix hfq drift."""
     targets = tickers if tickers else list_active_tickers()
     return stock_updater_cn.update_prices_batch(targets, full_rebase=True)
-
-
-def _latest_snapshot_tickers(conn, index_id: str) -> list[str]:
-    rows = query(
-        """SELECT DISTINCT ticker FROM index_constituents
-           WHERE index_id=%s AND snapshot_date = (
-             SELECT MAX(snapshot_date) FROM index_constituents WHERE index_id=%s
-           )""",
-        (index_id, index_id)
-    )
-    return [r["ticker"] for r in rows]
