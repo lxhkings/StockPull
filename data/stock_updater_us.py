@@ -74,20 +74,6 @@ def _last_us_trading_date() -> date:
         return (now - timedelta(days=1)).date()
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 单只入口（向后兼容）
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-def update_prices(ticker: str, _legacy: Optional[str] = None) -> None:
-    """
-    单只 ticker 增量更新（薄包装，内部调 update_prices_batch）
-
-    Args:
-        ticker: 股票代码（如 AAPL）
-        _legacy: 已弃用，原 stooq_ticker 参数，传任何值都被忽略
-    """
-    update_prices_batch([ticker])
-
-
 def _test_aapl_data(target_date: date) -> tuple[Optional[pd.DataFrame], str]:
     """
     测试 AAPL 是否有目标日期数据，判断 yfinance 是否已更新
@@ -358,21 +344,3 @@ def _save_prices(conn, ticker: str, df: pd.DataFrame) -> int:
         cur.executemany(sql, rows)
     conn.commit()
     return len(rows)
-
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Ticker 映射工具
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-def guess_yf_ticker(ticker: str) -> str:
-    """
-    根据 DB ticker 推测 yfinance 调用代码
-    Args:
-        ticker: 如 AAPL、BRK.B
-    Returns:
-        如 AAPL、BRK-B
-    """
-    return _yf_symbol(ticker)
-
-
-# 过渡期别名：旧调用方仍可 import guess_stooq_ticker
-guess_stooq_ticker = guess_yf_ticker
