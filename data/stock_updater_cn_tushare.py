@@ -25,25 +25,31 @@ BATCH_COMMIT_SIZE = 50  # 每50个ticker commit一次，减少网络往返
 
 
 def _last_cn_trading_date() -> date:
-    """北京时间视角下A股最近已收盘交易日。"""
+    """北京时间视角下A股最近已收盘交易日。
+
+    A股15:00收盘，tushare数据16:00入库完成。
+    """
     now = datetime.now()
     weekday = now.weekday()  # 0=周一, 5=周六, 6=周日
     hour = now.hour
 
-    # 周六、周日：周五
+    # 周六：周五（周五数据周六早上入库）
     if weekday == 5:
         return (now - timedelta(days=1)).date()
+
+    # 周日：周五
     if weekday == 6:
         return (now - timedelta(days=2)).date()
 
-    # 周一凌晨5点前：周五
-    if weekday == 0 and hour < 5:
+    # 周一16点前：周五
+    if weekday == 0 and hour < 16:
         return (now - timedelta(days=3)).date()
 
-    # 其他：凌晨5点前取前一天，5点后等待当天收盘
-    if hour < 5:
-        return (now - timedelta(days=1)).date()
-    # 当前交易日尚未收盘，取前一天
+    # 其他交易日：
+    # 16点后 → 当天数据已入库，取当天
+    # 16点前 → 等待当天入库，取前一天
+    if hour >= 16:
+        return now.date()
     return (now - timedelta(days=1)).date()
 
 
