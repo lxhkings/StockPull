@@ -134,6 +134,19 @@ def get_index_tickers(index_id: str) -> List[str]:
     return [r["ticker"] for r in rows]
 
 
+def get_latest_snapshot_tickers(index_id: str) -> list[str]:
+    """获取指数最新快照的成分股ticker列表"""
+    rows = query("""
+        SELECT DISTINCT ticker FROM index_constituents
+        WHERE index_id = %s
+        AND snapshot_date = (
+            SELECT MAX(snapshot_date) FROM index_constituents WHERE index_id = %s
+        )
+        ORDER BY ticker
+    """, (index_id, index_id))
+    return [r["ticker"] for r in rows]
+
+
 def get_tickers_without_prices(conn) -> List[str]:
     """返回在 stocks 表中但 prices 表无任何数据的 ticker 列表"""
     with conn.cursor() as cur:
