@@ -7,7 +7,7 @@ from typing import Optional
 import yfinance as yf
 import pandas as pd
 
-from db import get_conn, get_index_tickers, query, execute
+from db import get_conn, get_index_tickers, get_latest_snapshot_tickers, query, execute
 from data import index_updater_hk
 from data import stock_updater_hk
 from data.base import to_float
@@ -18,19 +18,11 @@ market_id = "hk"
 
 
 def update_index() -> tuple[list[str], int, int]:
-    conn = get_conn()
-    try:
-        prev = set(_latest_snapshot_tickers(conn, "HSI"))
-    finally:
-        conn.close()
+    prev = set(get_latest_snapshot_tickers("HSI"))
 
     index_updater_hk.update_hsi()
 
-    conn = get_conn()
-    try:
-        curr = set(_latest_snapshot_tickers(conn, "HSI"))
-    finally:
-        conn.close()
+    curr = set(get_latest_snapshot_tickers("HSI"))
     new_added = sorted(curr - prev)
     return new_added, len(curr), len(prev - curr)
 
@@ -59,14 +51,3 @@ def update_index_price() -> int:
 def rebase(tickers: Optional[list[str]] = None) -> dict[str, str]:
     targets = tickers if tickers else list_active_tickers()
     return stock_updater_hk.update_prices_batch(targets, full_rebase=True)
-
-
-def _latest_snapshot_tickers(conn, index_id: str) -> list[str]:
-    rows = query(
-        """SELECT DISTINCT ticker FROM index_constituents
-           WHERE index_id=%s AND snapshot_date = (
-             SELECT MAX(snapshot_date) FROM index_constituents WHERE index_id=%s
-           )""",
-        (index_id, index_id)
-    )
-    return [r["ticker"] for r in rows]
