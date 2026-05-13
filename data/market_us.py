@@ -12,7 +12,7 @@ from typing import Optional
 
 import yfinance as yf
 
-from db import get_conn, get_index_tickers, query, execute
+from db import get_conn, get_index_tickers, get_latest_snapshot_tickers, query, execute
 from data import index_updater_us
 from data import stock_updater_us
 from data.base import to_float
@@ -24,19 +24,11 @@ market_id = "us"
 
 def update_index() -> tuple[list[str], int, int]:
     """Run SP500 snapshot + change detection. Returns (new_added_tickers, inserted, removed)."""
-    conn = get_conn()
-    try:
-        prev_tickers = set(_latest_snapshot_tickers(conn, "SP500"))
-    finally:
-        conn.close()
+    prev_tickers = set(get_latest_snapshot_tickers("SP500"))
 
     index_updater_us.update_sp500()
 
-    conn = get_conn()
-    try:
-        curr_tickers = set(_latest_snapshot_tickers(conn, "SP500"))
-    finally:
-        conn.close()
+    curr_tickers = set(get_latest_snapshot_tickers("SP500"))
 
     new_added = sorted(curr_tickers - prev_tickers)
     removed = len(prev_tickers - curr_tickers)
@@ -97,14 +89,3 @@ def rebase(tickers: Optional[list[str]] = None) -> dict[str, str]:
     yfinance auto_adjust=False stores raw, and prior US data does not need hfq rebase."""
     raise NotImplementedError("US rebase not supported (raw prices, no hfq drift). "
                               "Use `daily` to refresh recent data.")
-
-
-def _latest_snapshot_tickers(conn, index_id: str) -> list[str]:
-    rows = query(
-        """SELECT DISTINCT ticker FROM index_constituents
-           WHERE index_id=%s AND snapshot_date = (
-             SELECT MAX(snapshot_date) FROM index_constituents WHERE index_id=%s
-           )""",
-        (index_id, index_id)
-    )
-    return [r["ticker"] for r in rows]
