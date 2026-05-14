@@ -26,7 +26,7 @@ def test_backfill_stocks_a_inserts_into_stocks():
     assert n == 2
     args = cur.executemany.call_args
     sql = args[0][0]
-    assert "INSERT IGNORE INTO stocks" in sql
+    assert "ON DUPLICATE KEY UPDATE" in sql
 
 
 def test_backfill_etf_basic_uses_two_markets():
