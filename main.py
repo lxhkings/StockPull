@@ -35,10 +35,15 @@ def _build_parser() -> argparse.ArgumentParser:
     p_daily.add_argument("--market", choices=MARKETS, default="all")
     p_daily.add_argument("--code", action="append", default=None,
                          help="Only this ticker (repeatable, debug aid)")
+    p_daily.add_argument("--index", default=None,
+                         help="指数成分股（仅 US 市场：SP500）")
 
     p_rebase = sub.add_parser("rebase", help="Full re-pull (hfq drift fix)")
-    p_rebase.add_argument("--market", choices=("cn", "hk"), required=True)
+    p_rebase.add_argument("--market", choices=("cn", "hk", "us"), required=True)
     p_rebase.add_argument("--code", action="append", default=None)
+    p_rebase.add_argument("--years", type=int, default=None, help="历史年数（默认：US=5, CN/HK=15）")
+    p_rebase.add_argument("--index", default=None,
+                          help="指数成分股（仅 US 市场：SP500）")
 
     sub.add_parser("status", help="Print ingest status summary")
 
@@ -73,7 +78,7 @@ def cmd_status() -> int:
     return 0
 
 
-def cmd_daily(market: str, codes: list[str] | None) -> int:
+def cmd_daily(market: str, codes: list[str] | None, index: str | None) -> int:
     from data.pipeline import Pipeline
     targets = ["us", "cn", "hk"] if market == "all" else [market]
     for m in targets:
@@ -88,18 +93,24 @@ def cmd_daily(market: str, codes: list[str] | None) -> int:
             print(f"[{m}] daily --code {codes}: running incremental only")
             mod.incremental(codes)
         else:
-            Pipeline(mod).daily()
+            # 只对 US 市场传递 index 参数
+            pipe_index = index if m == "us" else None
+            Pipeline(mod).daily(index=pipe_index)
     return 0
 
 
-def cmd_rebase(market: str, codes: list[str] | None) -> int:
+def cmd_rebase(market: str, codes: list[str] | None, years: int | None, index: str | None) -> int:
     mod = _import_market(market)
     if not hasattr(mod, "rebase"):
         print(f"[{market}] rebase not implemented", file=sys.stderr)
         return 1
-    targets = codes or mod.list_active_tickers()
-    print(f"[{market}] rebase {len(targets)} tickers (full history)")
-    mod.rebase(targets)
+    # 只对 US 市场传递 index 参数
+    rebase_index = index if market == "us" else None
+    targets = codes or mod.list_active_tickers(index=rebase_index)
+    years_msg = f" ({years} 年)" if years else ""
+    index_msg = f" [{index}]" if index else ""
+    print(f"[{market}] rebase {len(targets)} tickers{index_msg}{years_msg} (full history)")
+    mod.rebase(targets, years=years, index=rebase_index)
     return 0
 
 
@@ -129,9 +140,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "status":
         return cmd_status()
     if args.cmd == "daily":
-        return cmd_daily(args.market, args.code)
+        return cmd_daily(args.market, args.code, args.index)
     if args.cmd == "rebase":
-        return cmd_rebase(args.market, args.code)
+        return cmd_rebase(args.market, args.code, args.years, args.index)
     if args.cmd == "tushare-backfill":
         return cmd_tushare_backfill(args.scope, args.market, args.dry_run)
     return 1
