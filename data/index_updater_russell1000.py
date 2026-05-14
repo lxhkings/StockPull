@@ -37,12 +37,17 @@ def fetch_russell1000_data() -> pd.DataFrame:
     csv_text = header_line + "\n" + "\n".join(data_lines)
     df = pd.read_csv(StringIO(csv_text))
 
-    # 只取有效 ticker（过滤空行和无效数据）
+    # 过滤无效行：空ticker、长度>5（股票ticker≤5）、"-"
     df = df[df["Ticker"].notna() & (df["Ticker"] != "-")]
     df["Ticker"] = df["Ticker"].str.strip().str.upper()
+    df = df[df["Ticker"].str.len() > 0]  # 过滤空字符串
+    df = df[df["Ticker"].str.len() <= 5]
 
     # 标准化列名
     df = df.rename(columns={"Ticker": "ticker", "Name": "name", "Sector": "sector"})
+
+    # 填充 NaN 为 None（MySQL 不支持 NaN）
+    df = df.where(pd.notnull(df), None)
 
     log.info(f"Russell 1000 ETF: 抓取 {len(df)} 支成分股")
     return df[["ticker", "name", "sector"]]
