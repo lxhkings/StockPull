@@ -49,12 +49,13 @@ uv run main.py tushare-backfill --dry-run                   # 预检
 main.py
   └── data/pipeline.py        # Pipeline 流程编排
         ├── data/market_us.py  # 美股适配器（yfinance）
-        ├── data/market_cn.py  # A股适配器（tushare + akshare）
-        └── data/market_hk.py  # 港股适配器（akshare）
+        ├── data/market_cn.py  # A股适配器（tushare）
+        └── data/market_hk.py  # 港股适配器（本地 CSV + yfinance）
 
 data/index_updater_*.py        # 各市场成分股快照
 ts_ingest/backfill_lists.py    # Tushare 股票列表回填
 ts_ingest/client.py            # Tushare API 客户端（限速+重试）
+ts_ingest/backfill_prices.py   # Tushare 日线回填
 db.py                          # 数据库连接池
 config.py                      # 配置管理
 ```
@@ -147,7 +148,7 @@ uv run pytest tests/test_cn_index_price.py -v
 
 ## 网络注意事项
 
-`main.py` 清除代理环境变量（设置 `NO_PROXY=*`），避免 macOS 系统代理干扰 akshare/efinance HTTP 请求。
+`main.py` 清除代理环境变量（设置 `NO_PROXY=*`），避免 macOS 系统代理干扰 tushare/yfinance API 请求。
 
 ## 实现计划
 
