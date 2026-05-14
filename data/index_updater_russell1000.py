@@ -46,6 +46,14 @@ def fetch_russell1000_data() -> pd.DataFrame:
     # 标准化列名
     df = df.rename(columns={"Ticker": "ticker", "Name": "name", "Sector": "sector"})
 
+    # 统一 sector 命名（与 SP500 GICS 一致）
+    sector_map = {
+        "Communication": "Communication Services",
+        "Cash and/or Derivatives": None,  # 非股票类别，过滤
+    }
+    df["sector"] = df["sector"].replace(sector_map)
+    df = df[df["sector"].notna()]  # 过滤非股票类别
+
     # 填充 NaN 为 None（MySQL 不支持 NaN）
     df = df.where(pd.notnull(df), None)
 
