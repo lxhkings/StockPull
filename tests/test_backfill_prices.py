@@ -45,7 +45,7 @@ def test_backfill_one_writes_with_on_duplicate():
     assert "ON DUPLICATE KEY UPDATE" in sql
     fake_client.pro_bar.assert_called_once()
     kwargs = fake_client.pro_bar.call_args.kwargs
-    assert kwargs["adj"] == "hfq"
+    assert kwargs["adj"] == "qfq"
     mock_ok.assert_called_once()
 
 

@@ -119,6 +119,6 @@ def update_index_price() -> int:
 
 
 def rebase(tickers: Optional[list[str]] = None, years: Optional[int] = None) -> dict[str, str]:
-    """Full re-pull from START_DATE_CN to fix hfq drift."""
+    """Full re-pull from START_DATE_CN to fix qfq drift."""
     targets = tickers if tickers else list_active_tickers()
     return stock_updater_cn.update_prices_batch(targets, full_rebase=True, years=years)

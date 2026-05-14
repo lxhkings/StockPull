@@ -1,4 +1,4 @@
-"""A-share daily-K updater via Tushare (post-adjusted, hfq).
+"""A-share daily-K updater via Tushare (pre-adjusted, qfq).
 
 参考 stock_updater_us.py 补缺逻辑：
 - 判断哪些ticker需要更新
@@ -70,7 +70,7 @@ def _normalize_pro_bar(df: pd.DataFrame) -> pd.DataFrame:
 def _fetch_one(ticker: str, start: str, end: str) -> pd.DataFrame:
     """tushare pro_bar 单ticker拉取。start/end格式YYYYMMDD。"""
     client = get_client()
-    df_raw = client.pro_bar(ts_code=ticker, adj="hfq", start_date=start, end_date=end, freq="D")
+    df_raw = client.pro_bar(ts_code=ticker, adj="qfq", start_date=start, end_date=end, freq="D")
     return _normalize_pro_bar(df_raw)
 
 

@@ -1,4 +1,4 @@
-"""三市场日 K backfill（A/HK 用 hfq 后复权；US 不复权）。"""
+"""三市场日 K backfill（A/HK 用 qfq 前复权；US 不复权）。"""
 from __future__ import annotations
 
 import logging
@@ -32,9 +32,9 @@ def _normalize_pro_bar(df: pd.DataFrame) -> pd.DataFrame:
 
 def _pro_bar_kwargs(ticker: str, market: str, start: str) -> dict:
     if market == "cn":
-        return {"ts_code": ticker, "adj": "hfq", "start_date": start, "freq": "D"}
+        return {"ts_code": ticker, "adj": "qfq", "start_date": start, "freq": "D"}
     if market == "hk":
-        return {"ts_code": ticker, "adj": "hfq", "asset": "HK", "start_date": start, "freq": "D"}
+        return {"ts_code": ticker, "adj": "qfq", "asset": "HK", "start_date": start, "freq": "D"}
     if market == "us":
         return {"ts_code": ticker, "asset": "US", "start_date": start, "freq": "D"}
     raise ValueError(market)

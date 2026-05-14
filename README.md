@@ -36,9 +36,9 @@ uv run main.py daily               # 全市场（默认）
 uv run main.py init                # 初始化指数元数据
 uv run main.py status              # 查看同步状态
 
-# 全量回补（hfq 漂移修复）
-uv run main.py rebase --market cn  # A股全量重拉（tushare hfq，默认15年）
-uv run main.py rebase --market hk  # 港股全量重拉（yfinance hfq，默认15年）
+# 全量回补（qfq 漂移修复）
+uv run main.py rebase --market cn  # A股全量重拉（tushare qfq，默认15年）
+uv run main.py rebase --market hk  # 港股全量重拉（yfinance auto_adjust，默认15年）
 uv run main.py rebase --market us  # 美股全量重拉（yfinance raw，2010年起，1016支）
 uv run main.py rebase --market us --index SP500  # 仅 SP500 成分股
 uv run main.py rebase --market us --years 10  # 指定10年历史
@@ -82,15 +82,15 @@ config.py                      # 配置管理
 - `backfill_new(tickers)` — 新股全量历史
 - `incremental(tickers)` — 存量股票增量（从 sync_log 恢复）
 - `update_index_price()` — 指数日线
-- `rebase(tickers)` — 全量重拉（修复 hfq 漂移）
+- `rebase(tickers)` — 全量重拉（修复 qfq 漂移）
 
 ## 数据源
 
 | 市场 | 指数成分股 | 股票价格 | 指数价格 | 行业分类 |
 |------|-----------|---------|---------|---------|
 | 美股 | GitHub CSV (SP500) + iShares CSV (R1000) | yfinance | yfinance ^GSPC | N/A |
-| A股 | tushare `index_weight` | tushare `pro_bar` (hfq) | tushare `index_daily` | tushare `stock_basic.industry` |
-| 港股 | 本地 CSV (HSI) | yfinance hfq | yfinance ETF | N/A |
+| A股 | tushare `index_weight` | tushare `pro_bar` (qfq) | tushare `index_daily` | tushare `stock_basic.industry` |
+| 港股 | 本地 CSV (HSI) | yfinance auto_adjust | yfinance ETF | N/A |
 
 **美股指数组合策略：**
 - 默认：SP500 + Russell 1000（约1016支大盘股）

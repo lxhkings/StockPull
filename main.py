@@ -38,7 +38,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_daily.add_argument("--index", default=None,
                          help="指数成分股（仅 US 市场：SP500）")
 
-    p_rebase = sub.add_parser("rebase", help="Full re-pull (hfq drift fix)")
+    p_rebase = sub.add_parser("rebase", help="Full re-pull (qfq drift fix)")
     p_rebase.add_argument("--market", choices=("cn", "hk", "us"), required=True)
     p_rebase.add_argument("--code", action="append", default=None)
     p_rebase.add_argument("--years", type=int, default=None, help="历史年数（默认：US=5, CN/HK=15）")

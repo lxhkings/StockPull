@@ -13,7 +13,7 @@ A market module must expose:
   update_index_price() -> int
       Update the index's own daily close. Returns rows inserted.
   rebase(tickers: list[str] | None = None) -> dict[str, str]
-      Full re-pull from START_DATE for hfq rebase. Optional to implement
+      Full re-pull from START_DATE for qfq rebase. Optional to implement
       (US module raises NotImplementedError).
 """
 
