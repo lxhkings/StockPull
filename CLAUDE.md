@@ -50,7 +50,7 @@ Three-market daily-K ingest (US/CN/HK) into shared MariaDB on Synology NAS (192.
 - CSI800 成分股: tushare `index_weight` API → stocks 表 join 获取 name/gics_sector
 - CSI800 指数价格: tushare `index_daily` API
 - A股基础信息: tushare `stock_basic` API（含行业分类 `industry` 字段）
-- A股日线价格: yfinance
+- A股日线价格: tushare `pro_bar` API (hfq)
 
 **HK Market 数据源：**
 - HSI 成分股: 本地 CSV `data/hsi_constituents.csv`（手动维护）

@@ -72,7 +72,7 @@ config.py                      # 配置管理
 | 市场 | 指数成分股 | 股票价格 | 指数价格 | 行业分类 |
 |------|-----------|---------|---------|---------|
 | 美股 | GitHub CSV (SP500) | yfinance | yfinance ^GSPC | N/A |
-| A股 | tushare `index_weight` | yfinance hfq | tushare `index_daily` | tushare `stock_basic.industry` |
+| A股 | tushare `index_weight` | tushare `pro_bar` (hfq) | tushare `index_daily` | tushare `stock_basic.industry` |
 | 港股 | 本地 CSV (HSI) | yfinance hfq | yfinance ETF | N/A |
 
 **HSI 成分股维护：**
