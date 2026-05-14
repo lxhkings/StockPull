@@ -25,7 +25,8 @@ uv run main.py daily     # 全市场增量同步
 
 ```bash
 # 日常增量同步
-uv run main.py daily --market us   # 美股
+uv run main.py daily --market us   # 美股全部（5927支）
+uv run main.py daily --market us --index SP500  # 仅 SP500 成分股
 uv run main.py daily --market cn   # A股
 uv run main.py daily --market hk   # 港股
 uv run main.py daily               # 全市场（默认）
@@ -35,12 +36,20 @@ uv run main.py init                # 初始化指数元数据
 uv run main.py status              # 查看同步状态
 
 # 全量回补（hfq 漂移修复）
-uv run main.py rebase --market cn  # A股全量重拉
+uv run main.py rebase --market cn  # A股全量重拉（tushare hfq，默认15年）
+uv run main.py rebase --market hk  # 港股全量重拉（yfinance hfq，默认15年）
+uv run main.py rebase --market us  # 美股全量重拉（yfinance raw，默认5年，5927支）
+uv run main.py rebase --market us --index SP500  # 仅 SP500 成分股
+uv run main.py rebase --market us --years 10  # 指定10年历史
+uv run main.py rebase --market cn --code 600519.SH  # 单只股票全量重拉
 
-# Tushare 回填（股票基础信息+行业分类）
-uv run main.py tushare-backfill --scope lists --market cn  # A股基础信息
-uv run main.py tushare-backfill --scope prices --market cn  # A股日线（可选）
-uv run main.py tushare-backfill --dry-run                   # 预检
+# Tushare 回填（股票基础信息+行业分类+财务数据）
+uv run main.py tushare-backfill --scope lists --market all  # 全市场基础信息（CN/HK/US + ETF）
+uv run main.py tushare-backfill --scope derive              # 周线/月线聚合（从日线计算）
+uv run main.py tushare-backfill --scope financial           # 财务数据
+uv run main.py tushare-backfill --dry-run                   # 预检（不执行）
+
+# 注：日线数据通过 daily/rebase 命令拉取（CN: tushare, HK/US: yfinance）
 ```
 
 ## 架构设计
