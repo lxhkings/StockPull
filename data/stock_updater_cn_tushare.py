@@ -132,9 +132,13 @@ def _process_tickers_batched(
 
             df = _fetch_one(t, start, end)
             if df.empty:
-                sync_buf.append((t, SYNC_DATA_TYPE, date.today(), 0, "error", "tushare: no data"))
-                result[t] = "no_data"
-                # 无数据也计入batch，保持进度一致
+                # 节假日无数据是正常的，只有当天缺失才记error
+                if end == date.today().strftime("%Y%m%d"):
+                    sync_buf.append((t, SYNC_DATA_TYPE, date.today(), 0, "error", "tushare: no data"))
+                    result[t] = "no_data"
+                else:
+                    # 历史日期无数据（节假日），正常skip
+                    result[t] = "skip"
                 if len(sync_buf) >= BATCH_COMMIT_SIZE:
                     _flush_batch(conn, prices_buf, sync_buf)
                     prices_buf.clear()
