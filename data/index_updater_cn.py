@@ -1,4 +1,4 @@
-"""CSI800 (中证800) constituent updater via akshare.
+"""CSI800 (中证800) constituent updater via tushare.
 
 Mirrors stock_system/data/index_updater.py:update_sp500() flow:
   1. fetch current constituents
@@ -14,16 +14,15 @@ import logging
 from datetime import date
 from typing import Optional, Set, Tuple
 
-import akshare as ak
 import pandas as pd
 
-from db import get_conn
-from data.ticker_utils import from_akshare_a
+from db import get_conn, query
+from ts_ingest.client import get_client
+from ts_ingest.ticker_map import index_id_to_ts_code
 
 log = logging.getLogger(__name__)
 
 INDEX_ID = "CSI800"
-AK_SYMBOL = "000906"
 
 
 def update_csi800() -> None:
@@ -55,12 +54,36 @@ def update_csi800() -> None:
 
 
 def _fetch_csi800() -> pd.DataFrame:
-    raw = ak.index_stock_cons_csindex(symbol=AK_SYMBOL)
-    # akshare returns columns: 成分券代码, 成分券名称, 行业, ...
+    """Fetch CSI800 constituents from tushare index_weight API.
+
+    Returns DataFrame with columns: ticker, name, sector.
+    Name and sector are looked up from stocks table (filled by tushare stock_basic).
+    """
+    client = get_client()
+    ts_code = index_id_to_ts_code(INDEX_ID)  # '000906.SH'
+
+    raw = client.call("index_weight", index_code=ts_code)
+    if raw.empty:
+        return pd.DataFrame(columns=["ticker", "name", "sector"])
+
+    # Filter to latest trade_date (tushare returns multi-period data)
+    latest_date = raw["trade_date"].max()
+    latest = raw[raw["trade_date"] == latest_date]
+
+    tickers = latest["con_code"].tolist()
+
+    # Lookup name and sector from stocks table
+    placeholders = ",".join(["%s"] * len(tickers))
+    rows = query(
+        f"SELECT ticker, name, gics_sector FROM stocks WHERE ticker IN ({placeholders})",
+        tickers,
+    )
+    stock_map = {r["ticker"]: (r["name"], r.get("gics_sector")) for r in rows}
+
     df = pd.DataFrame({
-        "ticker": [from_akshare_a(c) for c in raw["成分券代码"].astype(str).str.zfill(6)],
-        "name":   raw["成分券名称"],
-        "sector": raw.get("行业", ""),
+        "ticker": tickers,
+        "name":   [stock_map.get(t, (None, None))[0] for t in tickers],
+        "sector": [stock_map.get(t, (None, None))[1] for t in tickers],
     })
     return df
 
