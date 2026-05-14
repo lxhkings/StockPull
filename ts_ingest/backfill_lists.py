@@ -34,8 +34,9 @@ def backfill_stocks_a() -> int:
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.executemany(
-                "INSERT IGNORE INTO stocks (ticker, name, gics_sector, exchange) "
-                "VALUES (%s, %s, %s, %s)",
+                "INSERT INTO stocks (ticker, name, gics_sector, exchange) "
+                "VALUES (%s, %s, %s, %s) "
+                "ON DUPLICATE KEY UPDATE name=VALUES(name), gics_sector=VALUES(gics_sector)",
                 rows,
             )
         conn.commit()
