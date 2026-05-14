@@ -100,17 +100,30 @@ def cmd_daily(market: str, codes: list[str] | None, index: str | None) -> int:
 
 
 def cmd_rebase(market: str, codes: list[str] | None, years: int | None, index: str | None) -> int:
+    import inspect
     mod = _import_market(market)
     if not hasattr(mod, "rebase"):
         print(f"[{market}] rebase not implemented", file=sys.stderr)
         return 1
-    # 只对 US 市场传递 index 参数
-    rebase_index = index if market == "us" else None
-    targets = codes or mod.list_active_tickers(index=rebase_index)
+
+    # US 模块支持 index 参数，CN/HK 不支持（使用 inspect 判断）
+    sig_list = inspect.signature(mod.list_active_tickers)
+    if 'index' in sig_list.parameters:
+        targets = codes or mod.list_active_tickers(index=index)
+    else:
+        targets = codes or mod.list_active_tickers()
+
     years_msg = f" ({years} 年)" if years else ""
     index_msg = f" [{index}]" if index else ""
     print(f"[{market}] rebase {len(targets)} tickers{index_msg}{years_msg} (full history)")
-    mod.rebase(targets, years=years, index=rebase_index)
+
+    # rebase 函数同样检查 index 参数
+    sig_rebase = inspect.signature(mod.rebase)
+    if 'index' in sig_rebase.parameters:
+        mod.rebase(targets, years=years, index=index)
+    else:
+        mod.rebase(targets, years=years)
+
     return 0
 
 
