@@ -61,29 +61,20 @@ def backfill_stocks_hk() -> int:
 
 
 def backfill_stocks_us() -> int:
-    client = get_client()
-    df = client.call("us_basic", fields="ts_code,name,enname,classify,list_date")
-    # Filter out rows with missing ts_code
-    df = df[df["ts_code"].notna() & (df["ts_code"] != "")]
-    rows = []
-    for _, r in df.iterrows():
-        name = r.get("name")
-        if pd.isna(name) or name is None or name == "":
-            name = r["ts_code"]
-        classify = r.get("classify")
-        if pd.isna(classify):
-            classify = None
-        rows.append((r["ts_code"], name, classify, "US"))
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT IGNORE INTO stocks (ticker, name, gics_sector, exchange) "
-                "VALUES (%s, %s, %s, %s)",
-                rows,
-            )
-        conn.commit()
-    log.info(f"stocks_us: upserted {len(rows)} rows")
-    return len(rows)
+    """美股基础信息回填（已禁用）。
+
+    tushare us_basic 数据质量差：
+    - name 全空（6000 条无价值）
+    - exchange 存为 'US' 而非真实交易所名
+    - 包含大量 SPAC/退市/OTC 无效 ticker
+
+    美股数据策略：
+    - SP500 成分股：GitHub CSV（index_updater_us.py）
+    - 价格数据：yfinance（stock_updater_us.py）
+    - 基础信息：无需 tushare，stocks 表已有 SP500 成分股（exchange=Nasdaq/NYSE）
+    """
+    log.warning("backfill_stocks_us: 已禁用（tushare us_basic 数据质量差），跳过")
+    return 0
 
 
 def backfill_etf_basic() -> int:

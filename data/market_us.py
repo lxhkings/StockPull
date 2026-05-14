@@ -2,6 +2,11 @@
 
 Wraps existing index_updater_us.update_sp500() and stock_updater_us.update_prices_batch()
 into the Pipeline contract.
+
+支持指数：
+- SP500（S&P 500，约503支）
+- RUSSELL1000（Russell 1000，约1008支）
+- 默认组合：SP500 + RUSSELL1000（约1016支）
 """
 
 from __future__ import annotations
@@ -14,6 +19,7 @@ import yfinance as yf
 
 from db import get_conn, get_index_tickers, get_latest_snapshot_tickers, query, execute
 from data import index_updater_us
+from data import index_updater_russell1000
 from data import stock_updater_us
 from data.base import to_float
 
@@ -23,24 +29,52 @@ market_id = "us"
 
 
 def update_index() -> tuple[list[str], int, int]:
-    """Run SP500 snapshot + change detection. Returns (new_added_tickers, inserted, removed)."""
-    prev_tickers = set(get_latest_snapshot_tickers("SP500"))
+    """Run SP500 + Russell1000 snapshot + change detection.
 
+    Returns:
+        (new_added_tickers, total_inserted_rows, removed_count)
+    """
+    # SP500
+    prev_sp500 = set(get_latest_snapshot_tickers("SP500"))
     index_updater_us.update_sp500()
+    curr_sp500 = set(get_latest_snapshot_tickers("SP500"))
+    sp500_new = sorted(curr_sp500 - prev_sp500)
+    sp500_removed = len(prev_sp500 - curr_sp500)
 
-    curr_tickers = set(get_latest_snapshot_tickers("SP500"))
+    # Russell 1000
+    prev_r1k = set(get_latest_snapshot_tickers("RUSSELL1000"))
+    index_updater_russell1000.update_russell1000()
+    curr_r1k = set(get_latest_snapshot_tickers("RUSSELL1000"))
+    r1k_new = sorted(curr_r1k - prev_r1k)
+    r1k_removed = len(prev_r1k - curr_r1k)
 
-    new_added = sorted(curr_tickers - prev_tickers)
-    removed = len(prev_tickers - curr_tickers)
-    return new_added, len(curr_tickers), removed
+    # 合并新增
+    all_new = sorted(set(sp500_new) | set(r1k_new))
+    total_inserted = len(curr_sp500) + len(curr_r1k)
+    total_removed = sp500_removed + r1k_removed
+
+    return all_new, total_inserted, total_removed
 
 
 def list_active_tickers(index: Optional[str] = None) -> list[str]:
-    """返回美股 ticker 列表。index=None 全量，index='SP500' 指数成分股。"""
+    """返回美股 ticker 列表。
+
+    Args:
+        index: 指定指数（SP500/RUSSELL1000），None 返回组合（SP500+R1000）
+
+    Returns:
+        ticker 列表
+    """
     if index == "SP500":
         return get_index_tickers("SP500")
-    rows = query("SELECT ticker FROM stocks WHERE exchange='US' ORDER BY ticker")
-    return [r["ticker"] for r in rows]
+    if index == "RUSSELL1000":
+        return get_index_tickers("RUSSELL1000")
+
+    # 默认：SP500 + Russell 1000 组合（约1016支）
+    sp500 = get_index_tickers("SP500")
+    r1k = get_index_tickers("RUSSELL1000")
+    combined = sorted(set(sp500) | set(r1k))
+    return combined
 
 
 def backfill_new(new_tickers: list[str]) -> dict[str, str]:

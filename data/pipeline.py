@@ -56,6 +56,7 @@ class Pipeline:
             all_tickers = self.m.list_active_tickers(index=index)
         else:
             all_tickers = self.m.list_active_tickers()
+        log.info(f"[{mid}] incremental: {len(all_tickers)} tickers")
         self.m.incremental(all_tickers)
 
         log.info(f"[{mid}] === Step 4: update index price ===")

@@ -25,10 +25,11 @@ uv run main.py daily     # 全市场增量同步
 
 ```bash
 # 日常增量同步
-uv run main.py daily --market us   # 美股全部（5927支）
-uv run main.py daily --market us --index SP500  # 仅 SP500 成分股
-uv run main.py daily --market cn   # A股
-uv run main.py daily --market hk   # 港股
+uv run main.py daily --market us   # 美股默认组合（SP500 + R1000，约1016支）
+uv run main.py daily --market us --index SP500      # 仅 SP500 成分股（503支）
+uv run main.py daily --market us --index RUSSELL1000 # 仅 Russell 1000（1008支）
+uv run main.py daily --market cn   # A股（CSI800）
+uv run main.py daily --market hk   # 港股（HSI）
 uv run main.py daily               # 全市场（默认）
 
 # 初始化与状态
@@ -38,13 +39,14 @@ uv run main.py status              # 查看同步状态
 # 全量回补（hfq 漂移修复）
 uv run main.py rebase --market cn  # A股全量重拉（tushare hfq，默认15年）
 uv run main.py rebase --market hk  # 港股全量重拉（yfinance hfq，默认15年）
-uv run main.py rebase --market us  # 美股全量重拉（yfinance raw，2010年起，5927支）
+uv run main.py rebase --market us  # 美股全量重拉（yfinance raw，2010年起，1016支）
 uv run main.py rebase --market us --index SP500  # 仅 SP500 成分股
 uv run main.py rebase --market us --years 10  # 指定10年历史
 uv run main.py rebase --market cn --code 600519.SH  # 单只股票全量重拉
 
 # Tushare 回填（股票基础信息+行业分类+财务数据）
-uv run main.py tushare-backfill --scope lists --market all  # 全市场基础信息（CN/HK/US + ETF）
+uv run main.py tushare-backfill --scope lists --market cn  # A股基础信息（含行业分类）
+uv run main.py tushare-backfill --scope lists --market hk  # 港股基础信息
 uv run main.py tushare-backfill --scope derive              # 周线/月线聚合（从日线计算）
 uv run main.py tushare-backfill --scope financial           # 财务数据
 uv run main.py tushare-backfill --dry-run                   # 预检（不执行）
@@ -57,12 +59,17 @@ uv run main.py tushare-backfill --dry-run                   # 预检（不执行
 ```
 main.py
   └── data/pipeline.py        # Pipeline 流程编排
-        ├── data/market_us.py  # 美股适配器（yfinance）
+        ├── data/market_us.py  # 美股适配器（yfinance，SP500+R1000组合）
         ├── data/market_cn.py  # A股适配器（tushare）
         └── data/market_hk.py  # 港股适配器（本地 CSV + yfinance）
 
 data/index_updater_*.py        # 各市场成分股快照
-ts_ingest/backfill_lists.py    # Tushare 股票列表回填
+  ├── index_updater_us.py      # SP500（GitHub CSV）
+  ├── index_updater_russell1000.py # Russell 1000（iShares CSV）
+  ├── index_updater_cn.py      # CSI800（tushare）
+  └── index_updater_hk.py      # HSI（本地 CSV）
+
+ts_ingest/backfill_lists.py    # Tushare 股票列表回填（CN/HK）
 ts_ingest/client.py            # Tushare API 客户端（限速+重试）
 ts_ingest/backfill_prices.py   # Tushare 日线回填
 db.py                          # 数据库连接池
@@ -81,9 +88,14 @@ config.py                      # 配置管理
 
 | 市场 | 指数成分股 | 股票价格 | 指数价格 | 行业分类 |
 |------|-----------|---------|---------|---------|
-| 美股 | GitHub CSV (SP500) | yfinance | yfinance ^GSPC | N/A |
+| 美股 | GitHub CSV (SP500) + iShares CSV (R1000) | yfinance | yfinance ^GSPC | N/A |
 | A股 | tushare `index_weight` | tushare `pro_bar` (hfq) | tushare `index_daily` | tushare `stock_basic.industry` |
 | 港股 | 本地 CSV (HSI) | yfinance hfq | yfinance ETF | N/A |
+
+**美股指数组合策略：**
+- 默认：SP500 + Russell 1000（约1016支大盘股）
+- 可选单独指数：SP500（503支）或 RUSSELL1000（1008支）
+- 数据源：SP500 使用 GitHub CSV，R1000 使用 iShares holdings CSV
 
 **HSI 成分股维护：**
 - 文件：`data/hsi_constituents.csv`
@@ -122,7 +134,7 @@ config.py                      # 配置管理
 | TUSHARE_TOKEN | **必填** | Tushare API Token |
 
 历史深度配置（`config.py`）：
-- 美股：5 年
+- 美股：5 年（SP500 + R1000 组合，约1016支）
 - A股/港股：15 年（从 2010-01-01 起）
 
 Tushare 限速（`config.py`）：`TUSHARE_RATE_INTERVAL=0.12`（每分钟最多 500 次 API 调用）
