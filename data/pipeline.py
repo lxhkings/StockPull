@@ -19,8 +19,9 @@ A market module must expose:
 
 from __future__ import annotations
 
+import inspect
 import logging
-from typing import Protocol
+from typing import Optional, Protocol
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ class Pipeline:
     def __init__(self, market_module: MarketModule):
         self.m = market_module
 
-    def daily(self) -> None:
+    def daily(self, index: Optional[str] = None) -> None:
         mid = self.m.market_id
         log.info(f"[{mid}] === Step 1: update index constituents ===")
         new_tickers, inserted, removed = self.m.update_index()
@@ -49,7 +50,12 @@ class Pipeline:
             self.m.backfill_new(new_tickers)
 
         log.info(f"[{mid}] === Step 3: incremental update ===")
-        all_tickers = self.m.list_active_tickers()
+        # US 模块支持 index 参数，CN/HK 不支持（使用默认调用）
+        sig = inspect.signature(self.m.list_active_tickers)
+        if 'index' in sig.parameters:
+            all_tickers = self.m.list_active_tickers(index=index)
+        else:
+            all_tickers = self.m.list_active_tickers()
         self.m.incremental(all_tickers)
 
         log.info(f"[{mid}] === Step 4: update index price ===")
