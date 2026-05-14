@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import time
 from datetime import date, timedelta
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import yfinance as yf
 import pandas as pd
@@ -19,7 +19,7 @@ from data.base import to_float, to_int
 log = logging.getLogger(__name__)
 
 
-def update_prices_batch(tickers: List[str], full_rebase: bool = False) -> Dict[str, str]:
+def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Optional[int] = None) -> Dict[str, str]:
     if not tickers:
         return {}
     today = date.today()
@@ -31,7 +31,11 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False) -> Dict[s
         for t in tickers:
             try:
                 if full_rebase:
-                    start = date.fromisoformat(START_DATE_HK)
+                    if years:
+                        # 根据指定的年数计算起始日期
+                        start = today - timedelta(days=365 * years)
+                    else:
+                        start = date.fromisoformat(START_DATE_HK)
                 else:
                     last = get_last_sync(conn, t, "price")
                     if last is None:

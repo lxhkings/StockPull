@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, timedelta
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 import pandas as pd
 
@@ -112,7 +112,8 @@ def _flush_batch(conn, prices_buf: List[Tuple], sync_buf: List[Tuple]):
 def _process_tickers_batched(
     conn, tickers: List[str], last_trading: date,
     full_rebase: bool, result: Dict[str, str],
-    progress_label: str = "补缺"
+    progress_label: str = "补缺",
+    years: Optional[int] = None
 ) -> Tuple[List[Tuple], List[Tuple]]:
     """批量处理ticker，返回未flush的buffer。"""
     prices_buf: List[Tuple] = []
@@ -121,7 +122,12 @@ def _process_tickers_batched(
     for i, t in enumerate(tickers, 1):
         try:
             if full_rebase:
-                start = TUSHARE_BACKFILL_START
+                if years:
+                    # 根据指定的年数计算起始日期
+                    start_date = last_trading - timedelta(days=365 * years)
+                    start = start_date.strftime("%Y%m%d")
+                else:
+                    start = TUSHARE_BACKFILL_START
             else:
                 last = get_last_sync(conn, t, SYNC_DATA_TYPE)
                 if last:
@@ -183,12 +189,13 @@ def _process_tickers_batched(
     return prices_buf, sync_buf
 
 
-def update_prices_batch(tickers: List[str], full_rebase: bool = False) -> Dict[str, str]:
+def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Optional[int] = None) -> Dict[str, str]:
     """批量增量拉取，参考US补缺逻辑。
 
     Args:
       tickers: canonical A-share tickers (e.g., 600519.SH)
       full_rebase: if True, ignore sync_log and pull from START_DATE_CN
+      years: 指定历史年数（None 时使用 START_DATE_CN）
 
     Returns: {ticker: status}
     """
@@ -221,7 +228,7 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False) -> Dict[s
             buf_p, buf_s = _process_tickers_batched(
                 conn, new_tickers, last_trading,
                 full_rebase=True, result=result,
-                progress_label="回填"
+                progress_label="回填", years=years
             )
             _flush_batch(conn, buf_p, buf_s)
 

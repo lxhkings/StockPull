@@ -48,6 +48,6 @@ def update_index_price() -> int:
     return 0
 
 
-def rebase(tickers: Optional[list[str]] = None) -> dict[str, str]:
+def rebase(tickers: Optional[list[str]] = None, years: Optional[int] = None) -> dict[str, str]:
     targets = tickers if tickers else list_active_tickers()
-    return stock_updater_hk.update_prices_batch(targets, full_rebase=True)
+    return stock_updater_hk.update_prices_batch(targets, full_rebase=True, years=years)
