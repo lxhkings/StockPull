@@ -6,29 +6,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Setup
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env  # fill DB_PASSWORD
+uv venv --python 3.12
+source .venv/bin/activate
+cp .env.example .env  # fill DB_PASSWORD, TUSHARE_TOKEN
 
 # Run tests
-pytest tests/ -v                    # all tests
-pytest tests/test_ticker_utils.py   # single file
-pytest tests/test_reconcile.py::test_both_sources_agree_uses_primary  # single test
+uv run pytest tests/ -v                    # all tests
+uv run pytest tests/test_index_updater_cn.py -v  # single file
+uv run pytest tests/test_cn_index_price.py::test_update_index_price_uses_tushare_index_daily  # single test
 
 # CLI
-python main.py init                 # one-time: seed index metadata
-python main.py daily                # all markets
-python main.py daily --market us
-python main.py daily --market cn    # single market
-python main.py daily --market cn --code 600519.SH  # single ticker (debug)
-python main.py rebase --market cn   # full hfq re-pull
-python main.py status               # DB sync summary
+uv run main.py init                 # one-time: seed index metadata
+uv run main.py daily                # all markets
+uv run main.py daily --market us
+uv run main.py daily --market cn    # single market
+uv run main.py daily --market cn --code 600519.SH  # single ticker (debug)
+uv run main.py rebase --market cn   # full hfq re-pull
+uv run main.py status               # DB sync summary
 
-# Tushare 一次性回填（独立子系统）
-python main.py tushare-backfill --dry-run                       # 预检 + 预算估算
-python main.py tushare-backfill --scope lists                   # 仅列表
-python main.py tushare-backfill --scope prices --market hk      # 仅 HK 日 K
-python main.py tushare-backfill                                  # 全量（约 30–60 分钟）
+# Tushare 回填（股票基础信息、行业分类）
+uv run main.py tushare-backfill --scope lists --market cn  # A股基础信息+行业
 
 # Cron
 ./scripts/daily_update.sh [us|cn|hk|all]
@@ -46,30 +43,40 @@ Three-market daily-K ingest (US/CN/HK) into shared MariaDB on Synology NAS (192.
 
 **Market modules** follow `MarketModule` protocol (defined in `data/pipeline.py`):
 - `data/market_us.py` — yfinance, SP500 from GitHub CSV
-- `data/market_cn.py` — akshare + efinance, CSI800 from csindex.com.cn
-- `data/market_hk.py` — akshare, HSI from sina
+- `data/market_cn.py` — tushare (CSI800 constituents, index prices), akshare/efinance (stock prices hfq)
+- `data/market_hk.py` — akshare, HSI from sina (待迁移 Yahoo API)
+
+**CN Market 数据源（2026-05 重构）:**
+- CSI800 成分股: tushare `index_weight` API → stocks 表 join 获取 name/gics_sector
+- CSI800 指数价格: tushare `index_daily` API
+- A股基础信息: tushare `stock_basic` API（含行业分类 `industry` 字段）
+- A股日线价格: akshare hfq + efinance reconcile
 
 **Key patterns:**
 - CN/HK prices are hfq (后复权/post-adjusted); US prices are raw
 - Two-source reconciliation (`data/reconcile.py`) during backfill: akshare primary, efinance secondary, tolerance 0.5%
-- `ON DUPLICATE KEY UPDATE` for rebase overwrites; `INSERT IGNORE` for US legacy
+- `ON DUPLICATE KEY UPDATE` for stocks table (更新 name 和 gics_sector)
+- `INSERT IGNORE` for index_constituents (daily snapshots)
 - `sync_log` table tracks per-ticker last successful sync date
 - `index_constituents` table stores daily snapshots with `snapshot_date`
 - `constituent_changes` table tracks ADDED/REMOVED diffs
+- `gics_sector` column in stocks table filled by tushare `stock_basic.industry`
 
 **Ticker formats** (`data/ticker_utils.py`):
 - Canonical: `600519.SH`, `00700.HK`, `AAPL`
-- akshare A-share: 6-digit code only (`600519`)
+- tushare/akshare A-share: `600519.SH` (与 canonical 一致)
 - akshare HK: 5-digit with leading zeros (`00700`)
 - efinance: same as akshare
 
 ## Configuration
 
-Secrets in `.env` (see `.env.example`). `DB_PASSWORD` is required (raises KeyError).
+Secrets in `.env` (see `.env.example`). `DB_PASSWORD` and `TUSHARE_TOKEN` are required.
 
 History depths in `config.py`: US=5yr, CN/HK=15yr from 2010-01-01.
 
 Retry/delay settings in `config.py`: `AKSHARE_RETRY_COUNT=5`, `AKSHARE_RETRY_DELAY=3.0`, `AKSHARE_REQUEST_DELAY=1.5`.
+
+Tushare rate limiting in `config.py`: `TUSHARE_RATE_INTERVAL=0.12` (每分钟最多 500 次).
 
 ## Network Notes
 
@@ -80,3 +87,9 @@ The codebase clears proxy environment variables in `main.py` (sets `NO_PROXY=*`)
 MariaDB on Synology NAS. `db.py` sets `time_zone='+08:00'` on each connection.
 
 Tables: `stocks`, `prices`, `indices`, `index_constituents`, `constituent_changes`, `index_prices`, `index_sync_log`, `sync_log`.
+
+**stocks 表字段:**
+- `ticker` — 主键（canonical format）
+- `name` — 股票名称
+- `gics_sector` — 行业分类（tushare `stock_basic.industry`）
+- `exchange` — 交易所（SH/SZ/BJ/HK/US）
