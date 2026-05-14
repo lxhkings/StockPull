@@ -59,33 +59,45 @@ def _fetch_csi800() -> pd.DataFrame:
     Returns DataFrame with columns: ticker, name, sector.
     Name and sector are looked up from stocks table (filled by tushare stock_basic).
     """
-    client = get_client()
-    ts_code = index_id_to_ts_code(INDEX_ID)  # '000906.SH'
+    try:
+        client = get_client()
+        ts_code = index_id_to_ts_code(INDEX_ID)  # '000906.SH'
 
-    raw = client.call("index_weight", index_code=ts_code)
-    if raw.empty:
+        raw = client.call("index_weight", index_code=ts_code)
+        if raw is None or raw.empty:
+            log.warning(f"[{INDEX_ID}] index_weight returned empty data")
+            return pd.DataFrame(columns=["ticker", "name", "sector"])
+
+        # Validate required columns
+        required_cols = ["trade_date", "con_code"]
+        missing = [c for c in required_cols if c not in raw.columns]
+        if missing:
+            log.error(f"[{INDEX_ID}] index_weight missing columns: {missing}")
+            return pd.DataFrame(columns=["ticker", "name", "sector"])
+
+        # Filter to latest trade_date (tushare returns multi-period data)
+        latest_date = raw["trade_date"].max()
+        latest = raw[raw["trade_date"] == latest_date]
+
+        tickers = latest["con_code"].tolist()
+
+        # Lookup name and sector from stocks table
+        placeholders = ",".join(["%s"] * len(tickers))
+        rows = query(
+            f"SELECT ticker, name, gics_sector FROM stocks WHERE ticker IN ({placeholders})",
+            tickers,
+        )
+        stock_map = {r["ticker"]: (r["name"], r.get("gics_sector")) for r in rows}
+
+        df = pd.DataFrame({
+            "ticker": tickers,
+            "name":   [stock_map.get(t, (None, None))[0] for t in tickers],
+            "sector": [stock_map.get(t, (None, None))[1] for t in tickers],
+        })
+        return df
+    except Exception as e:
+        log.error(f"[{INDEX_ID}] index_weight call failed: {e}")
         return pd.DataFrame(columns=["ticker", "name", "sector"])
-
-    # Filter to latest trade_date (tushare returns multi-period data)
-    latest_date = raw["trade_date"].max()
-    latest = raw[raw["trade_date"] == latest_date]
-
-    tickers = latest["con_code"].tolist()
-
-    # Lookup name and sector from stocks table
-    placeholders = ",".join(["%s"] * len(tickers))
-    rows = query(
-        f"SELECT ticker, name, gics_sector FROM stocks WHERE ticker IN ({placeholders})",
-        tickers,
-    )
-    stock_map = {r["ticker"]: (r["name"], r.get("gics_sector")) for r in rows}
-
-    df = pd.DataFrame({
-        "ticker": tickers,
-        "name":   [stock_map.get(t, (None, None))[0] for t in tickers],
-        "sector": [stock_map.get(t, (None, None))[1] for t in tickers],
-    })
-    return df
 
 
 def _get_last_snapshot_date(conn, index_id: str) -> Optional[date]:

@@ -70,13 +70,67 @@ def test_fetch_csi800_handles_missing_stock_info(mock_get_client, mock_query):
     assert pd.isna(df["sector"].iloc[0]) or df["sector"].iloc[0] is None
 
 
+@patch("data.index_updater_cn.get_client")
+def test_fetch_csi800_handles_empty_response(mock_get_client):
+    """Test that _fetch_csi800 handles empty DataFrame from tushare."""
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
+    mock_client.call.return_value = pd.DataFrame()  # empty
+
+    from data.index_updater_cn import _fetch_csi800
+    df = _fetch_csi800()
+
+    assert df.empty
+    assert list(df.columns) == ["ticker", "name", "sector"]
+
+
+@patch("data.index_updater_cn.get_client")
+def test_fetch_csi800_handles_none_response(mock_get_client):
+    """Test that _fetch_csi800 handles None response from tushare."""
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
+    mock_client.call.return_value = None
+
+    from data.index_updater_cn import _fetch_csi800
+    df = _fetch_csi800()
+
+    assert df.empty
+    assert list(df.columns) == ["ticker", "name", "sector"]
+
+
+@patch("data.index_updater_cn.get_client")
+def test_fetch_csi800_handles_missing_columns(mock_get_client):
+    """Test that _fetch_csi800 handles response with missing required columns."""
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
+    # DataFrame missing 'con_code' column
+    mock_client.call.return_value = pd.DataFrame({
+        "index_code": ["000906.SH"],
+        "trade_date": ["20260513"],
+    })
+
+    from data.index_updater_cn import _fetch_csi800
+    df = _fetch_csi800()
+
+    assert df.empty
+    assert list(df.columns) == ["ticker", "name", "sector"]
+
+
 @patch("data.index_updater_cn._fetch_csi800")
 @patch("data.index_updater_cn.get_conn")
-def test_update_csi800_skips_when_today_already_done(mock_conn, mock_fetch):
+def test_update_csi800_skips_when_today_already_done(mock_get_conn, mock_fetch):
     """If snapshot already exists for today, skip without fetching constituents."""
     from data.index_updater_cn import update_csi800
-    cur = MagicMock()
-    cur.fetchone.return_value = (date.today(),)
-    mock_conn.return_value.cursor.return_value.__enter__.return_value = cur
+
+    # Mock connection with proper context manager support
+    mock_conn = MagicMock()
+    mock_cur = MagicMock()
+    mock_cur.fetchone.return_value = (date.today(),)
+
+    # Set up connection context managers
+    mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+    mock_get_conn.return_value = mock_conn
+
     update_csi800()
     mock_fetch.assert_not_called()
+    mock_conn.close.assert_called_once()

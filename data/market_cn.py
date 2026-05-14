@@ -91,6 +91,12 @@ def update_index_price() -> int:
         if raw is None or raw.empty:
             return 0
 
+        # Validate required columns exist
+        required_cols = {"trade_date", "close"}
+        if not required_cols.issubset(raw.columns):
+            log.error(f"[CSI800] index_daily missing columns: {required_cols - set(raw.columns)}")
+            return 0
+
         df = pd.DataFrame({
             "date":  pd.to_datetime(raw["trade_date"]).dt.date,
             "close": raw["close"].astype(float),

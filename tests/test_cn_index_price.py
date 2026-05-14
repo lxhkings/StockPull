@@ -119,3 +119,36 @@ def test_update_index_price_handles_exception(mock_get_client, mock_execute, moc
 
     assert count == 0
     assert not mock_execute.called
+
+
+@patch("data.market_cn.query")
+@patch("data.market_cn.get_client")
+def test_update_index_price_missing_columns(mock_get_client, mock_query):
+    """Should return 0 when response is missing required columns."""
+    mock_query.return_value = []
+
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
+    # Missing trade_date and close columns
+    mock_client.call.return_value = pd.DataFrame({"ts_code": ["000906.SH"]})
+
+    from data.market_cn import update_index_price
+    count = update_index_price()
+
+    assert count == 0
+
+
+@patch("data.market_cn.query")
+@patch("data.market_cn.get_client")
+def test_update_index_price_none_response(mock_get_client, mock_query):
+    """Should return 0 when tushare client returns None."""
+    mock_query.return_value = []
+
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
+    mock_client.call.return_value = None
+
+    from data.market_cn import update_index_price
+    count = update_index_price()
+
+    assert count == 0
