@@ -35,8 +35,12 @@ def update_index() -> tuple[list[str], int, int]:
     return new_added, len(curr_tickers), removed
 
 
-def list_active_tickers() -> list[str]:
-    return get_index_tickers("SP500")
+def list_active_tickers(index: Optional[str] = None) -> list[str]:
+    """返回美股 ticker 列表。index=None 全量，index='SP500' 指数成分股。"""
+    if index == "SP500":
+        return get_index_tickers("SP500")
+    rows = query("SELECT ticker FROM stocks WHERE exchange='US' ORDER BY ticker")
+    return [r["ticker"] for r in rows]
 
 
 def backfill_new(new_tickers: list[str]) -> dict[str, str]:
@@ -84,8 +88,7 @@ def update_index_price() -> int:
     )
 
 
-def rebase(tickers: Optional[list[str]] = None) -> dict[str, str]:
-    """US rebase is identical to incremental from the user's perspective:
-    yfinance auto_adjust=False stores raw, and prior US data does not need hfq rebase."""
-    raise NotImplementedError("US rebase not supported (raw prices, no hfq drift). "
-                              "Use `daily` to refresh recent data.")
+def rebase(tickers: Optional[list[str]] = None, years: Optional[int] = None, index: Optional[str] = None) -> dict[str, str]:
+    """US rebase: full re-pull from specified years (raw prices, no hfq)."""
+    targets = tickers if tickers else list_active_tickers(index=index)
+    return stock_updater_us.update_prices_batch(targets, full_rebase=True, years=years)
