@@ -6,13 +6,14 @@ import logging
 from datetime import date
 from typing import Optional
 
-import akshare as ak
 import pandas as pd
 
 from db import get_conn, query, execute
 from data import stock_updater_cn_tushare as stock_updater_cn
 from data.base import to_float
 from ts_ingest.backfill_lists import backfill_stocks_a
+from ts_ingest.client import get_client
+from ts_ingest.ticker_map import index_id_to_ts_code
 
 log = logging.getLogger(__name__)
 
@@ -74,31 +75,41 @@ def incremental(tickers: list[str]) -> dict[str, str]:
 
 
 def update_index_price() -> int:
-    """中证800 指数 close via akshare (sh000906)."""
+    """中证800 指数 close via tushare index_daily (000906.SH)."""
     last = query(
         "SELECT MAX(date) AS d FROM index_prices WHERE index_id=%s", ("CSI800",)
     )
     last_date = last[0]["d"] if last and last[0]["d"] else None
 
-    raw = ak.stock_zh_index_daily(symbol="sh000906")
-    if raw is None or raw.empty:
+    client = get_client()
+    ts_code = index_id_to_ts_code("CSI800")
+
+    try:
+        start_date = last_date.strftime("%Y%m%d") if last_date else None
+        raw = client.call("index_daily", ts_code=ts_code, start_date=start_date)
+
+        if raw is None or raw.empty:
+            return 0
+
+        df = pd.DataFrame({
+            "date":  pd.to_datetime(raw["trade_date"]).dt.date,
+            "close": raw["close"].astype(float),
+        })
+
+        if last_date:
+            df = df[df["date"] > last_date]
+
+        if df.empty:
+            return 0
+
+        rows = [(r.date, "CSI800", to_float(r.close)) for r in df.itertuples(index=False)]
+        return execute(
+            "INSERT IGNORE INTO index_prices (date, index_id, close) VALUES (%s,%s,%s)",
+            rows, many=True,
+        )
+    except Exception as e:
+        log.error(f"[CSI800] index_daily failed: {e}")
         return 0
-
-    df = pd.DataFrame({
-        "date":  pd.to_datetime(raw["date"]).dt.date,
-        "close": raw["close"].astype(float),
-    })
-    if last_date:
-        df = df[df["date"] > last_date]
-
-    if df.empty:
-        return 0
-
-    rows = [(r.date, "CSI800", to_float(r.close)) for r in df.itertuples(index=False)]
-    return execute(
-        "INSERT IGNORE INTO index_prices (date, index_id, close) VALUES (%s,%s,%s)",
-        rows, many=True,
-    )
 
 
 def rebase(tickers: Optional[list[str]] = None) -> dict[str, str]:
