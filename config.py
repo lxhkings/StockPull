@@ -25,6 +25,7 @@ HISTORY_YEARS_CN = 15
 HISTORY_YEARS_HK = 15
 START_DATE_CN    = "2010-01-01"
 START_DATE_HK    = "2010-01-01"
+START_DATE_US    = "2010-01-01"  # 默认历史起点
 
 # yfinance (效率优先配置)
 YF_BATCH_SIZE    = 40       # 每批 40 只

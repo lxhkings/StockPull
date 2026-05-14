@@ -38,7 +38,7 @@ uv run main.py status              # 查看同步状态
 # 全量回补（hfq 漂移修复）
 uv run main.py rebase --market cn  # A股全量重拉（tushare hfq，默认15年）
 uv run main.py rebase --market hk  # 港股全量重拉（yfinance hfq，默认15年）
-uv run main.py rebase --market us  # 美股全量重拉（yfinance raw，默认5年，5927支）
+uv run main.py rebase --market us  # 美股全量重拉（yfinance raw，2010年起，5927支）
 uv run main.py rebase --market us --index SP500  # 仅 SP500 成分股
 uv run main.py rebase --market us --years 10  # 指定10年历史
 uv run main.py rebase --market cn --code 600519.SH  # 单只股票全量重拉

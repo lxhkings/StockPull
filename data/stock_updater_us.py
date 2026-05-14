@@ -20,6 +20,7 @@ from typing import Optional, List, Dict
 
 from config import (
     HISTORY_YEARS_US as HISTORY_YEARS,
+    START_DATE_US,
     YF_BATCH_SIZE, YF_RETRY_COUNT, YF_TIMEOUT,
     YF_LOOKBACK_DAYS, YF_THREADS,
     YF_BATCH_DELAY_BASE, YF_BATCH_DELAY_JITTER,
@@ -132,12 +133,14 @@ def _test_aapl_data(target_date: date) -> tuple[Optional[pd.DataFrame], str]:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 批量入口（pipeline 用）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-def update_prices_batch(tickers: List[str]) -> Dict[str, str]:
+def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Optional[int] = None) -> Dict[str, str]:
     """
     批量增量拉取一组 ticker 的行情，写入 prices 表
 
     Args:
         tickers: DB 形式 ticker 列表
+        full_rebase: True 时强制从历史起点拉取（忽略 sync_log）
+        years: 指定历史年数（None 时使用 config 默认值）
 
     Returns:
         {ticker: "ok" | "no_data" | "error: <msg>"}
@@ -161,53 +164,65 @@ def update_prices_batch(tickers: List[str]) -> Dict[str, str]:
     result = {}
     conn = get_conn()
     try:
-        # 分离新 ticker 和已同步 ticker
-        new_tickers = []
-        pending_tickers = []  # 需要增量更新的 ticker
-        pending_start = None
-
-        for t in tickers:
-            last = get_last_sync(conn, t, "price")
-            if last is None:
-                new_tickers.append(t)
-            elif last < last_trading:
-                # 只有未同步到最新交易日的 ticker 才需要更新
-                start_dt = last + timedelta(days=1)
-                pending_tickers.append(t)
-                if pending_start is None or start_dt < pending_start:
-                    pending_start = start_dt
-            # 已同步到 last_trading 的 ticker 跳过
-
-        # 新 ticker 回填历史
-        if new_tickers:
-            log.info(f"[batch] {len(new_tickers)} 新 ticker 需回填 {HISTORY_YEARS} 年历史")
-            for i in range(0, len(new_tickers), YF_BATCH_SIZE):
-                batch_new = new_tickers[i:i + YF_BATCH_SIZE]
-                _download_and_save(conn, batch_new, None, result)
-                if i + YF_BATCH_SIZE < len(new_tickers):
-                    delay = YF_BATCH_DELAY_BASE + random.uniform(-YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER)
-                    log.debug(f"[batch] 等待 {delay:.1f}s 后继续")
-                    time.sleep(delay)
-
-        # 待更新 ticker 增量同步
-        if pending_tickers:
-            log.info(f"[batch] {len(pending_tickers)} ticker 需增量更新（从 {pending_start} 到 {last_trading}）")
-            for i in range(0, len(pending_tickers), YF_BATCH_SIZE):
-                batch_pending = pending_tickers[i:i + YF_BATCH_SIZE]
-                _download_and_save(conn, batch_pending, pending_start, result)
-                if i + YF_BATCH_SIZE < len(pending_tickers):
+        if full_rebase:
+            # full_rebase: 所有 ticker 从历史起点开始拉取
+            actual_years = years if years else HISTORY_YEARS
+            log.info(f"[batch] rebase: {len(tickers)} ticker 拉取 {actual_years} 年历史")
+            for i in range(0, len(tickers), YF_BATCH_SIZE):
+                batch = tickers[i:i + YF_BATCH_SIZE]
+                _download_and_save(conn, batch, None, result, years=actual_years)
+                if i + YF_BATCH_SIZE < len(tickers):
                     delay = YF_BATCH_DELAY_BASE + random.uniform(-YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER)
                     log.debug(f"[batch] 等待 {delay:.1f}s 后继续")
                     time.sleep(delay)
         else:
-            log.info(f"[batch] 所有 ticker 已同步到 {last_trading}，无需增量更新")
+            # 增量模式：区分新 ticker 和已同步 ticker
+            new_tickers = []
+            pending_tickers = []  # 需要增量更新的 ticker
+            pending_start = None
+
+            for t in tickers:
+                last = get_last_sync(conn, t, "price")
+                if last is None:
+                    new_tickers.append(t)
+                elif last < last_trading:
+                    # 只有未同步到最新交易日的 ticker 才需要更新
+                    start_dt = last + timedelta(days=1)
+                    pending_tickers.append(t)
+                    if pending_start is None or start_dt < pending_start:
+                        pending_start = start_dt
+                # 已同步到 last_trading 的 ticker 跳过
+
+            # 新 ticker 回填历史
+            if new_tickers:
+                log.info(f"[batch] {len(new_tickers)} 新 ticker 需回填 {HISTORY_YEARS} 年历史")
+                for i in range(0, len(new_tickers), YF_BATCH_SIZE):
+                    batch_new = new_tickers[i:i + YF_BATCH_SIZE]
+                    _download_and_save(conn, batch_new, None, result)
+                    if i + YF_BATCH_SIZE < len(new_tickers):
+                        delay = YF_BATCH_DELAY_BASE + random.uniform(-YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER)
+                        log.debug(f"[batch] 等待 {delay:.1f}s 后继续")
+                        time.sleep(delay)
+
+            # 待更新 ticker 增量同步
+            if pending_tickers:
+                log.info(f"[batch] {len(pending_tickers)} ticker 需增量更新（从 {pending_start} 到 {last_trading}）")
+                for i in range(0, len(pending_tickers), YF_BATCH_SIZE):
+                    batch_pending = pending_tickers[i:i + YF_BATCH_SIZE]
+                    _download_and_save(conn, batch_pending, pending_start, result)
+                    if i + YF_BATCH_SIZE < len(pending_tickers):
+                        delay = YF_BATCH_DELAY_BASE + random.uniform(-YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER)
+                        log.debug(f"[batch] 等待 {delay:.1f}s 后继续")
+                        time.sleep(delay)
+            else:
+                log.info(f"[batch] 所有 ticker 已同步到 {last_trading}，无需增量更新")
 
         return result
     finally:
         conn.close()
 
 
-def _download_and_save(conn, tickers: List[str], start_date: Optional[date], result: Dict[str, str]) -> None:
+def _download_and_save(conn, tickers: List[str], start_date: Optional[date], result: Dict[str, str], years: Optional[int] = None) -> None:
     """下载一批 ticker 数据并保存到数据库"""
     if not tickers:
         return
@@ -215,7 +230,12 @@ def _download_and_save(conn, tickers: List[str], start_date: Optional[date], res
     # start_date 为 None 表示新 ticker，从历史起点到最近收盘日
     if start_date is None:
         last_trading = _last_us_trading_date()
-        start_date = last_trading - timedelta(days=365 * HISTORY_YEARS)
+        if years:
+            # 指定年数，从 last_trading 往回推算
+            start_date = last_trading - timedelta(days=365 * years)
+        else:
+            # 默认从 START_DATE_US 开始（2010-01-01）
+            start_date = date.fromisoformat(START_DATE_US)
 
     # end_dt 设为最近收盘日 + 1 天（yfinance end 参数不包含该日期）
     last_trading = _last_us_trading_date()
