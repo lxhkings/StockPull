@@ -15,7 +15,8 @@ import pandas as pd
 from io import StringIO
 from datetime import date
 
-from db import execute, query
+from db import execute, query, get_conn
+from data.index_base import register_stocks
 
 log = logging.getLogger(__name__)
 
@@ -74,25 +75,34 @@ def update_russell1000() -> tuple[int, int]:
     today = date.today()
     index_id = "RUSSELL1000"
 
-    # 确保 indices 表有记录
-    execute(
-        "INSERT IGNORE INTO indices (index_id, name, etf_ticker, description) "
-        "VALUES (%s, %s, %s, %s)",
-        (index_id, "Russell 1000", "IWB", "Russell 1000 Large Cap Index"),
-    )
+    conn = get_conn()
+    try:
+        # 确保 indices 表有记录
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT IGNORE INTO indices (index_id, name, etf_ticker, description) "
+                "VALUES (%s, %s, %s, %s)",
+                (index_id, "Russell 1000", "IWB", "Russell 1000 Large Cap Index"),
+            )
 
-    # 插入成分股快照（含 name, sector）
-    rows = [(index_id, today, r["ticker"], r["name"], r["sector"]) for _, r in df.iterrows()]
-    inserted = execute(
-        "INSERT IGNORE INTO index_constituents "
-        "(index_id, snapshot_date, ticker, name, sector) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        rows,
-        many=True,
-    )
+        # 插入成分股快照（含 name, sector）
+        rows = [(index_id, today, r["ticker"], r["name"], r["sector"]) for _, r in df.iterrows()]
+        with conn.cursor() as cur:
+            inserted = cur.executemany(
+                "INSERT IGNORE INTO index_constituents "
+                "(index_id, snapshot_date, ticker, name, sector) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                rows,
+            )
 
-    log.info(f"Russell 1000: {inserted} rows inserted, {len(df)} constituents")
-    return inserted, len(df)
+        # 更新 stocks 表（含 name, gics_sector）
+        register_stocks(conn, df)
+
+        conn.commit()
+        log.info(f"Russell 1000: {inserted} rows inserted, {len(df)} constituents")
+        return inserted, len(df)
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":
