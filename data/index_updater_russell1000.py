@@ -1,14 +1,18 @@
 """Russell 1000 成分股更新模块。
 
 数据源：iShares Russell 1000 ETF (IWB) holdings CSV
-https://www.ishares.com/us/products/239707/ishares-russell-1000-value-etf/
+https://www.ishares.com/us/products/239707/ishares-russell-1000-etf/
 约 1008 支成分股（大盘股指数）
+
+CSV 字段：Ticker, Name, Sector, Asset Class, ...
 """
 
 from __future__ import annotations
 
 import logging
 import requests
+import pandas as pd
+from io import StringIO
 from datetime import date
 
 from db import execute, query
@@ -19,25 +23,29 @@ IWB_URL = "https://www.ishares.com/us/products/239707/ishares-russell-1000-etf/1
 HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
 
 
-def fetch_russell1000_tickers() -> list[str]:
-    """从 iShares CSV 抓取 Russell 1000 成分股 ticker 列表。"""
+def fetch_russell1000_data() -> pd.DataFrame:
+    """从 iShares CSV 抓取 Russell 1000 成分股数据（含 Name, Sector）。"""
     resp = requests.get(IWB_URL, headers=HEADERS, timeout=15)
     resp.raise_for_status()
 
+    # CSV 前9行是元数据，第10行是表头
     lines = resp.text.split("\n")
-    tickers = []
+    header_line = lines[9]
+    data_lines = lines[10:]
 
-    # CSV 格式：前9行是元数据，第10行开始是表格
-    for line in lines[9:]:
-        if line.strip() and '"' in line:
-            parts = line.split(",")
-            if parts:
-                ticker = parts[0].strip().replace('"', '')
-                if ticker and len(ticker) <= 5:
-                    tickers.append(ticker)
+    # 构造 CSV 文本
+    csv_text = header_line + "\n" + "\n".join(data_lines)
+    df = pd.read_csv(StringIO(csv_text))
 
-    log.info(f"Russell 1000 ETF: 抓取 {len(tickers)} 支成分股")
-    return tickers
+    # 只取有效 ticker（过滤空行和无效数据）
+    df = df[df["Ticker"].notna() & (df["Ticker"] != "-")]
+    df["Ticker"] = df["Ticker"].str.strip().str.upper()
+
+    # 标准化列名
+    df = df.rename(columns={"Ticker": "ticker", "Name": "name", "Sector": "sector"})
+
+    log.info(f"Russell 1000 ETF: 抓取 {len(df)} 支成分股")
+    return df[["ticker", "name", "sector"]]
 
 
 def update_russell1000() -> tuple[int, int]:
@@ -46,8 +54,8 @@ def update_russell1000() -> tuple[int, int]:
     Returns:
         (inserted_rows, constituent_count)
     """
-    tickers = fetch_russell1000_tickers()
-    if not tickers:
+    df = fetch_russell1000_data()
+    if df.empty:
         return 0, 0
 
     today = date.today()
@@ -60,8 +68,8 @@ def update_russell1000() -> tuple[int, int]:
         (index_id, "Russell 1000", "IWB", "Russell 1000 Large Cap Index"),
     )
 
-    # 插入成分股快照
-    rows = [(index_id, today, t, None, None) for t in tickers]
+    # 插入成分股快照（含 name, sector）
+    rows = [(index_id, today, r["ticker"], r["name"], r["sector"]) for _, r in df.iterrows()]
     inserted = execute(
         "INSERT IGNORE INTO index_constituents "
         "(index_id, snapshot_date, ticker, name, sector) "
@@ -70,8 +78,8 @@ def update_russell1000() -> tuple[int, int]:
         many=True,
     )
 
-    log.info(f"Russell 1000: {inserted} rows inserted, {len(tickers)} constituents")
-    return inserted, len(tickers)
+    log.info(f"Russell 1000: {inserted} rows inserted, {len(df)} constituents")
+    return inserted, len(df)
 
 
 if __name__ == "__main__":
