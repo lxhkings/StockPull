@@ -1,16 +1,15 @@
-"""HSI (恒生指数) constituent updater via Wikipedia.
+"""HSI (恒生指数) constituent updater via local CSV.
 
-Data source: https://en.wikipedia.org/wiki/Hang_Seng_Index
+Data source: data/hsi_constituents.csv (manually maintained)
 """
 
 from __future__ import annotations
 
 import logging
 from datetime import date
-from io import StringIO
+import os
 
 import pandas as pd
-import requests
 
 from db import get_conn
 from data.index_base import (
@@ -24,7 +23,6 @@ from data.index_base import (
 log = logging.getLogger(__name__)
 
 INDEX_ID = "HSI"
-WIKI_URL = "https://en.wikipedia.org/wiki/Hang_Seng_Index"
 
 
 def update_hsi() -> None:
@@ -56,43 +54,29 @@ def update_hsi() -> None:
 
 
 def _fetch_hsi() -> pd.DataFrame:
-    """Fetch HSI constituents from Wikipedia."""
+    """Fetch HSI constituents from local CSV."""
     try:
-        resp = requests.get(WIKI_URL, timeout=30)
-        if resp.status_code != 200:
-            log.error(f"[{INDEX_ID}] Wikipedia fetch failed: {resp.status_code}")
-            return None
+        csv_path = os.path.join(os.path.dirname(__file__), "hsi_constituents.csv")
+        raw = pd.read_csv(csv_path)
 
-        # Parse HTML tables
-        dfs = pd.read_html(StringIO(resp.text))
+        # Pad code to 5 digits and add .HK suffix
+        codes = raw["Code"].astype(str).str.strip().str.zfill(5)
+        tickers = codes + ".HK"
 
-        # Find the components table (contains stock codes)
-        for df in dfs:
-            # Look for table with stock codes (5-digit or 4-digit format)
-            if 'Code' in df.columns or 'Ticker' in df.columns or any(df.columns.str.contains('Code', case=False)):
-                # Extract code and name columns
-                code_col = df.columns[0]  # Usually first column is code
-                name_col = df.columns[1]  # Second column is company name
+        names = raw["Company"].fillna("").astype(str).str.strip()
 
-                # Clean code format (pad to 5 digits)
-                codes = df[code_col].astype(str).str.strip()
-                codes = codes.str.zfill(5)
+        df = pd.DataFrame({
+            "ticker": tickers,
+            "name": names,
+            "sector": "",
+        })
 
-                # Add .HK suffix
-                tickers = codes + ".HK"
+        # Remove any invalid rows
+        df = df[df["ticker"].str.len() == 8]  # Valid format: XXXXX.HK
 
-                result = pd.DataFrame({
-                    "ticker": tickers,
-                    "name": df[name_col].astype(str).str.strip(),
-                    "sector": None,  # Wikipedia doesn't provide sector
-                })
-
-                log.info(f"[{INDEX_ID}] Wikipedia 找到 {len(result)} 只成分股")
-                return result
-
-        log.error(f"[{INDEX_ID}] Wikipedia 未找到成分股表格")
-        return None
+        log.info(f"[{INDEX_ID}] CSV 找到 {len(df)} 只成分股")
+        return df
 
     except Exception as e:
-        log.error(f"[{INDEX_ID}] Wikipedia parse failed: {e}")
+        log.error(f"[{INDEX_ID}] CSV parse failed: {e}")
         return None
