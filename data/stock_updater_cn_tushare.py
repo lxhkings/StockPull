@@ -237,8 +237,9 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
             log.info(f"[cn] {len(pending_tickers)} ticker需增量补缺")
             buf_p, buf_s = _process_tickers_batched(
                 conn, pending_tickers, last_trading,
-                full_rebase=False, result=result,
-                progress_label="补缺"
+                full_rebase=full_rebase, result=result,
+                progress_label="补缺" if not full_rebase else "回填",
+                years=years if full_rebase else None
             )
             _flush_batch(conn, buf_p, buf_s)
 
