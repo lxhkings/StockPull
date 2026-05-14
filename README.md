@@ -67,22 +67,21 @@ config.py                      # 配置管理
 - `update_index_price()` — 指数日线
 - `rebase(tickers)` — 全量重拉（修复 hfq 漂移）
 
-## 数据源（2026-05 重构）
+## 数据源
 
 | 市场 | 指数成分股 | 股票价格 | 指数价格 | 行业分类 |
 |------|-----------|---------|---------|---------|
 | 美股 | GitHub CSV (SP500) | yfinance | yfinance ^GSPC | N/A |
-| A股 | tushare `index_weight` | akshare hfq + efinance | tushare `index_daily` | tushare `stock_basic.industry` |
-| 港股 | sina (HSI) | akshare hfq | akshare ETF | N/A（待迁移 Yahoo）|
+| A股 | tushare `index_weight` | yfinance hfq | tushare `index_daily` | tushare `stock_basic.industry` |
+| 港股 | 本地 CSV (HSI) | yfinance hfq | yfinance ETF | N/A |
 
-**A 股数据流：**
-1. CSI800 成分股：`index_weight` API → 800 支股票代码
-2. 从 stocks 表 join 获取 name 和 gics_sector（行业）
-3. 写入 `index_constituents` 快照表
+**HSI 成分股维护：**
+- 文件：`data/hsi_constituents.csv`
+- 手动更新：参考 https://en.wikipedia.org/wiki/Hang_Seng_Index
 
 ## 价格校验
 
-`data/reconcile.py` 对比两个数据源收盘价（容忍度 0.5%），用于 A 股 backfill 时 akshare vs efinance 交叉验证。
+（已废弃，原 akshare/efinance 双源校验功能）
 
 ## Cron 定时任务
 

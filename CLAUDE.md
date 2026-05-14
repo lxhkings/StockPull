@@ -43,18 +43,21 @@ Three-market daily-K ingest (US/CN/HK) into shared MariaDB on Synology NAS (192.
 
 **Market modules** follow `MarketModule` protocol (defined in `data/pipeline.py`):
 - `data/market_us.py` — yfinance, SP500 from GitHub CSV
-- `data/market_cn.py` — tushare (CSI800 constituents, index prices), akshare/efinance (stock prices hfq)
-- `data/market_hk.py` — akshare, HSI from sina (待迁移 Yahoo API)
+- `data/market_cn.py` — tushare (CSI800 constituents, index prices, stock basic), yfinance (stock prices hfq)
+- `data/market_hk.py` — yfinance, HSI from local CSV (`data/hsi_constituents.csv`)
 
-**CN Market 数据源（2026-05 重构）:**
+**CN Market 数据源：**
 - CSI800 成分股: tushare `index_weight` API → stocks 表 join 获取 name/gics_sector
 - CSI800 指数价格: tushare `index_daily` API
 - A股基础信息: tushare `stock_basic` API（含行业分类 `industry` 字段）
-- A股日线价格: akshare hfq + efinance reconcile
+- A股日线价格: yfinance
+
+**HK Market 数据源：**
+- HSI 成分股: 本地 CSV `data/hsi_constituents.csv`（手动维护）
+- 港股日线价格: yfinance
 
 **Key patterns:**
 - CN/HK prices are hfq (后复权/post-adjusted); US prices are raw
-- Two-source reconciliation (`data/reconcile.py`) during backfill: akshare primary, efinance secondary, tolerance 0.5%
 - `ON DUPLICATE KEY UPDATE` for stocks table (更新 name 和 gics_sector)
 - `INSERT IGNORE` for index_constituents (daily snapshots)
 - `sync_log` table tracks per-ticker last successful sync date
