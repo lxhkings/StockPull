@@ -12,4 +12,5 @@ venv/
 dist/
 build/
 cache/
-backups/data/.cache/
+backups/
+data/.cache/
