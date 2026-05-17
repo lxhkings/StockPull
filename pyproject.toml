@@ -19,6 +19,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "tenacity>=8.2.0",
     "tushare>=1.4.0",
+    "cloudscraper>=1.2.71",
 ]
 
 [tool.setuptools.packages.find]
