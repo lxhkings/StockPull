@@ -102,7 +102,7 @@ def _test_aapl_data(target_date: date) -> tuple[Optional[pd.DataFrame], str]:
             timeout=30,
         )
         if df is None or df.empty:
-            return None, "rate_limit"
+            return None, "no_data"
 
         # 处理 MultiIndex 列名（单 ticker 也返回 MultiIndex）
         df = df.reset_index()
@@ -120,7 +120,7 @@ def _test_aapl_data(target_date: date) -> tuple[Optional[pd.DataFrame], str]:
         df["date"] = pd.to_datetime(df["date"]).dt.date
         if target_date in df["date"].values:
             return df, "ok"
-        return None, "rate_limit"
+        return None, "no_data"
     except Exception as e:
         err_msg = str(e)
         if "RateLimit" in err_msg or "Too Many Requests" in err_msg:
@@ -153,8 +153,11 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
     test_df, status = _test_aapl_data(last_trading)
 
     if status == "rate_limit":
-        log.warning(f"[AAPL] yfinance 被限速或无数据，跳过本次增量更新，稍后重试")
+        log.warning("[AAPL] yfinance 被限速，跳过本次增量更新，稍后重试")
         return {t: "error: rate_limit" for t in tickers}
+    elif status == "no_data":
+        log.warning(f"[AAPL] yfinance 暂无 {last_trading} 数据（市场未开或未更新），跳过本次增量更新")
+        return {t: "error: no_data" for t in tickers}
     elif status == "error":
         log.warning(f"[AAPL] 测试请求失败，跳过本次增量更新")
         return {t: "error: test_failed" for t in tickers}
