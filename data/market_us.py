@@ -92,34 +92,38 @@ def incremental(tickers: list[str]) -> dict[str, str]:
 
 
 def update_index_price() -> int:
-    """Pull ^GSPC daily close from yfinance, write to index_prices."""
-    last = query(
-        "SELECT MAX(date) AS d FROM index_prices WHERE index_id=%s", ("SP500",)
-    )
-    last_date = last[0]["d"] if last and last[0]["d"] else None
+    """Pull ^GSPC and ^RUT daily close from yfinance, write to index_prices."""
+    indices = [("^GSPC", "SP500"), ("^RUT", "RUSSELL1000")]
+    total = 0
+    for symbol, index_id in indices:
+        last = query(
+            "SELECT MAX(date) AS d FROM index_prices WHERE index_id=%s", (index_id,)
+        )
+        last_date = last[0]["d"] if last and last[0]["d"] else None
 
-    start = last_date.isoformat() if last_date else "2010-01-01"
-    df = yf.download("^GSPC", start=start, interval="1d",
-                     auto_adjust=False, actions=False, progress=False)
-    if df.empty:
-        return 0
-
-    df = df.reset_index()
-    df.columns = [str(c).lower() if not isinstance(c, tuple) else str(c[0]).lower() for c in df.columns]
-    rows = []
-    for _, r in df.iterrows():
-        d = r["date"].date() if hasattr(r["date"], "date") else r["date"]
-        if last_date and d <= last_date:
+        start = last_date.isoformat() if last_date else "2010-01-01"
+        df = yf.download(symbol, start=start, interval="1d",
+                         auto_adjust=False, actions=False, progress=False)
+        if df.empty:
             continue
-        rows.append((d, "SP500", to_float(r.get("close"))))
 
-    if not rows:
-        return 0
+        df = df.reset_index()
+        df.columns = [str(c).lower() if not isinstance(c, tuple) else str(c[0]).lower() for c in df.columns]
+        rows = []
+        for _, r in df.iterrows():
+            d = r["date"].date() if hasattr(r["date"], "date") else r["date"]
+            if last_date and d <= last_date:
+                continue
+            rows.append((d, index_id, to_float(r.get("close"))))
 
-    return execute(
-        "INSERT IGNORE INTO index_prices (date, index_id, close) VALUES (%s,%s,%s)",
-        rows, many=True
-    )
+        if not rows:
+            continue
+
+        total += execute(
+            "INSERT IGNORE INTO index_prices (date, index_id, close) VALUES (%s,%s,%s)",
+            rows, many=True
+        )
+    return total
 
 
 def rebase(tickers: Optional[list[str]] = None, years: Optional[int] = None, index: Optional[str] = None) -> dict[str, str]:
