@@ -184,13 +184,16 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
             pending_tickers = []  # 需要增量更新的 ticker
             pending_start = None
 
+            # 增量窗口上限：不超过 YF_LOOKBACK_DAYS 天前
+            lookback_floor = last_trading - timedelta(days=YF_LOOKBACK_DAYS)
+
             for t in tickers:
                 last = get_last_sync(conn, t, "price")
                 if last is None:
                     new_tickers.append(t)
                 elif last < last_trading:
                     # 只有未同步到最新交易日的 ticker 才需要更新
-                    start_dt = last + timedelta(days=1)
+                    start_dt = max(last + timedelta(days=1), lookback_floor)
                     pending_tickers.append(t)
                     if pending_start is None or start_dt < pending_start:
                         pending_start = start_dt
@@ -209,7 +212,7 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
 
             # 待更新 ticker 增量同步
             if pending_tickers:
-                log.info(f"[batch] {len(pending_tickers)} ticker 需增量更新（从 {pending_start} 到 {last_trading}）")
+                log.info(f"[batch] {len(pending_tickers)} ticker 需增量更新（从 {pending_start} 到 {last_trading}，窗口上限 {YF_LOOKBACK_DAYS} 天）")
                 for i in range(0, len(pending_tickers), YF_BATCH_SIZE):
                     batch_pending = pending_tickers[i:i + YF_BATCH_SIZE]
                     _download_and_save(conn, batch_pending, pending_start, result)
