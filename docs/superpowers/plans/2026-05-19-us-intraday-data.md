@@ -425,10 +425,11 @@ def _make_yf_multiindex_df(symbol: str, interval: str) -> pd.DataFrame:
 @patch("data.intraday_updater_us.get_conn")
 @patch("data.intraday_updater_us.get_last_sync")
 @patch("data.intraday_updater_us.set_sync_ok")
+@patch("data.intraday_updater_us.set_sync_error")
 @patch("data.intraday_updater_us.yf.download")
 @patch("data.market_us.list_active_tickers")
 def test_update_intraday_calls_yf_download(
-    mock_list, mock_yf_download, mock_set_ok, mock_get_last_sync, mock_get_conn
+    mock_list, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
 ):
     mock_list.return_value = ["AAPL"]
     mock_get_last_sync.return_value = None  # 首次：全量拉取
@@ -523,13 +524,13 @@ def update_intraday(interval: str) -> dict[str, str]:
 
         # 按 start_date 排序，同批取最早起点（INSERT IGNORE 保证幂等）
         pending.sort(key=lambda x: x[1])
-        ticker_list = [t for t, _ in pending]
 
-        for i in range(0, len(ticker_list), YF_BATCH_SIZE):
-            batch = ticker_list[i:i + YF_BATCH_SIZE]
-            batch_start = min(s for _, s in pending[i:i + YF_BATCH_SIZE])
+        for i in range(0, len(pending), YF_BATCH_SIZE):
+            batch_pairs = pending[i:i + YF_BATCH_SIZE]
+            batch = [t for t, _ in batch_pairs]
+            batch_start = min(s for _, s in batch_pairs)
             _download_and_save(conn, batch, interval, batch_start, result)
-            if i + YF_BATCH_SIZE < len(ticker_list):
+            if i + YF_BATCH_SIZE < len(pending):
                 delay = YF_BATCH_DELAY_BASE + random.uniform(
                     -YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER
                 )
@@ -590,18 +591,26 @@ def _download_and_save(
             result[t] = f"error: {last_exc}"
         return
 
-    top_level: set[str] = set()
-    if df is not None and not df.empty and isinstance(df.columns, pd.MultiIndex):
-        top_level = set(df.columns.get_level_values(0))
+    # yfinance: 2+ tickers → MultiIndex DataFrame; single ticker → plain DataFrame
+    is_multi = df is not None and not df.empty and isinstance(df.columns, pd.MultiIndex)
+    top_level = set(df.columns.get_level_values(0)) if is_multi else set()
 
     for t in tickers:
         yf_t = _yf_symbol(t)
-        if yf_t not in top_level:
-            log.warning(f"[{t}] not in yfinance response")
-            set_sync_error(conn, t, sync_type, "yfinance: ticker not in response")
+        if is_multi:
+            if yf_t not in top_level:
+                log.warning(f"[{t}] not in yfinance response")
+                set_sync_error(conn, t, sync_type, "yfinance: ticker not in response")
+                result[t] = "no_data"
+                continue
+            sub = df[yf_t]
+        elif df is not None and not df.empty and len(tickers) == 1:
+            sub = df  # single-ticker: plain DataFrame
+        else:
+            log.warning(f"[{t}] no data in response")
+            set_sync_error(conn, t, sync_type, "yfinance: empty or unexpected response")
             result[t] = "no_data"
             continue
-        sub = df[yf_t]
         normalized = _normalize_frame(t, interval, sub)
         if normalized.empty:
             log.warning(f"[{t}] empty frame")
