@@ -162,6 +162,24 @@ def get_tickers_without_prices(conn) -> List[str]:
         return [r[0] for r in cur.fetchall()]
 
 
+def create_prices_intraday_table() -> None:
+    """Create prices_intraday table if not exists. Idempotent."""
+    execute("""
+        CREATE TABLE IF NOT EXISTS prices_intraday (
+            ticker    VARCHAR(20)   NOT NULL,
+            `interval` VARCHAR(4)  NOT NULL,
+            datetime  DATETIME      NOT NULL,
+            open      DECIMAL(12,4),
+            high      DECIMAL(12,4),
+            low       DECIMAL(12,4),
+            close     DECIMAL(12,4),
+            volume    BIGINT,
+            PRIMARY KEY (ticker, `interval`, datetime),
+            INDEX idx_interval_ticker (`interval`, ticker, datetime)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+
+
 def show_status():
     """打印数据库同步状态摘要"""
     conn = get_conn()
