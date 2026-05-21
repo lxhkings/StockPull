@@ -30,3 +30,8 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v"
 
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
+
