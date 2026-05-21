@@ -11,6 +11,12 @@ from ts_ingest.ticker_map import index_id_to_ts_code
 log = logging.getLogger(__name__)
 
 
+def _to_str(v) -> str | None:
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return None
+    return str(v)
+
+
 def _to_date(v):
     if pd.isna(v) or v in (None, ""):
         return None
@@ -28,7 +34,7 @@ def backfill_stocks_a() -> int:
         dfs.append(df)
     df = pd.concat(dfs, ignore_index=True)
     rows = [
-        (r["ts_code"], r["name"], r.get("industry"), r["exchange"])
+        (r["ts_code"], _to_str(r.get("name")), _to_str(r.get("industry")), r["exchange"])
         for _, r in df.iterrows()
     ]
     with get_conn() as conn:
