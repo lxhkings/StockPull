@@ -46,7 +46,7 @@ def _build_parser() -> argparse.ArgumentParser:
                           help="指数成分股（仅 US 市场：SP500）")
 
     p_weekly = sub.add_parser("weekly", help="Run weekly ingest (US market)")
-    p_weekly.add_argument("--market", choices=("us",), default="us")
+    p_weekly.add_argument("--market", choices=("us", "cn"), default="us")
     p_weekly.add_argument("--code", action="append", default=None,
                           help="Only this ticker (repeatable, debug aid)")
 
@@ -106,12 +106,7 @@ def cmd_daily(market: str, codes: list[str] | None, index: str | None) -> int:
 
 def cmd_weekly(market: str, codes: list[str] | None) -> int:
     mod = _import_market(market)
-    if codes:
-        print(f"[{market}] weekly --code {codes}: running single-ticker mode")
-        from data import stock_updater_us_weekly
-        result = stock_updater_us_weekly.update_weekly_batch(codes)
-    else:
-        result = mod.weekly()
+    result = mod.weekly(codes)
     ok = sum(1 for v in result.values() if v == "ok")
     print(f"[{market}] weekly done: {ok}/{len(result)} ok")
     return 0

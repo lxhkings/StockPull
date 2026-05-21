@@ -122,3 +122,10 @@ def rebase(tickers: Optional[list[str]] = None, years: Optional[int] = None) -> 
     """Full re-pull from START_DATE_CN to fix qfq drift."""
     targets = tickers if tickers else list_active_tickers()
     return stock_updater_cn.update_prices_batch(targets, full_rebase=True, years=years)
+
+
+def weekly(tickers: list[str] | None = None) -> dict[str, str]:
+    """Pull weekly prices for CN universe into prices_weekly."""
+    from data import stock_updater_cn_weekly
+    targets = tickers or list_active_tickers()
+    return stock_updater_cn_weekly.update_weekly_batch(targets)
