@@ -45,7 +45,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_rebase.add_argument("--index", default=None,
                           help="指数成分股（仅 US 市场：SP500）")
 
-    p_weekly = sub.add_parser("weekly", help="Run weekly ingest (US market)")
+    p_weekly = sub.add_parser("weekly", help="Run weekly ingest (US/CN market)")
     p_weekly.add_argument("--market", choices=("us", "cn"), default="us")
     p_weekly.add_argument("--code", action="append", default=None,
                           help="Only this ticker (repeatable, debug aid)")
