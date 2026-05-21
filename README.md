@@ -1,6 +1,6 @@
 # StockPull — 多市场股票数据同步系统
 
-三市场（美股/A股/港股）日线数据采集，写入群辉 NAS MariaDB（192.168.8.9:3306）。
+三市场（美股/A股/港股）日线 + 周线数据采集，写入群辉 NAS MariaDB（192.168.8.9:3306）。
 
 ## 系统要求
 
@@ -52,6 +52,12 @@ uv run main.py tushare-backfill --scope financial           # 财务数据
 uv run main.py tushare-backfill --dry-run                   # 预检（不执行）
 
 # 注：日线数据通过 daily/rebase 命令拉取（CN: tushare, HK/US: yfinance）
+
+# 周线采集（prices_weekly 表）
+uv run main.py weekly --market us   # 美股周线（SP500 + R1000，yfinance interval=1wk）
+uv run main.py weekly --market cn   # A股周线（全量 A 股，tushare pro_bar freq=W）
+uv run main.py weekly --market us --code AAPL      # 单票调试（美股）
+uv run main.py weekly --market cn --code 600519.SH # 单票调试（A股）
 ```
 
 ## 架构设计
@@ -62,6 +68,9 @@ main.py
         ├── data/market_us.py  # 美股适配器（yfinance，SP500+R1000组合）
         ├── data/market_cn.py  # A股适配器（tushare）
         └── data/market_hk.py  # 港股适配器（本地 CSV + yfinance）
+
+data/stock_updater_us_weekly.py  # 美股周线（yfinance 1wk → prices_weekly）
+data/stock_updater_cn_weekly.py  # A股周线（tushare freq=W → prices_weekly）
 
 data/index_updater_*.py        # 各市场成分股快照
   ├── index_updater_us.py      # SP500（GitHub CSV）
@@ -83,6 +92,7 @@ config.py                      # 配置管理
 - `incremental(tickers)` — 存量股票增量（从 sync_log 恢复）
 - `update_index_price()` — 指数日线
 - `rebase(tickers)` — 全量重拉（修复 qfq 漂移）
+- `weekly(tickers)` — 周线增量采集（US/CN，写 prices_weekly）
 
 ## 数据源
 
@@ -146,6 +156,7 @@ MariaDB 时区设置：`+08:00`（每连接设置）。
 核心表：
 - `stocks` — 股票基础信息（ticker, name, gics_sector, exchange）
 - `prices` — 日线数据（date, ticker, open, high, low, close, volume）
+- `prices_weekly` — 周线数据（同 prices 结构；美股=yfinance 1wk，A股=tushare freq=W）
 - `indices` — 指数元数据
 - `index_constituents` — 成分股快照（index_id, snapshot_date, ticker, name, sector）
 - `constituent_changes` — 成分股变动记录（ADDED/REMOVED）
