@@ -45,6 +45,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p_rebase.add_argument("--index", default=None,
                           help="指数成分股（仅 US 市场：SP500）")
 
+    p_weekly = sub.add_parser("weekly", help="Run weekly ingest (US market)")
+    p_weekly.add_argument("--market", choices=("us",), default="us")
+    p_weekly.add_argument("--code", action="append", default=None,
+                          help="Only this ticker (repeatable, debug aid)")
+
     sub.add_parser("status", help="Print ingest status summary")
 
     p_ts = sub.add_parser("tushare-backfill", help="Tushare 一次性回填三市场底层数据")
@@ -96,6 +101,19 @@ def cmd_daily(market: str, codes: list[str] | None, index: str | None) -> int:
             # 只对 US 市场传递 index 参数
             pipe_index = index if m == "us" else None
             Pipeline(mod).daily(index=pipe_index)
+    return 0
+
+
+def cmd_weekly(market: str, codes: list[str] | None) -> int:
+    mod = _import_market(market)
+    if codes:
+        print(f"[{market}] weekly --code {codes}: running single-ticker mode")
+        from data import stock_updater_us_weekly
+        result = stock_updater_us_weekly.update_weekly_batch(codes)
+    else:
+        result = mod.weekly()
+    ok = sum(1 for v in result.values() if v == "ok")
+    print(f"[{market}] weekly done: {ok}/{len(result)} ok")
     return 0
 
 
@@ -154,6 +172,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_status()
     if args.cmd == "daily":
         return cmd_daily(args.market, args.code, args.index)
+    if args.cmd == "weekly":
+        return cmd_weekly(args.market, args.code)
     if args.cmd == "rebase":
         return cmd_rebase(args.market, args.code, args.years, args.index)
     if args.cmd == "tushare-backfill":

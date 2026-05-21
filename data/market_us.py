@@ -130,3 +130,10 @@ def rebase(tickers: Optional[list[str]] = None, years: Optional[int] = None, ind
     """US rebase: full re-pull from specified years (raw prices, no hfq)."""
     targets = tickers if tickers else list_active_tickers(index=index)
     return stock_updater_us.update_prices_batch(targets, full_rebase=True, years=years)
+
+
+def weekly(tickers: list[str] | None = None) -> dict[str, str]:
+    """Pull weekly prices for US universe into prices_weekly."""
+    from data import stock_updater_us_weekly
+    targets = tickers or list_active_tickers()
+    return stock_updater_us_weekly.update_weekly_batch(targets)
