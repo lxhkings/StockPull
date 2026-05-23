@@ -221,11 +221,11 @@ mysql -h 192.168.8.9 -u root -p stocks
 
 ### ETF 指数数据查询
 
-项目支持 11 个美国行业 ETF 指数数据（XLK/XLY/XLF/XLV/XLP/XLI/XLE/XLB/XLRE/XLU/XLC），存储在 `index_prices` 表。
+项目支持 QQQ 和 11 个美国行业 ETF 指数数据，存储在 `index_prices` 表。
 
 ```python
 # 查询所有 ETF 数据范围
-etfs = ['XLK','XLY','XLF','XLV','XLP','XLI','XLE','XLB','XLRE','XLU','XLC']
+etfs = ['QQQ','XLK','XLY','XLF','XLV','XLP','XLI','XLE','XLB','XLRE','XLU','XLC']
 from db import query
 
 etf_data = query(
@@ -237,22 +237,23 @@ etf_data = query(
 for row in etf_data:
     print(f"{row['index_id']}: {row['min_date']} ~ {row['max_date']} ({row['count']} rows)")
 
-# 查询单个 ETF 最新价格
-xlk_latest = query(
+# 查询 QQQ 最新价格
+qqq_latest = query(
     "SELECT date, close FROM index_prices "
-    "WHERE index_id = 'XLK' "
+    "WHERE index_id = 'QQQ' "
     "ORDER BY date DESC LIMIT 1"
 )
 
 # 查询 ETF 指数价格历史
-xlk_history = query(
+qqq_history = query(
     "SELECT date, close FROM index_prices "
-    "WHERE index_id = 'XLK' AND date >= '2026-01-01' "
+    "WHERE index_id = 'QQQ' AND date >= '2026-01-01' "
     "ORDER BY date"
 )
 ```
 
 **ETF 列表：**
+- QQQ (纳斯达克100)
 - XLK (科技)
 - XLY (可选消费)
 - XLF (金融)
