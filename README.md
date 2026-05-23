@@ -153,6 +153,72 @@ MariaDB 时区设置：`+08:00`（每连接设置）。
 - `sync_log` — 股票同步状态（ticker, last_date, status）
 - `index_sync_log` — 指数同步状态
 
+## 数据库操作
+
+使用 `db.py` 模块操作数据库：
+
+### Python 代码示例
+
+```python
+# 导入数据库模块
+from db import query, execute
+
+# SELECT 查询（返回 list[dict]）
+rows = query(
+    "SELECT ticker, name, gics_sector FROM stocks WHERE exchange = 'SH' LIMIT 10"
+)
+for row in rows:
+    print(row['ticker'], row['name'])
+
+# SELECT with 参数
+etf_data = query(
+    "SELECT index_id, MIN(date), MAX(date), COUNT(*) "
+    "FROM index_prices WHERE index_id IN (%s, %s) "
+    "GROUP BY index_id",
+    ('XLK', 'XLY')
+)
+
+# INSERT/UPDATE/DELETE（返回影响行数）
+rows_affected = execute(
+    "INSERT INTO stocks (ticker, name, exchange) VALUES (%s, %s, %s)",
+    ('AAPL', 'Apple Inc', 'US')
+)
+
+# 批量插入
+rows = [
+    ('AAPL', '2026-05-23', 180.50),
+    ('MSFT', '2026-05-23', 420.30),
+]
+rows_affected = execute(
+    "INSERT INTO prices (ticker, date, close) VALUES (%s, %s, %s)",
+    rows,
+    many=True  # 批量模式
+)
+
+# 常用查询函数
+from db import get_index_tickers, get_latest_snapshot_tickers
+
+# 获取指数成分股列表
+sp500_tickers = get_index_tickers('SP500')  # 返回 list[str]
+
+# 获取最新快照成分股
+latest_tickers = get_latest_snapshot_tickers('CSI800')
+```
+
+### 命令行快速查询
+
+```bash
+# 使用 Python 交互式查询
+python3 -c "
+from db import query
+result = query('SELECT COUNT(*) as count FROM prices')
+print(result[0]['count'])
+"
+
+# 或者使用 mysql 命令行客户端
+mysql -h 192.168.8.9 -u root -p stocks
+```
+
 ## 测试
 
 ```bash
