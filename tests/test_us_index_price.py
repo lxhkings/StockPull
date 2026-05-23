@@ -26,7 +26,6 @@ def test_indices_list_format():
     """Indices list should use (symbol, index_id) tuple format."""
     from data.market_us import update_index_price
     import inspect
-    import ast
 
     source = inspect.getsource(update_index_price)
 
