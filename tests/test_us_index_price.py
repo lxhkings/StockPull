@@ -13,6 +13,7 @@ def test_update_index_price_includes_sector_etfs():
     # Extract indices list from function source
     source = inspect.getsource(update_index_price)
     expected_etfs = [
+        "QQQ",
         "XLK", "XLY", "XLF", "XLV", "XLP",
         "XLI", "XLE", "XLB", "XLRE", "XLU", "XLC"
     ]
