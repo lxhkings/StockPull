@@ -92,7 +92,7 @@ def incremental(tickers: list[str]) -> dict[str, str]:
 
 
 def update_index_price() -> int:
-    """Pull ^GSPC and ^RUT daily close from yfinance, write to index_prices."""
+    """Pull ^GSPC, ^RUT, and 11 sector ETFs daily close from yfinance, write to index_prices."""
     indices = [
         ("^GSPC", "SP500"),
         ("^RUT", "RUSSELL1000"),
