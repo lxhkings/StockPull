@@ -2,12 +2,6 @@
 
 跑法: uv run python scripts/verify_cn_etfs.py
 """
-import sys
-from pathlib import Path
-
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from config import CN_SECTOR_ETFS
 from ts_ingest.client import get_client
 
