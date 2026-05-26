@@ -21,6 +21,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
+log = logging.getLogger(__name__)
 
 MARKETS = ("us", "cn", "hk", "all")
 
@@ -44,6 +45,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p_rebase.add_argument("--years", type=int, default=None, help="历史年数（默认：US=5, CN/HK=15）")
     p_rebase.add_argument("--index", default=None,
                           help="指数成分股（仅 US 市场：SP500）")
+    p_rebase.add_argument("--etf-only", action="store_true",
+                          help="仅重灌 ETF index_prices（仅 CN 市场）")
 
     p_weekly = sub.add_parser("weekly", help="Run weekly ingest (US/CN market)")
     p_weekly.add_argument("--market", choices=("us", "cn"), default="us")
@@ -51,6 +54,16 @@ def _build_parser() -> argparse.ArgumentParser:
                           help="Only this ticker (repeatable, debug aid)")
 
     sub.add_parser("status", help="Print ingest status summary")
+
+    sub.add_parser("migrate-intraday", help="Create prices_intraday table (idempotent)")
+
+    p_intraday = sub.add_parser("intraday", help="拉取美股分钟级行情（15m / 1h）并写入 prices_intraday")
+    p_intraday.add_argument(
+        "--interval",
+        choices=["15m", "1h"],
+        default=None,
+        help="仅拉取指定 interval（默认：15m 和 1h 均拉）",
+    )
 
     p_ts = sub.add_parser("tushare-backfill", help="Tushare 一次性回填三市场底层数据")
     p_ts.add_argument("--scope", choices=("all", "lists", "prices", "derive", "financial"),
@@ -112,7 +125,16 @@ def cmd_weekly(market: str, codes: list[str] | None) -> int:
     return 0
 
 
-def cmd_rebase(market: str, codes: list[str] | None, years: int | None, index: str | None) -> int:
+def cmd_rebase(market: str, codes: list[str] | None, years: int | None, index: str | None, etf_only: bool = False) -> int:
+    if etf_only:
+        if market != "cn":
+            print(f"--etf-only currently only supports --market cn", file=sys.stderr)
+            return 1
+        from data.etf_updater_cn import update_etf_prices
+        n = update_etf_prices(full_rebase=True)
+        print(f"[cn] ETF rebase wrote {n} rows to index_prices")
+        return 0
+
     import inspect
     mod = _import_market(market)
     if not hasattr(mod, "rebase"):
@@ -137,6 +159,25 @@ def cmd_rebase(market: str, codes: list[str] | None, years: int | None, index: s
     else:
         mod.rebase(targets, years=years)
 
+    return 0
+
+
+def cmd_migrate_intraday() -> int:
+    from db import create_prices_intraday_table
+    create_prices_intraday_table()
+    print("prices_intraday table ready")
+    return 0
+
+
+def cmd_intraday(interval: str | None) -> int:
+    from data.intraday_updater_us import update_intraday, SUPPORTED_INTERVALS
+    intervals = [interval] if interval else SUPPORTED_INTERVALS
+    for ivl in intervals:
+        log.info(f"[intraday] 开始拉取 {ivl}")
+        result = update_intraday(ivl)
+        ok = sum(1 for v in result.values() if v == "ok")
+        err = sum(1 for v in result.values() if v.startswith("error"))
+        log.info(f"[intraday {ivl}] 完成: ok={ok}, error={err}")
     return 0
 
 
@@ -170,9 +211,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "weekly":
         return cmd_weekly(args.market, args.code)
     if args.cmd == "rebase":
-        return cmd_rebase(args.market, args.code, args.years, args.index)
+        return cmd_rebase(args.market, args.code, args.years, args.index, args.etf_only)
     if args.cmd == "tushare-backfill":
         return cmd_tushare_backfill(args.scope, args.market, args.dry_run)
+    if args.cmd == "migrate-intraday":
+        return cmd_migrate_intraday()
+    if args.cmd == "intraday":
+        return cmd_intraday(args.interval)
     return 1
 
 

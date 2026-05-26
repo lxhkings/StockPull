@@ -75,7 +75,15 @@ def incremental(tickers: list[str]) -> dict[str, str]:
 
 
 def update_index_price() -> int:
-    """中证800 指数 close via tushare index_daily (000906.SH)."""
+    """中证800 指数 close via tushare index_daily + 行业 ETF hfq close via fund_daily × fund_adj。"""
+    csi800_count = _update_csi800()
+    from data.etf_updater_cn import update_etf_prices
+    etf_count = update_etf_prices()
+    return csi800_count + etf_count
+
+
+def _update_csi800() -> int:
+    """中证800 指数 close via tushare index_daily (000906.SH)。"""
     last = query(
         "SELECT MAX(date) AS d FROM index_prices WHERE index_id=%s", ("CSI800",)
     )
@@ -91,7 +99,6 @@ def update_index_price() -> int:
         if raw is None or raw.empty:
             return 0
 
-        # Validate required columns exist
         required_cols = {"trade_date", "close"}
         if not required_cols.issubset(raw.columns):
             log.error(f"[CSI800] index_daily missing columns: {required_cols - set(raw.columns)}")

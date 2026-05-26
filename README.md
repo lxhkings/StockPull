@@ -164,6 +164,173 @@ MariaDB 时区设置：`+08:00`（每连接设置）。
 - `sync_log` — 股票同步状态（ticker, last_date, status）
 - `index_sync_log` — 指数同步状态
 
+## 数据库操作
+
+使用 `db.py` 模块操作数据库：
+
+### Python 代码示例
+
+```python
+# 导入数据库模块
+from db import query, execute
+
+# SELECT 查询（返回 list[dict]）
+rows = query(
+    "SELECT ticker, name, gics_sector FROM stocks WHERE exchange = 'SH' LIMIT 10"
+)
+for row in rows:
+    print(row['ticker'], row['name'])
+
+# SELECT with 参数
+etf_data = query(
+    "SELECT index_id, MIN(date), MAX(date), COUNT(*) "
+    "FROM index_prices WHERE index_id IN (%s, %s) "
+    "GROUP BY index_id",
+    ('XLK', 'XLY')
+)
+
+# INSERT/UPDATE/DELETE（返回影响行数）
+rows_affected = execute(
+    "INSERT INTO stocks (ticker, name, exchange) VALUES (%s, %s, %s)",
+    ('AAPL', 'Apple Inc', 'US')
+)
+
+# 批量插入
+rows = [
+    ('AAPL', '2026-05-23', 180.50),
+    ('MSFT', '2026-05-23', 420.30),
+]
+rows_affected = execute(
+    "INSERT INTO prices (ticker, date, close) VALUES (%s, %s, %s)",
+    rows,
+    many=True  # 批量模式
+)
+
+# 常用查询函数
+from db import get_index_tickers, get_latest_snapshot_tickers
+
+# 获取指数成分股列表
+sp500_tickers = get_index_tickers('SP500')  # 返回 list[str]
+
+# 获取最新快照成分股
+latest_tickers = get_latest_snapshot_tickers('CSI800')
+```
+
+### 命令行快速查询
+
+```bash
+# 使用 Python 交互式查询
+python3 -c "
+from db import query
+result = query('SELECT COUNT(*) as count FROM prices')
+print(result[0]['count'])
+"
+
+# 或者使用 mysql 命令行客户端
+mysql -h 192.168.8.9 -u root -p stocks
+```
+
+### ETF 指数数据查询
+
+项目支持 QQQ 和 11 个美国行业 ETF 指数数据，存储在 `index_prices` 表。
+
+```python
+# 查询所有 ETF 数据范围
+etfs = ['QQQ','XLK','XLY','XLF','XLV','XLP','XLI','XLE','XLB','XLRE','XLU','XLC']
+from db import query
+
+etf_data = query(
+    "SELECT index_id, MIN(date) as min_date, MAX(date) as max_date, COUNT(*) as count "
+    "FROM index_prices "
+    "WHERE index_id IN ('" + "','".join(etfs) + "') "
+    "GROUP BY index_id ORDER BY index_id"
+)
+for row in etf_data:
+    print(f"{row['index_id']}: {row['min_date']} ~ {row['max_date']} ({row['count']} rows)")
+
+# 查询 QQQ 最新价格
+qqq_latest = query(
+    "SELECT date, close FROM index_prices "
+    "WHERE index_id = 'QQQ' "
+    "ORDER BY date DESC LIMIT 1"
+)
+
+# 查询 ETF 指数价格历史
+qqq_history = query(
+    "SELECT date, close FROM index_prices "
+    "WHERE index_id = 'QQQ' AND date >= '2026-01-01' "
+    "ORDER BY date"
+)
+```
+
+**ETF 列表：**
+- QQQ (纳斯达克100)
+- XLK (科技)
+- XLY (可选消费)
+- XLF (金融)
+- XLV (医疗)
+- XLP (必选消费)
+- XLI (工业)
+- XLE (能源)
+- XLB (材料)
+- XLRE (房地产)
+- XLU (公用事业)
+- XLC (通信服务)
+
+数据通过 `uv run main.py daily --market us` 自动采集，存储在 `index_prices` 表。
+
+### CN 行业 ETF 数据
+
+A股行业 ETF 后复权日线（hfq close）via tushare `fund_daily × fund_adj`，存 `index_prices` 表，`index_id` 为 ts_code（如 `512800.SH`）。
+
+清单：`config.CN_SECTOR_ETFS`，按 GICS 11 类对齐 US XL* + A 股主题（光伏/新能源车/芯片），共 ~17 只。
+
+跑法：
+
+```bash
+uv run main.py daily --market cn        # 自动包含 ETF
+uv run main.py rebase --market cn --etf-only   # 仅 ETF 全量重灌（季度执行修正分红 drift）
+```
+
+查询示例：
+
+```sql
+-- CN vs US 同行业横向对比（银行 vs 美国金融）
+SELECT date, index_id, close
+FROM index_prices
+WHERE index_id IN ('512800.SH', 'XLF')
+  AND date >= '2026-01-01'
+ORDER BY date, index_id;
+
+-- 查 CN HealthCare 板块两只 ETF
+SELECT date, index_id, close
+FROM index_prices
+WHERE index_id IN ('512170.SH', '512010.SH')
+ORDER BY date;
+```
+
+ETF 列表：
+
+| ts_code | 名称 | GICS / 主题 |
+|---|---|---|
+| 515220.SH | 煤炭ETF | Energy |
+| 512400.SH | 有色金属ETF | Materials |
+| 512660.SH | 军工ETF | Industrials |
+| 159996.SZ | 家电ETF | ConsumerDiscretionary |
+| 512690.SH | 酒ETF | ConsumerStaples |
+| 512170.SH | 医疗ETF | HealthCare |
+| 512010.SH | 医药ETF | HealthCare |
+| 512800.SH | 银行ETF | Financials |
+| 512000.SH | 券商ETF | Financials |
+| 512720.SH | 计算机ETF | InformationTechnology |
+| 512480.SH | 半导体ETF | InformationTechnology |
+| 515050.SH | 5G通信ETF | CommunicationServices |
+| 159611.SZ | 电力ETF | Utilities |
+| 512200.SH | 房地产ETF | RealEstate |
+| 515790.SH | 光伏ETF | Theme.Solar |
+| 515030.SH | 新能源车ETF | Theme.NEV |
+| 159995.SZ | 芯片ETF | Theme.Chip |
+
 ## 测试
 
 ```bash

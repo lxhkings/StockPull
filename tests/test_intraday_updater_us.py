@@ -1,0 +1,191 @@
+"""Tests for data/intraday_updater_us.py"""
+
+from datetime import date, datetime
+from unittest.mock import MagicMock, patch
+
+import pandas as pd
+import pytest
+
+
+# ─── DB migration ────────────────────────────────────────────────────────────
+
+def test_create_prices_intraday_table_executes_ddl():
+    with patch("db.execute") as mock_execute:
+        from db import create_prices_intraday_table
+        create_prices_intraday_table()
+        mock_execute.assert_called_once()
+        sql = mock_execute.call_args[0][0]
+        assert "prices_intraday" in sql
+        assert "CREATE TABLE IF NOT EXISTS" in sql
+        assert "`interval`" in sql
+
+
+# ─── Pure functions ───────────────────────────────────────────────────────────
+
+def test_sync_type():
+    from data.intraday_updater_us import _sync_type
+    assert _sync_type("15m") == "intraday_15m"
+    assert _sync_type("1h") == "intraday_60m"
+
+
+def test_yf_symbol():
+    from data.intraday_updater_us import _yf_symbol
+    assert _yf_symbol("BRK.B") == "BRK-B"
+    assert _yf_symbol("AAPL") == "AAPL"
+
+
+def test_normalize_frame_basic():
+    idx = pd.to_datetime([
+        "2026-05-15 14:30:00+00:00",
+        "2026-05-15 14:45:00+00:00",
+    ])
+    sub = pd.DataFrame({
+        "Open":   [150.0, 151.0],
+        "High":   [151.5, 152.0],
+        "Low":    [149.5, 150.5],
+        "Close":  [151.0, 151.5],
+        "Volume": [1000000, 900000],
+    }, index=idx)
+    sub.index.name = "Datetime"
+
+    from data.intraday_updater_us import _normalize_frame
+    result = _normalize_frame("AAPL", "15m", sub)
+
+    assert list(result.columns) == ["ticker", "interval", "datetime", "open", "high", "low", "close", "volume"]
+    assert len(result) == 2
+    assert result["ticker"].iloc[0] == "AAPL"
+    assert result["interval"].iloc[0] == "15m"
+    assert result["datetime"].dtype.kind == "M"  # datetime type (ns or us)
+    assert result["datetime"].iloc[0].tzinfo is None
+    assert result["close"].iloc[0] == 151.0
+
+
+def test_normalize_frame_empty():
+    from data.intraday_updater_us import _normalize_frame
+    result = _normalize_frame("AAPL", "15m", pd.DataFrame())
+    assert result.empty
+    assert list(result.columns) == ["ticker", "interval", "datetime", "open", "high", "low", "close", "volume"]
+
+
+# ─── _save_rows ───────────────────────────────────────────────────────────────
+
+def test_save_rows_executes_insert():
+    df = pd.DataFrame({
+        "ticker":   ["AAPL", "AAPL"],
+        "interval": ["15m", "15m"],
+        "datetime": [datetime(2026, 5, 15, 14, 30), datetime(2026, 5, 15, 14, 45)],
+        "open":     [150.0, 151.0],
+        "high":     [151.5, 152.0],
+        "low":      [149.5, 150.5],
+        "close":    [151.0, 151.5],
+        "volume":   [1000000, 900000],
+    })
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
+    mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+
+    from data.intraday_updater_us import _save_rows
+    n = _save_rows(mock_conn, df)
+
+    assert n == 2
+    mock_cursor.executemany.assert_called_once()
+    sql = mock_cursor.executemany.call_args[0][0]
+    assert "INSERT IGNORE INTO prices_intraday" in sql
+    assert "`interval`" in sql
+    mock_conn.commit.assert_called_once()
+
+
+# ─── update_intraday ──────────────────────────────────────────────────────────
+
+def _make_yf_multiindex_df(symbol: str) -> pd.DataFrame:
+    """构造 yfinance 批量下载返回的 MultiIndex DataFrame。
+    group_by='ticker' 时 level 0 = ticker, level 1 = price field。
+    """
+    idx = pd.to_datetime([
+        "2026-05-15 14:30:00+00:00",
+        "2026-05-15 14:45:00+00:00",
+    ])
+    cols = pd.MultiIndex.from_tuples(
+        [(symbol, col) for col in ["Open", "High", "Low", "Close", "Volume"]],
+        names=["Ticker", "Price"],
+    )
+    data = {
+        (symbol, "Open"):   [150.0, 151.0],
+        (symbol, "High"):   [151.5, 152.0],
+        (symbol, "Low"):    [149.5, 150.5],
+        (symbol, "Close"):  [151.0, 151.5],
+        (symbol, "Volume"): [1000000, 900000],
+    }
+    df = pd.DataFrame(data, index=idx)
+    df.columns = cols
+    df.index.name = "Datetime"
+    return df
+
+
+@patch("data.intraday_updater_us.get_conn")
+@patch("data.intraday_updater_us.get_last_sync")
+@patch("data.intraday_updater_us.set_sync_ok")
+@patch("data.intraday_updater_us.set_sync_error")
+@patch("data.intraday_updater_us.yf.download")
+@patch("data.market_us.list_active_tickers")
+def test_update_intraday_calls_yf_download(
+    mock_list, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
+):
+    mock_list.return_value = ["AAPL"]
+    mock_get_last_sync.return_value = None  # 首次：全量拉取
+    mock_get_conn.return_value = MagicMock()
+    mock_yf_download.return_value = _make_yf_multiindex_df("AAPL")
+
+    with patch("data.intraday_updater_us._save_rows", return_value=2):
+        from data.intraday_updater_us import update_intraday
+        result = update_intraday("15m")
+
+    assert result["AAPL"] == "ok"
+    mock_yf_download.assert_called_once()
+    assert mock_yf_download.call_args[1]["interval"] == "15m"
+
+
+@patch("data.intraday_updater_us.get_conn")
+@patch("data.intraday_updater_us.get_last_sync")
+@patch("data.market_us.list_active_tickers")
+def test_update_intraday_skips_up_to_date_ticker(mock_list, mock_get_last_sync, mock_get_conn):
+    mock_list.return_value = ["AAPL"]
+    mock_get_last_sync.return_value = date.today()
+    mock_get_conn.return_value = MagicMock()
+
+    with patch("data.intraday_updater_us.yf.download") as mock_dl:
+        from data.intraday_updater_us import update_intraday
+        result = update_intraday("15m")
+
+    assert result["AAPL"] == "ok"
+    mock_dl.assert_not_called()
+
+
+def test_update_intraday_rejects_unsupported_interval():
+    from data.intraday_updater_us import update_intraday
+    with pytest.raises(ValueError, match="Unsupported interval"):
+        update_intraday("3m")
+
+
+# ─── CLI ──────────────────────────────────────────────────────────────────────
+
+def test_cli_intraday_all():
+    with patch("data.intraday_updater_us.update_intraday") as mock_update:
+        mock_update.return_value = {"AAPL": "ok"}
+        import main
+        ret = main.main(["intraday"])
+    assert ret == 0
+    assert mock_update.call_count == 2
+    intervals_called = [c.args[0] for c in mock_update.call_args_list]
+    assert "15m" in intervals_called
+    assert "1h" in intervals_called
+
+
+def test_cli_intraday_single_interval():
+    with patch("data.intraday_updater_us.update_intraday") as mock_update:
+        mock_update.return_value = {"AAPL": "ok"}
+        import main
+        ret = main.main(["intraday", "--interval", "15m"])
+    assert ret == 0
+    mock_update.assert_called_once_with("15m")

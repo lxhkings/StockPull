@@ -34,7 +34,7 @@ def backfill_stocks_a() -> int:
         dfs.append(df)
     df = pd.concat(dfs, ignore_index=True)
     rows = [
-        (r["ts_code"], _to_str(r.get("name")), _to_str(r.get("industry")), r["exchange"])
+        (r["ts_code"], r["name"], r.get("industry") if pd.notna(r.get("industry")) else None, r["exchange"])
         for _, r in df.iterrows()
     ]
     with get_conn() as conn:
