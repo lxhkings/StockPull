@@ -73,9 +73,10 @@ INDEX_CONFIG = {
 
 INDEX_DELAY = 2.0   # delay between index updates (carried over)
 
-# A-share 行业 ETF (后复权日线 via tushare fund_daily × fund_adj)
-# 与 US XL* 对齐 GICS 11 类 + A 股特色主题
+# A-share ETF (后复权日线 via tushare fund_daily × fund_adj)
+# GICS 11 行业 + A股主题 + 宽基指数
 CN_SECTOR_ETFS = {
+    # GICS 11 行业
     "515220.SH": {"name": "煤炭ETF",     "gics": "Energy"},
     "512400.SH": {"name": "有色金属ETF", "gics": "Materials"},
     "512660.SH": {"name": "军工ETF",     "gics": "Industrials"},
@@ -90,9 +91,17 @@ CN_SECTOR_ETFS = {
     "515050.SH": {"name": "5G通信ETF",   "gics": "CommunicationServices"},
     "159611.SZ": {"name": "电力ETF",     "gics": "Utilities"},
     "512200.SH": {"name": "房地产ETF",   "gics": "RealEstate"},
+    # A股主题
     "515790.SH": {"name": "光伏ETF",     "gics": "Theme.Solar"},
     "515030.SH": {"name": "新能源车ETF", "gics": "Theme.NEV"},
     "159995.SZ": {"name": "芯片ETF",     "gics": "Theme.Chip"},
+    # 行业大盘
+    "159928.SZ": {"name": "消费ETF",     "gics": "Consumer"},
+    "515000.SH": {"name": "科技ETF",     "gics": "Technology"},
+    # 宽基指数
+    "510300.SH": {"name": "沪深300ETF",  "gics": "Broad.CSI300"},
+    "159915.SZ": {"name": "创业板ETF",   "gics": "Broad.ChiNext"},
+    "588000.SH": {"name": "科创50ETF",   "gics": "Broad.STAR50"},
 }
 
 # Tushare
