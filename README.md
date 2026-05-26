@@ -268,6 +268,58 @@ qqq_history = query(
 
 数据通过 `uv run main.py daily --market us` 自动采集，存储在 `index_prices` 表。
 
+### CN 行业 ETF 数据
+
+A股行业 ETF 后复权日线（hfq close）via tushare `fund_daily × fund_adj`，存 `index_prices` 表，`index_id` 为 ts_code（如 `512800.SH`）。
+
+清单：`config.CN_SECTOR_ETFS`，按 GICS 11 类对齐 US XL* + A 股主题（光伏/新能源车/芯片），共 ~17 只。
+
+跑法：
+
+```bash
+uv run main.py daily --market cn        # 自动包含 ETF
+uv run main.py rebase --market cn --etf-only   # 仅 ETF 全量重灌（季度执行修正分红 drift）
+```
+
+查询示例：
+
+```sql
+-- CN vs US 同行业横向对比（银行 vs 美国金融）
+SELECT date, index_id, close
+FROM index_prices
+WHERE index_id IN ('512800.SH', 'XLF')
+  AND date >= '2026-01-01'
+ORDER BY date, index_id;
+
+-- 查 CN HealthCare 板块两只 ETF
+SELECT date, index_id, close
+FROM index_prices
+WHERE index_id IN ('512170.SH', '512010.SH')
+ORDER BY date;
+```
+
+ETF 列表：
+
+| ts_code | 名称 | GICS / 主题 |
+|---|---|---|
+| 515220.SH | 煤炭ETF | Energy |
+| 512400.SH | 有色金属ETF | Materials |
+| 512660.SH | 军工ETF | Industrials |
+| 159996.SZ | 家电ETF | ConsumerDiscretionary |
+| 512690.SH | 酒ETF | ConsumerStaples |
+| 512170.SH | 医疗ETF | HealthCare |
+| 512010.SH | 医药ETF | HealthCare |
+| 512800.SH | 银行ETF | Financials |
+| 512000.SH | 券商ETF | Financials |
+| 512720.SH | 计算机ETF | InformationTechnology |
+| 512480.SH | 半导体ETF | InformationTechnology |
+| 515050.SH | 5G通信ETF | CommunicationServices |
+| 159611.SZ | 电力ETF | Utilities |
+| 512200.SH | 房地产ETF | RealEstate |
+| 515790.SH | 光伏ETF | Theme.Solar |
+| 515030.SH | 新能源车ETF | Theme.NEV |
+| 159995.SZ | 芯片ETF | Theme.Chip |
+
 ## 测试
 
 ```bash
