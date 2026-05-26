@@ -173,3 +173,57 @@ def test_update_etf_prices_incremental_skips_existing(mock_fetch, mock_execute, 
     rows = mock_execute.call_args[0][1]
     assert len(rows) == 1
     assert rows[0][0] == date(2026, 5, 13)
+
+
+@patch("data.etf_updater_cn.CN_SECTOR_ETFS", {
+    "512800.SH": {"name": "银行ETF", "gics": "Financials"},
+    "512000.SH": {"name": "券商ETF", "gics": "Financials"},
+})
+@patch("data.etf_updater_cn.query")
+@patch("data.etf_updater_cn.execute")
+@patch("data.etf_updater_cn.fetch_etf_daily_hfq")
+def test_update_etf_prices_continues_on_single_failure(mock_fetch, mock_execute, mock_query):
+    """If one ETF fetch raises, others still process."""
+    mock_query.return_value = [{"d": None}]
+
+    def fake_fetch(ts_code, start_date):
+        if ts_code == "512800.SH":
+            raise RuntimeError("tushare boom")
+        return pd.DataFrame({
+            "date": [date(2026, 5, 13)],
+            "hfq_close": [1.0],
+        })
+
+    mock_fetch.side_effect = fake_fetch
+    mock_execute.return_value = 1
+
+    from data.etf_updater_cn import update_etf_prices
+    total = update_etf_prices()
+
+    # 512000.SH succeeded
+    assert total == 1
+    assert mock_execute.call_count == 1
+    written_rows = mock_execute.call_args[0][1]
+    assert written_rows[0][1] == "512000.SH"
+
+
+@patch("data.etf_updater_cn.CN_SECTOR_ETFS", {"512800.SH": {"name": "银行ETF", "gics": "Financials"}})
+@patch("data.etf_updater_cn.query")
+@patch("data.etf_updater_cn.execute")
+@patch("data.etf_updater_cn.fetch_etf_daily_hfq")
+def test_update_etf_prices_full_rebase_ignores_last_date(mock_fetch, mock_execute, mock_query):
+    """full_rebase=True → start from 20100101 even if last_date exists."""
+    mock_query.return_value = [{"d": date(2026, 5, 12)}]
+    mock_fetch.return_value = pd.DataFrame({
+        "date": [date(2010, 1, 5), date(2026, 5, 13)],
+        "hfq_close": [0.5, 1.8],
+    })
+    mock_execute.return_value = 2
+
+    from data.etf_updater_cn import update_etf_prices
+    total = update_etf_prices(full_rebase=True)
+
+    mock_fetch.assert_called_once_with("512800.SH", start_date="20100101")
+    # No last_date filter applied → both rows written
+    rows = mock_execute.call_args[0][1]
+    assert len(rows) == 2
