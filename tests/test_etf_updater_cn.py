@@ -121,3 +121,55 @@ def test_fetch_etf_daily_hfq_ffill_adj_gaps(mock_get_client):
     # 20260512 ffills from 20260511 (factor 2.0)
     row_0512 = df[df["date"] == date(2026, 5, 12)].iloc[0]
     assert row_0512["hfq_close"] == pytest.approx(1.1 * 2.0)
+
+
+@patch("data.etf_updater_cn.CN_SECTOR_ETFS", {"512800.SH": {"name": "银行ETF", "gics": "Financials"}})
+@patch("data.etf_updater_cn.query")
+@patch("data.etf_updater_cn.execute")
+@patch("data.etf_updater_cn.fetch_etf_daily_hfq")
+def test_update_etf_prices_writes_to_index_prices(mock_fetch, mock_execute, mock_query):
+    """update_etf_prices writes (date, ts_code, hfq_close) rows to index_prices."""
+    mock_query.return_value = [{"d": None}]  # no last_date
+    mock_fetch.return_value = pd.DataFrame({
+        "date": [date(2026, 5, 12), date(2026, 5, 13)],
+        "hfq_close": [1.776, 1.800],
+    })
+    mock_execute.return_value = 2
+
+    from data.etf_updater_cn import update_etf_prices
+    total = update_etf_prices()
+
+    assert total == 2
+    # fetch called with start_date=20100101 (no last_date)
+    mock_fetch.assert_called_once_with("512800.SH", start_date="20100101")
+
+    # execute called with INSERT IGNORE into index_prices
+    sql, rows = mock_execute.call_args[0]
+    assert "INSERT IGNORE INTO index_prices" in sql
+    assert rows == [
+        (date(2026, 5, 12), "512800.SH", 1.776),
+        (date(2026, 5, 13), "512800.SH", 1.800),
+    ]
+
+
+@patch("data.etf_updater_cn.CN_SECTOR_ETFS", {"512800.SH": {"name": "银行ETF", "gics": "Financials"}})
+@patch("data.etf_updater_cn.query")
+@patch("data.etf_updater_cn.execute")
+@patch("data.etf_updater_cn.fetch_etf_daily_hfq")
+def test_update_etf_prices_incremental_skips_existing(mock_fetch, mock_execute, mock_query):
+    """last_date in DB → start_date passed as YYYYMMDD, rows ≤ last_date filtered."""
+    mock_query.return_value = [{"d": date(2026, 5, 12)}]
+    mock_fetch.return_value = pd.DataFrame({
+        "date": [date(2026, 5, 12), date(2026, 5, 13)],
+        "hfq_close": [1.776, 1.800],
+    })
+    mock_execute.return_value = 1
+
+    from data.etf_updater_cn import update_etf_prices
+    total = update_etf_prices()
+
+    mock_fetch.assert_called_once_with("512800.SH", start_date="20260512")
+    # Only 20260513 row written (20260512 == last_date filtered)
+    rows = mock_execute.call_args[0][1]
+    assert len(rows) == 1
+    assert rows[0][0] == date(2026, 5, 13)
