@@ -45,6 +45,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p_rebase.add_argument("--years", type=int, default=None, help="历史年数（默认：US=5, CN/HK=15）")
     p_rebase.add_argument("--index", default=None,
                           help="指数成分股（仅 US 市场：SP500）")
+    p_rebase.add_argument("--etf-only", action="store_true",
+                          help="仅重灌 ETF index_prices（仅 CN 市场）")
 
     sub.add_parser("status", help="Print ingest status summary")
 
@@ -110,7 +112,16 @@ def cmd_daily(market: str, codes: list[str] | None, index: str | None) -> int:
     return 0
 
 
-def cmd_rebase(market: str, codes: list[str] | None, years: int | None, index: str | None) -> int:
+def cmd_rebase(market: str, codes: list[str] | None, years: int | None, index: str | None, etf_only: bool = False) -> int:
+    if etf_only:
+        if market != "cn":
+            print(f"--etf-only currently only supports --market cn", file=sys.stderr)
+            return 1
+        from data.etf_updater_cn import update_etf_prices
+        n = update_etf_prices(full_rebase=True)
+        print(f"[cn] ETF rebase wrote {n} rows to index_prices")
+        return 0
+
     import inspect
     mod = _import_market(market)
     if not hasattr(mod, "rebase"):
@@ -185,7 +196,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "daily":
         return cmd_daily(args.market, args.code, args.index)
     if args.cmd == "rebase":
-        return cmd_rebase(args.market, args.code, args.years, args.index)
+        return cmd_rebase(args.market, args.code, args.years, args.index, args.etf_only)
     if args.cmd == "tushare-backfill":
         return cmd_tushare_backfill(args.scope, args.market, args.dry_run)
     if args.cmd == "migrate-intraday":
