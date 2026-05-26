@@ -73,6 +73,28 @@ INDEX_CONFIG = {
 
 INDEX_DELAY = 2.0   # delay between index updates (carried over)
 
+# A-share 行业 ETF (后复权日线 via tushare fund_daily × fund_adj)
+# 与 US XL* 对齐 GICS 11 类 + A 股特色主题
+CN_SECTOR_ETFS = {
+    "515220.SH": {"name": "煤炭ETF",     "gics": "Energy"},
+    "512400.SH": {"name": "有色金属ETF", "gics": "Materials"},
+    "512660.SH": {"name": "军工ETF",     "gics": "Industrials"},
+    "159996.SZ": {"name": "家电ETF",     "gics": "ConsumerDiscretionary"},
+    "512690.SH": {"name": "酒ETF",       "gics": "ConsumerStaples"},
+    "512170.SH": {"name": "医疗ETF",     "gics": "HealthCare"},
+    "512010.SH": {"name": "医药ETF",     "gics": "HealthCare"},
+    "512800.SH": {"name": "银行ETF",     "gics": "Financials"},
+    "512000.SH": {"name": "券商ETF",     "gics": "Financials"},
+    "512720.SH": {"name": "计算机ETF",   "gics": "InformationTechnology"},
+    "512480.SH": {"name": "半导体ETF",   "gics": "InformationTechnology"},
+    "515050.SH": {"name": "5G通信ETF",   "gics": "CommunicationServices"},
+    "159611.SZ": {"name": "电力ETF",     "gics": "Utilities"},
+    "512200.SH": {"name": "房地产ETF",   "gics": "RealEstate"},
+    "515790.SH": {"name": "光伏ETF",     "gics": "Theme.Solar"},
+    "515030.SH": {"name": "新能源车ETF", "gics": "Theme.NEV"},
+    "159995.SZ": {"name": "芯片ETF",     "gics": "Theme.Chip"},
+}
+
 # Tushare
 TUSHARE_TOKEN = os.getenv("TUSHARE_TOKEN", "")
 TUSHARE_RATE_INTERVAL = float(os.getenv("TUSHARE_RATE_INTERVAL", "0.15"))  # 0.15=400/min, 0.08=800/min
