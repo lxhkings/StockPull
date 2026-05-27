@@ -92,16 +92,34 @@ def _test_aapl_data(target_date: date) -> tuple[Optional[pd.DataFrame], str]:
     start_dt = target_date - timedelta(days=5)
 
     try:
-        signal.signal(signal.SIGINT, signal.SIG_DFL)
-        df = yf.download(
-            tickers="AAPL",
-            start=start_dt.strftime("%Y-%m-%d"),
-            end=end_dt.strftime("%Y-%m-%d"),
-            interval="1d",
-            progress=False,
-            timeout=30,
-        )
+        import logging as _logging
+
+        _yf_log = _logging.getLogger("yfinance")
+        _captured: list[str] = []
+
+        class _Cap(_logging.Handler):
+            def emit(self, record):
+                _captured.append(record.getMessage())
+
+        _cap = _Cap()
+        _yf_log.addHandler(_cap)
+        try:
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
+            df = yf.download(
+                tickers="AAPL",
+                start=start_dt.strftime("%Y-%m-%d"),
+                end=end_dt.strftime("%Y-%m-%d"),
+                interval="1d",
+                progress=False,
+                timeout=30,
+            )
+        finally:
+            _yf_log.removeHandler(_cap)
+
         if df is None or df.empty:
+            if any("RateLimit" in m or "Too Many Requests" in m for m in _captured):
+                log.warning("[AAPL] yfinance 被限速（内部日志检测）")
+                return None, "rate_limit"
             return None, "no_data"
 
         # 处理 MultiIndex 列名（单 ticker 也返回 MultiIndex）

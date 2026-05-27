@@ -12,7 +12,7 @@ into the Pipeline contract.
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional
 
 import yfinance as yf
@@ -109,6 +109,7 @@ def update_index_price() -> int:
         ("XLU", "XLU"),
         ("XLC", "XLC"),
     ]
+    last_trading = stock_updater_us._last_us_trading_date()
     total = 0
     for symbol, index_id in indices:
         last = query(
@@ -116,8 +117,12 @@ def update_index_price() -> int:
         )
         last_date = last[0]["d"] if last and last[0]["d"] else None
 
+        if last_date and last_date >= last_trading:
+            continue
+
         start = last_date.isoformat() if last_date else "2010-01-01"
-        df = yf.download(symbol, start=start, interval="1d",
+        end = (last_trading + timedelta(days=1)).isoformat()
+        df = yf.download(symbol, start=start, end=end, interval="1d",
                          auto_adjust=False, actions=False, progress=False)
         if df.empty:
             continue

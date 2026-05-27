@@ -7,15 +7,12 @@ import logging
 import os
 import sys
 
-# Bypass all proxy settings (including macOS system proxy) to avoid connection issues
-# Must happen before any library imports that use requests/urllib3
-_PROXY_KEYS = [
-    "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
-    "ALL_PROXY", "all_proxy",
-]
-for _key in _PROXY_KEYS:
-    os.environ.pop(_key, None)
-os.environ["NO_PROXY"] = "*"
+# akshare/efinance (eastmoney.com) must bypass proxy — direct connect only.
+# yfinance (Yahoo Finance) should still go through proxy to avoid rate limits.
+# So we only add eastmoney domains to NO_PROXY, not "*".
+_AKSHARE_NO_PROXY = "eastmoney.com,*.eastmoney.com,xueqiu.com,*.xueqiu.com"
+existing = os.environ.get("NO_PROXY", "")
+os.environ["NO_PROXY"] = ",".join(filter(None, [existing, _AKSHARE_NO_PROXY]))
 
 logging.basicConfig(
     level=logging.INFO,
