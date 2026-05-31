@@ -20,6 +20,7 @@ dependencies = [
     "tenacity>=8.2.0",
     "tushare>=1.4.0",
     "cloudscraper>=1.2.71",
+    "futu-api>=9.1.0",
 ]
 
 [tool.setuptools.packages.find]
