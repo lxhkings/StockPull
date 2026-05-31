@@ -110,3 +110,13 @@ TUSHARE_RATE_INTERVAL = float(os.getenv("TUSHARE_RATE_INTERVAL", "0.15"))  # 0.1
 TUSHARE_BACKFILL_START = "20100101"  # YYYYMMDD for Tushare APIs
 TUSHARE_RETRY_COUNT = 3
 TUSHARE_RETRY_DELAY = 5.0
+
+# Futu OpenAPI (美股基本面入库 via 本地 OpenD)
+FUTU_OPEND_HOST    = os.getenv("FUTU_OPEND_HOST", "127.0.0.1")
+FUTU_OPEND_PORT    = int(os.getenv("FUTU_OPEND_PORT", "11111"))
+FUTU_RATE_INTERVAL = float(os.getenv("FUTU_RATE_INTERVAL", "1.05"))  # F10 接口 30次/30秒 → ~1/秒
+FUTU_RETRY_COUNT   = 3
+FUTU_RETRY_DELAY   = 3.0
+FUTU_BACKFILL_START = "2010-01-01"   # 财报历史起点
+FUTU_FINANCIAL_TYPE = 10             # 10=单季报+年报（Futu financial_type 枚举）
+FUTU_CURRENCY_CODE  = "USD"          # 财报币种统一 USD
