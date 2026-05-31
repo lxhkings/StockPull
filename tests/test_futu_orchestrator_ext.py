@@ -1,0 +1,24 @@
+from unittest.mock import patch
+
+from futu_ingest.orchestrator import run_backfill, run_weekly
+
+
+def test_run_backfill_includes_profile_phase():
+    with patch("futu_ingest.orchestrator.list_us_tickers", return_value=["AAPL"]), \
+         patch("futu_ingest.orchestrator.profile_backfill_all") as mock_profile, \
+         patch("futu_ingest.orchestrator.fin_backfill_all"), \
+         patch("futu_ingest.orchestrator.earnings_backfill_all"), \
+         patch("futu_ingest.orchestrator.actions_backfill_all"):
+        mock_profile.return_value = {"rows": 18, "tickers": 1}
+        rep = run_backfill(scope="profile")
+    assert "profile" in rep
+    assert rep["profile"]["rows"] == 18
+
+
+def test_run_weekly_executes_3_snapshots():
+    with patch("futu_ingest.orchestrator.list_us_tickers", return_value=["AAPL"]), \
+         patch("futu_ingest.orchestrator.snapshot_run_weekly") as mock_weekly:
+        mock_weekly.return_value = {"valuation": 1, "rating": 5, "morningstar": 1, "tickers": 1}
+        rep = run_weekly()
+    assert rep["valuation"] == 1
+    assert rep["rating"] == 5

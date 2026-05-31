@@ -69,10 +69,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_ts.add_argument("--dry-run", action="store_true")
 
     p_fb = sub.add_parser("futu-backfill", help="Futu 一次性回填美股基本面数据")
-    p_fb.add_argument("--scope", choices=("all", "financial", "earnings", "actions"),
+    p_fb.add_argument("--scope", choices=("all", "financial", "earnings", "actions",
+                                           "profile", "revenue", "shareholders", "efficiency"),
                       default="all")
 
     sub.add_parser("futu-daily", help="Futu 每日快照增量（流通股 + 分析师预期）")
+    sub.add_parser("futu-weekly", help="Futu 周频快照（估值 + 评级 + Morningstar）")
 
     return p
 
@@ -205,6 +207,13 @@ def cmd_futu_daily() -> int:
     return 0
 
 
+def cmd_futu_weekly() -> int:
+    from futu_ingest.orchestrator import run_weekly
+    rep = run_weekly()
+    print(rep)
+    return 0
+
+
 def _import_market(market: str):
     if market == "us":
         from data import market_us as m
@@ -235,6 +244,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_futu_backfill(args.scope)
     if args.cmd == "futu-daily":
         return cmd_futu_daily()
+    if args.cmd == "futu-weekly":
+        return cmd_futu_weekly()
     if args.cmd == "migrate-intraday":
         return cmd_migrate_intraday()
     if args.cmd == "intraday":
