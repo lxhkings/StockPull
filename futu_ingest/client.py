@@ -65,7 +65,12 @@ class FutuClient:
         for attempt in range(FUTU_RETRY_COUNT):
             self._limiter.wait()
             try:
-                ret, data = getattr(ctx, method_name)(*args, **kwargs)
+                result = getattr(ctx, method_name)(*args, **kwargs)
+                # 适配 3 值返回 (short_interest/daily_short_volume)
+                if len(result) == 3:
+                    ret, data, _ = result
+                else:
+                    ret, data = result
                 if ret == RET_OK:
                     return data
                 last_err = RuntimeError(f"futu.{method_name} ret={ret}: {data}")

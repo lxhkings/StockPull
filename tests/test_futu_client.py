@@ -38,3 +38,17 @@ def test_client_call_retries_then_raises_on_ret_error():
         except RuntimeError as e:
             assert "permission denied" in str(e)
     assert fake_ctx.get_market_snapshot.call_count == 3   # FUTU_RETRY_COUNT
+
+
+def test_client_call_handles_3_value_return():
+    """get_short_interest / get_daily_short_volume 返回 3 个值。"""
+    from futu_ingest.client import FutuClient
+    fake_ctx = MagicMock()
+    fake_df = MagicMock()
+    fake_secondary = MagicMock()
+    fake_ctx.get_short_interest.return_value = (0, fake_df, fake_secondary)
+    c = FutuClient()
+    c._ctx = fake_ctx
+    c._limiter = MagicMock()
+    data = c.call("get_short_interest", "US.AAPL")
+    assert data is fake_df
