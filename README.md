@@ -349,6 +349,82 @@ uv run pytest tests/test_cn_index_price.py -v
 
 `main.py` 清除代理环境变量（设置 `NO_PROXY=*`），避免 macOS 系统代理干扰 tushare/yfinance API 请求。
 
+## 美股基本面数据 (Futu OpenAPI)
+
+供下游量化项目做回测因子库。本项目只负责取数入库，不算因子。
+
+### 数据来源 & 抓取命令
+
+```bash
+# 一次性全量回填（财报 + 发布日 + 分红 + 拆股），约 2-4 小时
+uv run main.py futu-backfill --scope all
+
+# 分 scope 回填
+uv run main.py futu-backfill --scope financial   # 仅四张财务表
+uv run main.py futu-backfill --scope earnings    # 财报发布日 + PIT 回填 ann_date
+uv run main.py futu-backfill --scope actions     # 分红 + 拆股
+
+# 每日快照增量（流通股 + 分析师预期），接入 cron
+uv run main.py futu-daily
+```
+
+前提：本地 OpenD 运行于 `127.0.0.1:11111`，美股行情权限 ≥ LV1。
+
+### 数据库连接
+
+| 项 | 值 |
+|----|-----|
+| Host | 192.168.8.9:3306 (Synology NAS MariaDB) |
+| Database | stocks |
+| 时区 | 连接已设 `+08:00` |
+
+### 表清单
+
+| 表 | 内容 | 主键 | 频率 |
+|----|------|------|------|
+| `us_fin_income` | 利润表 | (ticker, period_end, financial_type) | 季/年 |
+| `us_fin_balance` | 资产负债表 | (ticker, period_end, financial_type) | 季/年 |
+| `us_fin_cashflow` | 现金流量表 | (ticker, period_end, financial_type) | 季/年 |
+| `us_fin_indicator` | 关键指标(ROE/EPS等) | (ticker, period_end, financial_type) | 季/年 |
+| `us_earnings_dates` | 财报发布日 | (ticker, period_text) | 事件 |
+| `us_dividends` | 分红派息 | (ticker, ex_date) | 事件 |
+| `us_splits` | 拆/合股 | (ticker, ex_date) | 事件 |
+| `us_shares_daily` | 流通股本 + 市值 | (ticker, date) | 每日 |
+| `us_analyst_consensus` | 分析师目标价/评级 | (ticker, snapshot_date) | 每日 |
+
+- `ticker` 为 canonical 格式，**无前缀**（如 `AAPL`、`BRK.B`）
+- 每张表都有 `raw_payload` (JSON)，存接口返回的全部原始字段
+- 财务表的全部会计科目在 `raw_payload.item_list`（`field_id` + `data` + `yoy` + `qoq`）
+
+### ⚠️ Point-in-Time（回测必读）
+
+财务表有两个日期：
+- `period_end`：报告期末（财报覆盖到哪天）
+- `ann_date`：**发布日**（财报实际公布日，晚于 period_end）
+
+**回测取财务数据必须按发布日过滤，否则用到未来数据：**
+
+```sql
+-- ✅ 正确：某回测日 D 能看到的最新年报净利润
+SELECT raw_payload
+FROM us_fin_income
+WHERE ticker = 'AAPL'
+  AND financial_type = '7'        -- 7=年报
+  AND ann_date <= '2024-06-30'    -- 回测日 D，只用已发布的
+ORDER BY period_end DESC
+LIMIT 1;
+
+-- ❌ 错误：按 period_end 过滤会用到尚未公布的财报
+```
+
+### 复权价计算（下游自算）
+
+本项目美股 `prices` 表是**不复权**原始价。复权由下游用 `us_dividends` + `us_splits` 事件自算（CRSP 标准总收益复权），本项目不存复权因子。
+
+### 财务科目字段对照
+
+`raw_payload.item_list` 里 `field_id` 的含义，查 Futu 字段表或调用接口的 `structure_list`（含 `field_id` → `display_name` 映射）。
+
 ## 实现计划
 
 详见 `docs/superpowers/plans/` 目录。
