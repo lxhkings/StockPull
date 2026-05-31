@@ -67,7 +67,7 @@ class FutuClient:
             try:
                 result = getattr(ctx, method_name)(*args, **kwargs)
                 # 适配 3 值返回 (short_interest/daily_short_volume)
-                if len(result) == 3:
+                if isinstance(result, tuple) and len(result) == 3:
                     ret, data, _ = result
                 else:
                     ret, data = result

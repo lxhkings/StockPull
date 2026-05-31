@@ -52,3 +52,20 @@ def test_client_call_handles_3_value_return():
     c._limiter = MagicMock()
     data = c.call("get_short_interest", "US.AAPL")
     assert data is fake_df
+
+
+def test_client_call_3_value_retries_on_error():
+    """3值返回 + ret != RET_OK 也应正确重试。"""
+    from futu_ingest.client import FutuClient
+    fake_ctx = MagicMock()
+    fake_ctx.get_short_interest.return_value = (-1, "no permission", None)
+    c = FutuClient()
+    c._ctx = fake_ctx
+    c._limiter = MagicMock()
+    with patch("futu_ingest.client.time.sleep"):
+        try:
+            c.call("get_short_interest", "US.AAPL")
+            assert False, "should raise"
+        except RuntimeError as e:
+            assert "no permission" in str(e)
+    assert fake_ctx.get_short_interest.call_count == 3  # FUTU_RETRY_COUNT
