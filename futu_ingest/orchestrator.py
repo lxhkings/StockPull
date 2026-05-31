@@ -15,6 +15,7 @@ from futu_ingest.backfill_revenue import backfill_all as revenue_backfill_all
 from futu_ingest.backfill_shareholders import backfill_all as shareholders_backfill_all
 from futu_ingest.backfill_efficiency import backfill_all as efficiency_backfill_all
 from futu_ingest.snapshot_daily import run_daily as snapshot_run_daily
+from futu_ingest.snapshot_daily_ext import run_daily_ext as daily_ext_run
 from futu_ingest.snapshot_weekly import run_weekly as snapshot_run_weekly
 
 log = logging.getLogger(__name__)
@@ -67,9 +68,11 @@ def run_backfill(scope: str = "all") -> dict:
 
 
 def run_daily() -> dict:
-    """每日增量：流通股 + 分析师快照。"""
+    """每日增量：流通股 + 分析师快照 + 资金流 + 卖空（Batch 2）。"""
     tickers = list_us_tickers()
-    return snapshot_run_daily(tickers)
+    rep = snapshot_run_daily(tickers)
+    rep.update(daily_ext_run(tickers))
+    return rep
 
 
 def run_weekly() -> dict:
