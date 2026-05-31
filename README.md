@@ -363,9 +363,16 @@ uv run main.py futu-backfill --scope all
 uv run main.py futu-backfill --scope financial   # 仅四张财务表
 uv run main.py futu-backfill --scope earnings    # 财报发布日 + PIT 回填 ann_date
 uv run main.py futu-backfill --scope actions     # 分红 + 拆股
+uv run main.py futu-backfill --scope profile     # 公司元数据
+uv run main.py futu-backfill --scope revenue     # 分部营收 + 财报日涨跌
+uv run main.py futu-backfill --scope shareholders  # 股东 + 内部人（5 张表）
+uv run main.py futu-backfill --scope efficiency  # 运营效率
 
-# 每日快照增量（流通股 + 分析师预期），接入 cron
+# 每日快照增量（流通股 + 分析师预期 + 资金流 + 卖空），接入 cron
 uv run main.py futu-daily
+
+# 周频快照（估值 + 评级 + Morningstar）
+uv run main.py futu-weekly
 ```
 
 前提：本地 OpenD 运行于 `127.0.0.1:11111`，美股行情权限 ≥ LV1。
@@ -391,6 +398,22 @@ uv run main.py futu-daily
 | `us_splits` | 拆/合股 | (ticker, ex_date) | 事件 |
 | `us_shares_daily` | 流通股本 + 市值 | (ticker, date) | 每日 |
 | `us_analyst_consensus` | 分析师目标价/评级 | (ticker, snapshot_date) | 每日 |
+| `us_company_profile` | 公司元数据（EAV） | (ticker, field_name) | 月 |
+| `us_revenue_breakdown` | 分部营收 | (ticker, period_text, type, item_name) | 季 |
+| `us_earnings_price_move` | 财报日涨跌 | (ticker, period_text, day_offset) | 季 |
+| `us_valuation_snapshot` | 估值快照 | (ticker, snapshot_date) | 周 |
+| `us_rating_summary` | 机构评级变动 | (ticker, snapshot_date, institution_uid) | 周 |
+| `us_morningstar` | Morningstar 评级 | (ticker, snapshot_date) | 周 |
+| `us_shareholders_overview` | 股东概览 | (ticker, period_text, holder_category, holder_name) | 季 |
+| `us_holding_changes` | 股东增减持 | (ticker, period_text, holder_id) | 季 |
+| `us_institutional` | 机构持仓汇总 | (ticker, period_text) | 季 |
+| `us_insider_holders` | 内部人持股 | (ticker, holder_id, snapshot_date) | 季 |
+| `us_insider_trades` | 内部人交易 | (ticker, holder_id, min_trade_date, transaction_type) | 季 |
+| `us_op_efficiency` | 运营效率 | (ticker, period_text) | 季 |
+| `us_capital_flow` | 日频资金流 | (ticker, date) | 每日 |
+| `us_capital_distribution` | 资金分布 | (ticker, date) | 每日 |
+| `us_short_interest` | 空头持仓 | (ticker, timestamp) | 每日 |
+| `us_daily_short_volume` | 每日卖空量 | (ticker, timestamp) | 每日 |
 
 - `ticker` 为 canonical 格式，**无前缀**（如 `AAPL`、`BRK.B`）
 - 每张表都有 `raw_payload` (JSON)，存接口返回的全部原始字段
