@@ -71,6 +71,9 @@ class FutuClient:
                 last_err = RuntimeError(f"futu.{method_name} ret={ret}: {data}")
             except Exception as e:  # noqa: BLE001
                 last_err = e
+            # 永久性错误（如"不支持"）不重试
+            if "不支持" in str(last_err):
+                raise last_err
             wait = FUTU_RETRY_DELAY * (2 ** attempt)
             log.warning(f"futu.{method_name} failed (attempt {attempt+1}): {last_err}; sleep {wait}s")
             time.sleep(wait)
