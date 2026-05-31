@@ -1,0 +1,175 @@
+"""周频快照：估值 + 评级 + Morningstar（3 张表）。
+
+append-only 时序，ON DUPLICATE KEY UPDATE 覆盖当期。
+"""
+from __future__ import annotations
+
+import json
+import logging
+from datetime import date
+
+from db import get_conn
+from futu_ingest.client import get_client, to_futu_code
+
+log = logging.getLogger(__name__)
+
+PAGE_NUM = 50
+
+
+def snapshot_valuation(client, ticker: str) -> int:
+    """抓单只估值快照，upsert。返回写入行数（0 或 1）。"""
+    code = to_futu_code(ticker)
+    data = client.call("get_valuation_detail", code)
+    if not isinstance(data, dict) or not data:
+        return 0
+
+    today = date.today().isoformat()
+    trend = data.get("trend", {})
+    plate = data.get("plate_distribution", {})
+
+    row = (
+        ticker, today,
+        trend.get("current_value"),  # pe_ttm
+        data.get("pe_percentile"),
+        trend.get("average_value"),  # pe_avg
+        data.get("pb"),
+        data.get("pb_percentile"),
+        data.get("ps_ttm"),
+        data.get("ps_percentile"),
+        plate.get("plate"),
+        plate.get("plate_name"),
+        plate.get("plate_ranking"),
+        json.dumps(data, ensure_ascii=False, default=str),
+    )
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO us_valuation_snapshot "
+                "(ticker, snapshot_date, pe_ttm, pe_percentile, pe_avg, "
+                " pb, pb_percentile, ps_ttm, ps_percentile, "
+                " plate_code, plate_name, plate_ranking, raw_payload) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+                "ON DUPLICATE KEY UPDATE "
+                "  pe_ttm=VALUES(pe_ttm), pe_percentile=VALUES(pe_percentile), "
+                "  pb=VALUES(pb), pb_percentile=VALUES(pb_percentile), "
+                "  ps_ttm=VALUES(ps_ttm), ps_percentile=VALUES(ps_percentile), "
+                "  plate_ranking=VALUES(plate_ranking), raw_payload=VALUES(raw_payload)",
+                row,
+            )
+        conn.commit()
+    log.info(f"us_valuation_snapshot {ticker}: 1 row")
+    return 1
+
+
+def snapshot_rating(client, ticker: str) -> int:
+    """抓单只评级变动（分页），upsert。返回写入行数。"""
+    code = to_futu_code(ticker)
+    rows = []
+    next_key = None
+    while True:
+        kwargs = {"num": PAGE_NUM}
+        if next_key is not None:
+            kwargs["next_key"] = next_key
+        data = client.call("get_research_rating_summary", code, **kwargs)
+        if not isinstance(data, dict) or not data:
+            break
+
+        items = data.get("inst_rating_summary_list", [])
+        today = date.today().isoformat()
+        for item in items:
+            rows.append((
+                ticker, today,
+                item.get("institution_uid"),
+                item.get("institution_name"),
+                item.get("institution_picture_url"),
+                item.get("rating"),
+                item.get("target_price"),
+                item.get("update_time"),
+                json.dumps(item, ensure_ascii=False, default=str),
+            ))
+
+        next_key = data.get("next_key", "-1")
+        if not items or next_key == "-1":
+            break
+
+    if not rows:
+        return 0
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO us_rating_summary "
+                "(ticker, snapshot_date, institution_uid, institution_name, "
+                " institution_picture_url, rating, target_price, update_time, raw_payload) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+                "ON DUPLICATE KEY UPDATE "
+                "  rating=VALUES(rating), target_price=VALUES(target_price), "
+                "  update_time=VALUES(update_time), raw_payload=VALUES(raw_payload)",
+                rows,
+            )
+        conn.commit()
+    log.info(f"us_rating_summary {ticker}: {len(rows)} rows")
+    return len(rows)
+
+
+def snapshot_morningstar(client, ticker: str) -> int:
+    """抓单只 Morningstar 评级，upsert。返回写入行数（0 或 1）。"""
+    code = to_futu_code(ticker)
+    data = client.call("get_research_morningstar_report", code)
+    if not isinstance(data, dict) or not data:
+        return 0
+
+    today = date.today().isoformat()
+    row = (
+        ticker, today,
+        data.get("star_rating"),
+        data.get("star_update_time"),
+        data.get("fair_value"),
+        data.get("economic_moat_label"),
+        data.get("uncertainty_label"),
+        data.get("capital_allocation_label"),
+        data.get("analyst_report_by_line"),
+        data.get("analyst_update_time"),
+        json.dumps(data, ensure_ascii=False, default=str),
+    )
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO us_morningstar "
+                "(ticker, snapshot_date, star_rating, star_update_time, fair_value, "
+                " economic_moat, uncertainty, capital_allocation, analyst_name, "
+                " analyst_update_time, raw_payload) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+                "ON DUPLICATE KEY UPDATE "
+                "  star_rating=VALUES(star_rating), fair_value=VALUES(fair_value), "
+                "  economic_moat=VALUES(economic_moat), uncertainty=VALUES(uncertainty), "
+                "  raw_payload=VALUES(raw_payload)",
+                row,
+            )
+        conn.commit()
+    log.info(f"us_morningstar {ticker}: 1 row")
+    return 1
+
+
+def run_weekly(tickers: list[str]) -> dict:
+    client = get_client()
+    val_total = 0
+    rating_total = 0
+    morning_total = 0
+    ok = 0
+    for t in tickers:
+        try:
+            val_total += snapshot_valuation(client, t)
+            rating_total += snapshot_rating(client, t)
+            morning_total += snapshot_morningstar(client, t)
+            ok += 1
+        except Exception as e:  # noqa: BLE001
+            log.error(f"weekly {t}: {e}")
+    return {
+        "valuation": val_total,
+        "rating": rating_total,
+        "morningstar": morning_total,
+        "tickers": ok,
+    }
