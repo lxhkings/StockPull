@@ -1,4 +1,3 @@
-import json
 from unittest.mock import MagicMock, patch
 
 from futu_ingest.backfill_profile import backfill_profile
