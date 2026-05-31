@@ -116,7 +116,7 @@ def backfill_institutional(client, ticker: str) -> int:
     if not isinstance(data, dict) or not data:
         return 0
 
-    row = ((
+    row = (
         ticker,
         data.get("period_text"),
         data.get("institution_quantity"),
@@ -127,7 +127,7 @@ def backfill_institutional(client, ticker: str) -> int:
         data.get("holder_pct_change"),
         data.get("update_time"),
         json.dumps(data, ensure_ascii=False, default=str),
-    ))
+    )
 
     with get_conn() as conn:
         with conn.cursor() as cur:
