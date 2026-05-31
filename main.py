@@ -68,6 +68,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_ts.add_argument("--market", choices=("all", "cn", "hk", "us"), default="all")
     p_ts.add_argument("--dry-run", action="store_true")
 
+    p_fb = sub.add_parser("futu-backfill", help="Futu 一次性回填美股基本面数据")
+    p_fb.add_argument("--scope", choices=("all", "financial", "earnings", "actions"),
+                      default="all")
+
+    sub.add_parser("futu-daily", help="Futu 每日快照增量（流通股 + 分析师预期）")
+
     return p
 
 
@@ -185,6 +191,20 @@ def cmd_tushare_backfill(scope: str, market: str, dry_run: bool) -> int:
     return 0
 
 
+def cmd_futu_backfill(scope: str) -> int:
+    from futu_ingest.orchestrator import run_backfill
+    rep = run_backfill(scope=scope)
+    print(rep)
+    return 0
+
+
+def cmd_futu_daily() -> int:
+    from futu_ingest.orchestrator import run_daily
+    rep = run_daily()
+    print(rep)
+    return 0
+
+
 def _import_market(market: str):
     if market == "us":
         from data import market_us as m
@@ -211,6 +231,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_rebase(args.market, args.code, args.years, args.index, args.etf_only)
     if args.cmd == "tushare-backfill":
         return cmd_tushare_backfill(args.scope, args.market, args.dry_run)
+    if args.cmd == "futu-backfill":
+        return cmd_futu_backfill(args.scope)
+    if args.cmd == "futu-daily":
+        return cmd_futu_daily()
     if args.cmd == "migrate-intraday":
         return cmd_migrate_intraday()
     if args.cmd == "intraday":
