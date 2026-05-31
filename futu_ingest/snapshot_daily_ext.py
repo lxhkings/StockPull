@@ -72,7 +72,7 @@ def snapshot_capital_dist(client, ticker: str) -> int:
         return 0
 
     today = date.today().isoformat()
-    row = ((
+    row = (
         ticker, today,
         data.get("capital_in_super"),
         data.get("capital_in_big"),
@@ -84,7 +84,7 @@ def snapshot_capital_dist(client, ticker: str) -> int:
         data.get("capital_out_small"),
         data.get("update_time"),
         json.dumps(data, ensure_ascii=False, default=str),
-    ))
+    )
 
     with get_conn() as conn:
         with conn.cursor() as cur:
