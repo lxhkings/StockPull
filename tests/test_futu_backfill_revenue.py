@@ -57,3 +57,12 @@ def test_backfill_earnings_move_upserts():
     assert n == 2
     sql = cur.executemany.call_args[0][0]
     assert "INSERT INTO us_earnings_price_move" in sql
+
+
+def test_backfill_all_aggregates_via_streams(monkeypatch):
+    import futu_ingest.backfill_revenue as m
+    monkeypatch.setattr(m, "get_client", lambda: object())
+    monkeypatch.setattr(m, "backfill_revenue", lambda c, t: 7)
+    monkeypatch.setattr(m, "backfill_earnings_move", lambda c, t: 11)
+    rep = m.backfill_all(["A", "B"])
+    assert rep == {"revenue_rows": 14, "earnings_move_rows": 22, "tickers": 2}

@@ -12,6 +12,7 @@ import pandas as pd
 
 from db import get_conn
 from futu_ingest.client import get_client, to_futu_code, from_futu_code
+from futu_ingest.concurrency import run_streams, ticker_stream
 
 log = logging.getLogger(__name__)
 
@@ -99,11 +100,8 @@ def snapshot_analyst(client, ticker: str) -> int:
 
 def run_daily(tickers: list[str]) -> dict:
     client = get_client()
-    shares = snapshot_shares(client, tickers)
-    analyst = 0
-    for t in tickers:
-        try:
-            analyst += snapshot_analyst(client, t)
-        except Exception as e:  # noqa: BLE001
-            log.error(f"analyst {t}: {e}")
-    return {"shares": shares, "analyst": analyst, "tickers": len(tickers)}
+    r = run_streams([
+        ("shares",  lambda: (snapshot_shares(client, tickers), len(tickers))),
+        ("analyst", lambda: ticker_stream(snapshot_analyst, client, tickers, "analyst")),
+    ])
+    return {"shares": r["shares"][0], "analyst": r["analyst"][0], "tickers": len(tickers)}

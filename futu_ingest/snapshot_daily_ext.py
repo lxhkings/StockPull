@@ -13,6 +13,7 @@ from datetime import date
 
 from db import get_conn
 from futu_ingest.client import get_client, to_futu_code
+from futu_ingest.concurrency import run_streams, ticker_stream
 
 log = logging.getLogger(__name__)
 
@@ -213,24 +214,16 @@ def snapshot_short_volume(client, ticker: str) -> int:
 def run_daily_ext(tickers: list[str]) -> dict:
     """Batch 2 日频扩展：资金流 + 卖空。"""
     client = get_client()
-    flow_total = 0
-    dist_total = 0
-    si_total = 0
-    sv_total = 0
-    ok = 0
-    for t in tickers:
-        try:
-            flow_total += snapshot_capital_flow(client, t)
-            dist_total += snapshot_capital_dist(client, t)
-            si_total += snapshot_short_interest(client, t)
-            sv_total += snapshot_short_volume(client, t)
-            ok += 1
-        except Exception as e:  # noqa: BLE001
-            log.error(f"daily_ext {t}: {e}")
+    r = run_streams([
+        ("flow", lambda: ticker_stream(snapshot_capital_flow, client, tickers, "capital_flow")),
+        ("dist", lambda: ticker_stream(snapshot_capital_dist, client, tickers, "capital_dist")),
+        ("si",   lambda: ticker_stream(snapshot_short_interest, client, tickers, "short_interest")),
+        ("sv",   lambda: ticker_stream(snapshot_short_volume, client, tickers, "short_volume")),
+    ])
     return {
-        "capital_flow": flow_total,
-        "capital_dist": dist_total,
-        "short_interest": si_total,
-        "short_volume": sv_total,
-        "tickers": ok,
+        "capital_flow": r["flow"][0],
+        "capital_dist": r["dist"][0],
+        "short_interest": r["si"][0],
+        "short_volume": r["sv"][0],
+        "tickers": r["flow"][1],
     }

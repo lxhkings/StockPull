@@ -6,6 +6,7 @@ import logging
 
 from db import get_conn
 from futu_ingest.client import get_client, to_futu_code
+from futu_ingest.concurrency import run_streams, ticker_stream
 
 log = logging.getLogger(__name__)
 
@@ -79,14 +80,8 @@ def backfill_splits(client, ticker: str) -> int:
 
 def backfill_all(tickers: list[str]) -> dict:
     client = get_client()
-    div_total = split_total = 0
-    for t in tickers:
-        try:
-            div_total += backfill_dividends(client, t)
-        except Exception as e:  # noqa: BLE001
-            log.error(f"dividends {t}: {e}")
-        try:
-            split_total += backfill_splits(client, t)
-        except Exception as e:  # noqa: BLE001
-            log.error(f"splits {t}: {e}")
-    return {"dividends": div_total, "splits": split_total, "tickers": len(tickers)}
+    r = run_streams([
+        ("div",   lambda: ticker_stream(backfill_dividends, client, tickers, "dividends")),
+        ("split", lambda: ticker_stream(backfill_splits, client, tickers, "splits")),
+    ])
+    return {"dividends": r["div"][0], "splits": r["split"][0], "tickers": len(tickers)}

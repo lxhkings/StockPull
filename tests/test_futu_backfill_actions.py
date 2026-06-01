@@ -43,3 +43,12 @@ def test_backfill_splits_paginates_and_upserts():
     assert client.call.call_count == 2
     sql = cur.executemany.call_args[0][0]
     assert "INSERT INTO us_splits" in sql
+
+
+def test_backfill_all_aggregates_via_streams(monkeypatch):
+    import futu_ingest.backfill_actions as m
+    monkeypatch.setattr(m, "get_client", lambda: object())
+    monkeypatch.setattr(m, "backfill_dividends", lambda c, t: 2)
+    monkeypatch.setattr(m, "backfill_splits", lambda c, t: 3)
+    rep = m.backfill_all(["A", "B"])
+    assert rep == {"dividends": 4, "splits": 6, "tickers": 2}

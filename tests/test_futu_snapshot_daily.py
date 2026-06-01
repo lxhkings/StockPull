@@ -50,3 +50,12 @@ def test_snapshot_analyst_upserts_today():
     assert params[0] == "AAPL"
     assert params[2] == 400.0
     assert params[6] == 27
+
+
+def test_run_daily_aggregates_via_streams(monkeypatch):
+    import futu_ingest.snapshot_daily as m
+    monkeypatch.setattr(m, "get_client", lambda: object())
+    monkeypatch.setattr(m, "snapshot_shares", lambda c, ts: 100)
+    monkeypatch.setattr(m, "snapshot_analyst", lambda c, t: 1)
+    rep = m.run_daily(["A", "B", "C"])
+    assert rep == {"shares": 100, "analyst": 3, "tickers": 3}

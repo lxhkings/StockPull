@@ -10,6 +10,7 @@ from datetime import date
 
 from db import get_conn
 from futu_ingest.client import get_client, to_futu_code
+from futu_ingest.concurrency import run_streams, ticker_stream
 
 log = logging.getLogger(__name__)
 
@@ -155,21 +156,14 @@ def snapshot_morningstar(client, ticker: str) -> int:
 
 def run_weekly(tickers: list[str]) -> dict:
     client = get_client()
-    val_total = 0
-    rating_total = 0
-    morning_total = 0
-    ok = 0
-    for t in tickers:
-        try:
-            val_total += snapshot_valuation(client, t)
-            rating_total += snapshot_rating(client, t)
-            morning_total += snapshot_morningstar(client, t)
-            ok += 1
-        except Exception as e:  # noqa: BLE001
-            log.error(f"weekly {t}: {e}")
+    r = run_streams([
+        ("val",     lambda: ticker_stream(snapshot_valuation, client, tickers, "valuation")),
+        ("rating",  lambda: ticker_stream(snapshot_rating, client, tickers, "rating")),
+        ("morning", lambda: ticker_stream(snapshot_morningstar, client, tickers, "morningstar")),
+    ])
     return {
-        "valuation": val_total,
-        "rating": rating_total,
-        "morningstar": morning_total,
-        "tickers": ok,
+        "valuation": r["val"][0],
+        "rating": r["rating"][0],
+        "morningstar": r["morning"][0],
+        "tickers": r["val"][1],
     }

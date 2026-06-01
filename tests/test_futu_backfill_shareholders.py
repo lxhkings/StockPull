@@ -131,3 +131,18 @@ def test_backfill_insider_trades_returns_0_on_empty():
     with patch("futu_ingest.backfill_shareholders.get_conn"):
         n = backfill_insider_trades(client, "AAPL")
     assert n == 0
+
+
+def test_backfill_all_aggregates_via_streams(monkeypatch):
+    import futu_ingest.backfill_shareholders as m
+    monkeypatch.setattr(m, "get_client", lambda: object())
+    monkeypatch.setattr(m, "backfill_overview", lambda c, t: 1)
+    monkeypatch.setattr(m, "backfill_holding_changes", lambda c, t: 2)
+    monkeypatch.setattr(m, "backfill_institutional", lambda c, t: 3)
+    monkeypatch.setattr(m, "backfill_insider_holders", lambda c, t: 4)
+    monkeypatch.setattr(m, "backfill_insider_trades", lambda c, t: 5)
+    rep = m.backfill_all(["A", "B"])
+    assert rep == {
+        "overview_rows": 2, "changes_rows": 4, "institutional_rows": 6,
+        "insider_holders_rows": 8, "insider_trades_rows": 10, "tickers": 2,
+    }
