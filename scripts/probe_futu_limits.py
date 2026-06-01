@@ -22,3 +22,24 @@ def classify(ret: int, data) -> str:
     if any(p.lower() in msg for p in FREQ_PATTERNS):
         return "FREQ"
     return "OTHER"
+
+
+CAP = 120          # burst 安全上限
+MARGIN = 0.8       # 推荐速率留 20% 余量
+
+
+def summarize_rounds(interface: str, rounds: list[int], raw_msg: str) -> dict:
+    """聚合某接口多轮 burst 结果。rounds 含 -1 → SKIP;含 CAP → NO-LIMIT;否则取 min。"""
+    base = {"interface": interface, "raw_msg": raw_msg}
+    if any(n < 0 for n in rounds):
+        return {**base, "status": "SKIP", "n_per_30s": None,
+                "fastest_interval": None, "recommended_interval": None}
+    n = min(rounds)
+    status = "NO-LIMIT@cap" if n >= CAP else "OK"
+    return {
+        **base,
+        "status": status,
+        "n_per_30s": n,
+        "fastest_interval": 30 / n,
+        "recommended_interval": 30 / (n * MARGIN),
+    }
