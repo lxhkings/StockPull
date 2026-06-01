@@ -12,8 +12,10 @@ import argparse
 import json
 import socket
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from pathlib import Path
+from threading import Event
 
 # ── 常量 ──
 RET_OK = 0
@@ -99,6 +101,20 @@ def _unpack(result):
     return result
 
 
+def _burst_count(make_call, stop_event, cap: int = CAP) -> tuple[int, str]:
+    """突发调用直到 stop_event 被 set 或达到 cap。返回 (ok, first_err_msg)。"""
+    ok = 0
+    for _ in range(cap):
+        if stop_event.is_set():
+            break
+        ret, data = _unpack(make_call())
+        if ret == RET_OK:
+            ok += 1
+            continue
+        return ok, str(data)
+    return ok, "cap-reached"
+
+
 def burst_probe(make_call, cap: int = CAP) -> tuple[int, str]:
     """紧循环调用直到首次 FREQ。返回 (成功次数, message)。
     OTHER → (-1, msg);达到 cap → (cap, 'no-limit-hit@cap')。"""
@@ -129,6 +145,74 @@ def probe_one(name: str, make_call) -> dict:
             print(f"    sleep {RESET_SLEEP}s 重置窗口...")
             time.sleep(RESET_SLEEP)
     return summarize_rounds(name, rounds, raw_msg)
+
+
+MULTI_IFACE_PICKS = [
+    "get_company_profile",       # 30/30s
+    "get_market_snapshot",       # 60/30s
+    "get_valuation_detail",      # 30/30s
+    "get_capital_distribution",  # 60/30s
+    "get_insider_trade_list",    # 120+/30s (无限制)
+]
+
+
+def probe_multi_iface(ctx) -> list[dict]:
+    """同连接并发打 5 个接口,观察限频是否共享。"""
+    probes = {n: fn for n, fn in _build_probes(ctx)}
+    picks = [(n, probes[n]) for n in MULTI_IFACE_PICKS if n in probes]
+    stop = Event()
+
+    def run(name, fn):
+        n, msg = _burst_count(fn, stop)
+        stop.set()   # 任一接口触发 FREQ → 全停
+        return {"interface": name, "ok": n, "msg": msg[:80]}
+
+    with ThreadPoolExecutor(max_workers=len(picks)) as pool:
+        futs = {pool.submit(run, n, fn): n for n, fn in picks}
+        results = [f.result() for f in as_completed(futs)]
+
+    total = sum(r["ok"] for r in results)
+    print(f"\n=== multi-iface (同连接并发) ===")
+    print(f"{'interface':<38} {'ok':>6} msg")
+    print("-" * 90)
+    for r in sorted(results, key=lambda x: x["interface"]):
+        print(f"{r['interface']:<38} {r['ok']:>6} {r['msg'][:40]!r}")
+    print(f"{'TOTAL':<38} {total:>6}")
+    print(f"\n结论: 若 total ≈ 30 → 限频为全局共享;若 total ≈ sum(各自串行值) → 限频为每接口独立")
+    return results
+
+
+CONNS = 3
+
+
+def probe_multi_conn() -> list[dict]:
+    """多连接并发打同一接口(get_company_profile)。"""
+    stop = Event()
+
+    def run(conn_id):
+        from futu import OpenQuoteContext
+        ctx = OpenQuoteContext(host=HOST, port=PORT)
+        try:
+            fn = lambda: ctx.get_company_profile(CODE)
+            n, msg = _burst_count(fn, stop)
+            stop.set()
+            return {"conn_id": conn_id, "ok": n, "msg": msg[:80]}
+        finally:
+            ctx.close()
+
+    with ThreadPoolExecutor(max_workers=CONNS) as pool:
+        futs = [pool.submit(run, i) for i in range(CONNS)]
+        results = [f.result() for f in as_completed(futs)]
+
+    total = sum(r["ok"] for r in results)
+    print(f"\n=== multi-conn ({CONNS} 连接并发, 接口=get_company_profile) ===")
+    print(f"{'conn_id':>6} {'ok':>6} msg")
+    print("-" * 90)
+    for r in sorted(results, key=lambda x: x["conn_id"]):
+        print(f"{r['conn_id']:>6} {r['ok']:>6} {r['msg'][:40]!r}")
+    print(f"{'TOTAL':>6} {total:>6}")
+    print(f"\n结论: 若 total ≈ 30 → 限频为 OpenD 全局;若 total ≈ {CONNS}×30 → 限频为每连接独立")
+    return results
 
 
 # ── 输出 ──
@@ -164,26 +248,39 @@ def _check_opend(host: str, port: int) -> None:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", help="只测单个接口名(冒烟用)")
+    ap.add_argument("--concurrency", choices=["multi-iface", "multi-conn"],
+                    help="并发探测模式")
     args = ap.parse_args()
 
     _check_opend(HOST, PORT)
-    from futu import OpenQuoteContext
-    ctx = OpenQuoteContext(host=HOST, port=PORT)
-    try:
-        probes = _build_probes(ctx)
-        if args.only:
-            probes = [(n, fn) for n, fn in probes if n == args.only]
-            if not probes:
-                raise SystemExit(f"未知接口: {args.only}")
-        results = []
-        for name, fn in probes:
-            print(f"\n=== probing {name} ===")
-            results.append(probe_one(name, fn))
-        print_table(results)
-        out = write_json(results)
-        print(f"\n写入 {out}")
-    finally:
-        ctx.close()
+
+    if args.concurrency == "multi-iface":
+        from futu import OpenQuoteContext
+        ctx = OpenQuoteContext(host=HOST, port=PORT)
+        try:
+            probe_multi_iface(ctx)
+        finally:
+            ctx.close()
+    elif args.concurrency == "multi-conn":
+        probe_multi_conn()
+    else:
+        from futu import OpenQuoteContext
+        ctx = OpenQuoteContext(host=HOST, port=PORT)
+        try:
+            probes = _build_probes(ctx)
+            if args.only:
+                probes = [(n, fn) for n, fn in probes if n == args.only]
+                if not probes:
+                    raise SystemExit(f"未知接口: {args.only}")
+            results = []
+            for name, fn in probes:
+                print(f"\n=== probing {name} ===")
+                results.append(probe_one(name, fn))
+            print_table(results)
+            out = write_json(results)
+            print(f"\n写入 {out}")
+        finally:
+            ctx.close()
 
 
 if __name__ == "__main__":
