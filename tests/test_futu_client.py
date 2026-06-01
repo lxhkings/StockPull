@@ -4,9 +4,9 @@ from futu_ingest.client import to_futu_code, from_futu_code
 
 
 def test_to_futu_code_adds_us_prefix():
-    assert to_futu_code("AAPL") == "US.aapl"
-    assert to_futu_code("BRK.B") == "US.brk.b"
-    assert to_futu_code("BF-A") == "US.bf.a"
+    assert to_futu_code("AAPL") == "US.AAPL"
+    assert to_futu_code("BRK.B") == "US.BRK.B"
+    assert to_futu_code("BF-A") == "US.BF.A"
 
 
 def test_from_futu_code_strips_us_prefix():
