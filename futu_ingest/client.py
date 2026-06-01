@@ -25,8 +25,10 @@ RET_OK = 0   # futu.RET_OK 的实际值
 
 
 def to_futu_code(ticker: str) -> str:
-    """canonical 美股 ticker -> Futu 代码。AAPL -> US.AAPL"""
-    return f"US.{ticker}"
+    """canonical 美股 ticker -> Futu 代码。AAPL -> US.AAPL, BRK.B -> US.BRK.B"""
+    # 富途 API 需要小写格式，用 . 分隔（如 bf.a 而不是 BF-A）
+    futu_ticker = ticker.lower().replace("-", ".")
+    return f"US.{futu_ticker}"
 
 
 def from_futu_code(code: str) -> str:

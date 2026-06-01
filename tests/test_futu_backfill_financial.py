@@ -31,8 +31,9 @@ def test_backfill_statement_upserts_with_raw_payload():
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
-        n = backfill_statement(client, "AAPL", statement_type=1, table="us_fin_income")
+        n, latest = backfill_statement(client, "AAPL", statement_type=1, table="us_fin_income")
     assert n == 1
+    assert latest == "2025-09-26"
     sql = cur.executemany.call_args[0][0]
     assert "INSERT INTO us_fin_income" in sql
     assert "ON DUPLICATE KEY UPDATE" in sql
