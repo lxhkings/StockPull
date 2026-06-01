@@ -164,7 +164,8 @@ def probe_multi_iface(ctx) -> list[dict]:
 
     def run(name, fn):
         n, msg = _burst_count(fn, stop)
-        stop.set()   # 任一接口触发 FREQ → 全停
+        if msg != "cap-reached":
+            stop.set()   # 触发限频 → 通知其他线程停
         return {"interface": name, "ok": n, "msg": msg[:80]}
 
     with ThreadPoolExecutor(max_workers=len(picks)) as pool:
@@ -195,7 +196,8 @@ def probe_multi_conn() -> list[dict]:
         try:
             fn = lambda: ctx.get_company_profile(CODE)
             n, msg = _burst_count(fn, stop)
-            stop.set()
+            if msg != "cap-reached":
+                stop.set()
             return {"conn_id": conn_id, "ok": n, "msg": msg[:80]}
         finally:
             ctx.close()
