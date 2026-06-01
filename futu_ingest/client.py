@@ -30,9 +30,24 @@ def to_futu_code(ticker: str) -> str:
     - AAPL -> US.AAPL
     - BRK.B -> US.BRK.B
     - BF-A -> US.BF.A (横线转点，保持大写)
+    - BRKB -> US.BRK.B (变体格式映射)
+    - BFA -> US.BF.A (变体格式映射)
+    - BFB -> US.BF.B (变体格式映射)
     """
+    # 特殊变体格式映射（数据库中存在但富途 API 不识别的格式）
+    VARIANT_MAP = {
+        "BRKB": "BRK.B",
+        "BFA": "BF.A",
+        "BFB": "BF.B",
+    }
+
+    # 先检查是否是变体格式
+    upper_ticker = ticker.upper()
+    if upper_ticker in VARIANT_MAP:
+        upper_ticker = VARIANT_MAP[upper_ticker]
+
     # 富途 API 需要大写格式，横线需要转换为点
-    futu_ticker = ticker.upper().replace("-", ".")
+    futu_ticker = upper_ticker.replace("-", ".")
     return f"US.{futu_ticker}"
 
 

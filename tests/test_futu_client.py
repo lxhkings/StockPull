@@ -8,6 +8,11 @@ def test_to_futu_code_adds_us_prefix():
     assert to_futu_code("BRK.B") == "US.BRK.B"
     assert to_futu_code("BF-A") == "US.BF.A"
 
+    # 测试变体格式映射
+    assert to_futu_code("BRKB") == "US.BRK.B"
+    assert to_futu_code("BFA") == "US.BF.A"
+    assert to_futu_code("BFB") == "US.BF.B"
+
 
 def test_from_futu_code_strips_us_prefix():
     assert from_futu_code("US.AAPL") == "AAPL"
