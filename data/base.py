@@ -9,6 +9,7 @@ base.py — 爬虫公共基础设施
 
 import time
 import logging
+import threading
 from typing import Optional, Callable, TypeVar
 
 import requests
@@ -115,13 +116,15 @@ class RateLimiter:
     def __init__(self, delay: float):
         self.delay = delay
         self._last_call = 0.0
+        self._lock = threading.Lock()
 
     def wait(self):
-        """等待直到可以执行下一次调用"""
-        elapsed = time.time() - self._last_call
-        if elapsed < self.delay:
-            time.sleep(self.delay - elapsed)
-        self._last_call = time.time()
+        """等待直到可以执行下一次调用（线程安全：同一 limiter 的调用串行）"""
+        with self._lock:
+            elapsed = time.time() - self._last_call
+            if elapsed < self.delay:
+                time.sleep(self.delay - elapsed)
+            self._last_call = time.time()
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

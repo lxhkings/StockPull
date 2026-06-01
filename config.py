@@ -114,7 +114,16 @@ TUSHARE_RETRY_DELAY = 5.0
 # Futu OpenAPI (美股基本面入库 via 本地 OpenD)
 FUTU_OPEND_HOST    = os.getenv("FUTU_OPEND_HOST", "127.0.0.1")
 FUTU_OPEND_PORT    = int(os.getenv("FUTU_OPEND_PORT", "11111"))
-FUTU_RATE_INTERVAL = float(os.getenv("FUTU_RATE_INTERVAL", "1.05"))  # F10 接口 30次/30秒 → ~1/秒
+# 每接口限频（探测实测，n 次/30s）。只列比默认快的；其余走默认。
+# 0.625 = 60/30s；0.312 = 120-cap；默认 1.25 = 30/30s + 20% 余量。
+FUTU_LIMIT_INTERVALS = {
+    "get_market_snapshot":                0.625,
+    "get_capital_distribution":           0.625,
+    "get_company_operational_efficiency": 0.312,
+    "get_insider_holder_list":            0.312,
+    "get_insider_trade_list":             0.312,
+}
+FUTU_DEFAULT_INTERVAL = 1.25
 FUTU_RETRY_COUNT   = 3
 FUTU_RETRY_DELAY   = 3.0
 FUTU_BACKFILL_START = "2010-01-01"   # 财报历史起点

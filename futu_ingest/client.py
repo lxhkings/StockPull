@@ -1,7 +1,7 @@
 """Futu OpenQuoteContext 单例封装。
 
 每次 call 自动：
-- 阻塞到满足 FUTU_RATE_INTERVAL（限频）
+- 阻塞到满足该接口的限频（per-method，见 FUTU_LIMIT_INTERVALS）
 - ret != RET_OK 时按 FUTU_RETRY_DELAY 指数退避（最多 FUTU_RETRY_COUNT 次）
 - 全部失败抛 RuntimeError
 """
@@ -11,10 +11,11 @@ import logging
 import socket
 import time
 from functools import lru_cache
+from threading import Lock
 
 from config import (
-    FUTU_OPEND_HOST, FUTU_OPEND_PORT, FUTU_RATE_INTERVAL,
-    FUTU_RETRY_COUNT, FUTU_RETRY_DELAY,
+    FUTU_OPEND_HOST, FUTU_OPEND_PORT, FUTU_DEFAULT_INTERVAL,
+    FUTU_LIMIT_INTERVALS, FUTU_RETRY_COUNT, FUTU_RETRY_DELAY,
 )
 from data.base import RateLimiter
 
@@ -49,7 +50,18 @@ def _check_opend(host: str, port: int) -> None:
 class FutuClient:
     def __init__(self):
         self._ctx = None
-        self._limiter = RateLimiter(FUTU_RATE_INTERVAL)
+        self._limiters: dict[str, RateLimiter] = {}
+        self._dict_lock = Lock()
+
+    def _limiter_for(self, method_name: str) -> RateLimiter:
+        """按接口名取 limiter，懒建。interval 查 FUTU_LIMIT_INTERVALS，缺省 FUTU_DEFAULT_INTERVAL。"""
+        with self._dict_lock:
+            lim = self._limiters.get(method_name)
+            if lim is None:
+                interval = FUTU_LIMIT_INTERVALS.get(method_name, FUTU_DEFAULT_INTERVAL)
+                lim = RateLimiter(interval)
+                self._limiters[method_name] = lim
+            return lim
 
     def _ensure_ctx(self):
         if self._ctx is None:
@@ -62,8 +74,9 @@ class FutuClient:
         """调用 ctx.<method_name>(*args, **kwargs)，返回 data（ret 校验在内部）。"""
         ctx = self._ensure_ctx()
         last_err = None
+        limiter = self._limiter_for(method_name)
         for attempt in range(FUTU_RETRY_COUNT):
-            self._limiter.wait()
+            limiter.wait()
             try:
                 result = getattr(ctx, method_name)(*args, **kwargs)
                 # 适配 3 值返回 (short_interest/daily_short_volume)
