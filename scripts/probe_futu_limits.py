@@ -29,7 +29,7 @@ MARGIN = 0.8       # 推荐速率留 20% 余量
 
 
 def summarize_rounds(interface: str, rounds: list[int], raw_msg: str) -> dict:
-    """聚合某接口多轮 burst 结果。rounds 含 -1 → SKIP;含 CAP → NO-LIMIT;否则取 min。"""
+    """聚合某接口多轮 burst 结果。rounds 含 -1 → SKIP;min ≥ CAP → NO-LIMIT;否则取 min。"""
     base = {"interface": interface, "raw_msg": raw_msg}
     if any(n < 0 for n in rounds):
         return {**base, "status": "SKIP", "n_per_30s": None,
