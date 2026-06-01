@@ -124,7 +124,12 @@ def backfill_all(tickers: list[str]) -> dict:
     new_tickers: list[str] = []
     exist_tickers: list[str] = []
     for t in tickers:
-        last = get_last_sync(conn, t, SYNC_DATA_TYPE)
+        try:
+            last = get_last_sync(conn, t, SYNC_DATA_TYPE)
+        except Exception:
+            # 连接断开，重新获取
+            conn = get_conn()
+            last = get_last_sync(conn, t, SYNC_DATA_TYPE)
         if last is None:
             new_tickers.append(t)
         else:
@@ -144,7 +149,12 @@ def backfill_all(tickers: list[str]) -> dict:
             ok += 1
         except Exception as e:  # noqa: BLE001
             log.error(f"financial {t}: {e}")
-            set_sync_error(conn, t, SYNC_DATA_TYPE, str(e))
+            try:
+                set_sync_error(conn, t, SYNC_DATA_TYPE, str(e))
+            except Exception:
+                # 连接断开，重新获取
+                conn = get_conn()
+                set_sync_error(conn, t, SYNC_DATA_TYPE, str(e))
 
     for t in exist_tickers:
         try:
@@ -155,7 +165,12 @@ def backfill_all(tickers: list[str]) -> dict:
             ok += 1
         except Exception as e:  # noqa: BLE001
             log.error(f"financial {t}: {e}")
-            set_sync_error(conn, t, SYNC_DATA_TYPE, str(e))
+            try:
+                set_sync_error(conn, t, SYNC_DATA_TYPE, str(e))
+            except Exception:
+                # 连接断开，重新获取
+                conn = get_conn()
+                set_sync_error(conn, t, SYNC_DATA_TYPE, str(e))
 
     conn.close()
     return {"rows": total, "tickers": ok}
