@@ -14,6 +14,7 @@ from datetime import date
 
 from db import get_conn
 from futu_ingest.client import get_client, to_futu_code
+from futu_ingest.concurrency import run_streams, ticker_stream
 
 log = logging.getLogger(__name__)
 
@@ -245,27 +246,18 @@ def backfill_insider_trades(client, ticker: str) -> int:
 
 def backfill_all(tickers: list[str]) -> dict:
     client = get_client()
-    overview_total = 0
-    changes_total = 0
-    inst_total = 0
-    holders_total = 0
-    trades_total = 0
-    ok = 0
-    for t in tickers:
-        try:
-            overview_total += backfill_overview(client, t)
-            changes_total += backfill_holding_changes(client, t)
-            inst_total += backfill_institutional(client, t)
-            holders_total += backfill_insider_holders(client, t)
-            trades_total += backfill_insider_trades(client, t)
-            ok += 1
-        except Exception as e:  # noqa: BLE001
-            log.error(f"shareholders {t}: {e}")
+    r = run_streams([
+        ("overview", lambda: ticker_stream(backfill_overview, client, tickers, "overview")),
+        ("changes",  lambda: ticker_stream(backfill_holding_changes, client, tickers, "changes")),
+        ("inst",     lambda: ticker_stream(backfill_institutional, client, tickers, "inst")),
+        ("holders",  lambda: ticker_stream(backfill_insider_holders, client, tickers, "holders")),
+        ("trades",   lambda: ticker_stream(backfill_insider_trades, client, tickers, "trades")),
+    ])
     return {
-        "overview_rows": overview_total,
-        "changes_rows": changes_total,
-        "institutional_rows": inst_total,
-        "insider_holders_rows": holders_total,
-        "insider_trades_rows": trades_total,
-        "tickers": ok,
+        "overview_rows": r["overview"][0],
+        "changes_rows": r["changes"][0],
+        "institutional_rows": r["inst"][0],
+        "insider_holders_rows": r["holders"][0],
+        "insider_trades_rows": r["trades"][0],
+        "tickers": r["overview"][1],
     }

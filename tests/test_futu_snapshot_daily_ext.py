@@ -69,3 +69,17 @@ def test_snapshot_short_interest_handles_3_value_return():
     assert n == 1
     sql = cur.executemany.call_args[0][0]
     assert "INSERT INTO us_short_interest" in sql
+
+
+def test_run_daily_ext_aggregates_via_streams(monkeypatch):
+    import futu_ingest.snapshot_daily_ext as m
+    monkeypatch.setattr(m, "get_client", lambda: object())
+    monkeypatch.setattr(m, "snapshot_capital_flow", lambda c, t: 1)
+    monkeypatch.setattr(m, "snapshot_capital_dist", lambda c, t: 2)
+    monkeypatch.setattr(m, "snapshot_short_interest", lambda c, t: 3)
+    monkeypatch.setattr(m, "snapshot_short_volume", lambda c, t: 4)
+    rep = m.run_daily_ext(["A", "B"])
+    assert rep == {
+        "capital_flow": 2, "capital_dist": 4,
+        "short_interest": 6, "short_volume": 8, "tickers": 2,
+    }

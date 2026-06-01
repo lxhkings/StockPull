@@ -88,3 +88,13 @@ def test_snapshot_morningstar_upserts():
     params = cur.execute.call_args[0][1]
     assert params[2] == 4  # star_rating
     assert params[4] == 195.0  # fair_value
+
+
+def test_run_weekly_aggregates_via_streams(monkeypatch):
+    import futu_ingest.snapshot_weekly as m
+    monkeypatch.setattr(m, "get_client", lambda: object())
+    monkeypatch.setattr(m, "snapshot_valuation", lambda c, t: 1)
+    monkeypatch.setattr(m, "snapshot_rating", lambda c, t: 2)
+    monkeypatch.setattr(m, "snapshot_morningstar", lambda c, t: 3)
+    rep = m.run_weekly(["A", "B"])
+    assert rep == {"valuation": 2, "rating": 4, "morningstar": 6, "tickers": 2}

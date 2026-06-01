@@ -11,6 +11,7 @@ from datetime import date
 
 from db import get_conn
 from futu_ingest.client import get_client, to_futu_code
+from futu_ingest.concurrency import run_streams, ticker_stream
 
 log = logging.getLogger(__name__)
 
@@ -141,14 +142,8 @@ def backfill_earnings_move(client, ticker: str) -> int:
 
 def backfill_all(tickers: list[str]) -> dict:
     client = get_client()
-    rev_total = 0
-    move_total = 0
-    ok = 0
-    for t in tickers:
-        try:
-            rev_total += backfill_revenue(client, t)
-            move_total += backfill_earnings_move(client, t)
-            ok += 1
-        except Exception as e:  # noqa: BLE001
-            log.error(f"revenue {t}: {e}")
-    return {"revenue_rows": rev_total, "earnings_move_rows": move_total, "tickers": ok}
+    r = run_streams([
+        ("rev",  lambda: ticker_stream(backfill_revenue, client, tickers, "revenue")),
+        ("move", lambda: ticker_stream(backfill_earnings_move, client, tickers, "earnings_move")),
+    ])
+    return {"revenue_rows": r["rev"][0], "earnings_move_rows": r["move"][0], "tickers": r["rev"][1]}
