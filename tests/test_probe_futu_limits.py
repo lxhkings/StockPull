@@ -48,3 +48,12 @@ def test_summarize_skip_on_negative():
     assert r["n_per_30s"] is None
     assert r["fastest_interval"] is None
     assert r["recommended_interval"] is None
+
+
+def test_summarize_zero_no_division_error():
+    # n=0 表示首轮即 FREQ,不应触发除零
+    r = summarize_rounds("get_market_snapshot", [0, 0, 0], raw_msg="too frequent")
+    assert r["status"] == "FREQ@0"
+    assert r["n_per_30s"] == 0
+    assert r["fastest_interval"] is None
+    assert r["recommended_interval"] is None

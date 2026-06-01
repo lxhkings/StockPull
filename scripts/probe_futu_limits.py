@@ -8,11 +8,29 @@
 """
 from __future__ import annotations
 
+import argparse
+import json
+import socket
+import time
+from datetime import date
+from pathlib import Path
+
+# ── 常量 ──
 RET_OK = 0
 FREQ_PATTERNS = (
     "频率", "限频", "frequent", "frequency", "too many", "rate limit", "请求过于",
 )
+CAP = 120          # burst 安全上限
+MARGIN = 0.8       # 推荐速率留 20% 余量
+HOST, PORT = "127.0.0.1", 11111
+CODE = "US.AAPL"
+NUM = 50
+RESET_SLEEP = 35   # > 30s 滑动窗口,确保重置
+ROUNDS = 3
+OUT_DIR = Path("docs/superpowers/probe-results")
 
+
+# ── 纯函数 ──
 
 def classify(ret: int, data) -> str:
     """归类单次调用结果:OK / FREQ / OTHER。"""
@@ -24,10 +42,6 @@ def classify(ret: int, data) -> str:
     return "OTHER"
 
 
-CAP = 120          # burst 安全上限
-MARGIN = 0.8       # 推荐速率留 20% 余量
-
-
 def summarize_rounds(interface: str, rounds: list[int], raw_msg: str) -> dict:
     """聚合某接口多轮 burst 结果。rounds 含 -1 → SKIP;min ≥ CAP → NO-LIMIT;否则取 min。"""
     base = {"interface": interface, "raw_msg": raw_msg}
@@ -35,6 +49,9 @@ def summarize_rounds(interface: str, rounds: list[int], raw_msg: str) -> dict:
         return {**base, "status": "SKIP", "n_per_30s": None,
                 "fastest_interval": None, "recommended_interval": None}
     n = min(rounds)
+    if n == 0:
+        return {**base, "status": "FREQ@0", "n_per_30s": 0,
+                "fastest_interval": None, "recommended_interval": None}
     status = "NO-LIMIT@cap" if n >= CAP else "OK"
     return {
         **base,
@@ -45,20 +62,7 @@ def summarize_rounds(interface: str, rounds: list[int], raw_msg: str) -> dict:
     }
 
 
-import argparse
-import json
-import socket
-import time
-from datetime import date
-from pathlib import Path
-
-HOST, PORT = "127.0.0.1", 11111
-CODE = "US.AAPL"
-NUM = 50
-RESET_SLEEP = 35   # > 30s 滑动窗口,确保重置
-ROUNDS = 3
-OUT_DIR = Path("docs/superpowers/probe-results")
-
+# ── 探测逻辑 ──
 
 def _build_probes(ctx):
     """返回 [(name, callable_returning_(ret,data)), ...]。"""
@@ -126,6 +130,8 @@ def probe_one(name: str, make_call) -> dict:
             time.sleep(RESET_SLEEP)
     return summarize_rounds(name, rounds, raw_msg)
 
+
+# ── 输出 ──
 
 def print_table(results: list[dict]) -> None:
     print(f"\n{'interface':<38} {'n/30s':>6} {'fastest':>8} {'recommend':>10} {'status':<13} raw_msg")
