@@ -22,14 +22,15 @@ log = logging.getLogger(__name__)
 
 
 def list_us_tickers() -> list[str]:
-    """stocks 表中所有美股 ticker（非 CN/HK）。"""
+    """stocks 表中有日线价格数据的美股 ticker（非 CN/HK）。"""
     with get_conn() as conn:
         with conn.cursor(pymysql.cursors.DictCursor) as cur:
             cur.execute(
-                "SELECT ticker FROM stocks "
-                "WHERE ticker NOT LIKE '%%.SH' AND ticker NOT LIKE '%%.SZ' "
-                "  AND ticker NOT LIKE '%%.BJ' AND ticker NOT LIKE '%%.HK' "
-                "ORDER BY ticker"
+                "SELECT DISTINCT s.ticker FROM stocks s "
+                "INNER JOIN prices p ON s.ticker = p.ticker "
+                "WHERE s.ticker NOT LIKE '%%.SH' AND s.ticker NOT LIKE '%%.SZ' "
+                "  AND s.ticker NOT LIKE '%%.BJ' AND s.ticker NOT LIKE '%%.HK' "
+                "ORDER BY s.ticker"
             )
             return [r["ticker"] for r in cur.fetchall()]
 
