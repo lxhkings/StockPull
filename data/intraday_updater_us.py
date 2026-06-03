@@ -16,6 +16,7 @@ from datetime import date, timedelta
 from typing import Optional
 
 import pandas as pd
+import pymysql.err
 import yfinance as yf
 
 from config import (
@@ -255,5 +256,14 @@ def _download_and_save(
             log.info(f"[{t}] 写入 {rows_inserted} 条，最新={new_last}")
         except Exception as e:
             log.error(f"[{t}] 写库失败: {e}")
-            set_sync_error(conn, t, sync_type, str(e))
+            # 检查是否是连接错误（应该立即停止，不应继续尝试写入）
+            if isinstance(e, (pymysql.err.OperationalError, pymysql.err.InterfaceError)):
+                log.error(f"DB 连接断开，停止处理剩余 ticker")
+                result[t] = f"error: {e}"
+                raise  # 连接错误应该向上抛出，停止整个批次
+            # 非连接错误：尝试记录到 sync_log（可能成功）
+            try:
+                set_sync_error(conn, t, sync_type, str(e))
+            except Exception as db_err:
+                log.error(f"无法写入 sync_error（DB 可能已断开）: {db_err}")
             result[t] = f"error: {e}"
