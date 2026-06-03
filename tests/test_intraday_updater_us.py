@@ -129,9 +129,12 @@ def _make_yf_multiindex_df(symbol: str) -> pd.DataFrame:
 @patch("data.intraday_updater_us.set_sync_error")
 @patch("data.intraday_updater_us.yf.download")
 @patch("data.market_us.list_active_tickers")
+@patch("data.intraday_updater_us._test_aapl_intraday")
 def test_update_intraday_calls_yf_download(
-    mock_list, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
+    mock_test_aapl, mock_list, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
 ):
+    # AAPL 测试返回成功
+    mock_test_aapl.return_value = (date(2026, 5, 15), "ok")
     mock_list.return_value = ["AAPL"]
     mock_get_last_sync.return_value = None  # 首次：全量拉取
     mock_get_conn.return_value = MagicMock()
@@ -142,6 +145,7 @@ def test_update_intraday_calls_yf_download(
         result = update_intraday("15m")
 
     assert result["AAPL"] == "ok"
+    # AAPL 测试被 mock，不调用 yf.download；只有批量下载调用 1 次
     mock_yf_download.assert_called_once()
     assert mock_yf_download.call_args[1]["interval"] == "15m"
 
@@ -152,10 +156,13 @@ def test_update_intraday_calls_yf_download(
 @patch("data.intraday_updater_us.set_sync_error")
 @patch("data.intraday_updater_us.yf.download")
 @patch("data.market_us.list_active_tickers")
+@patch("data.intraday_updater_us._test_aapl_intraday")
 def test_update_intraday_full_rebase_ignores_sync_log(
-    mock_list, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
+    mock_test_aapl, mock_list, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
 ):
     """full_rebase=True must not call get_last_sync — all tickers start from floor_date."""
+    # AAPL 测试返回成功
+    mock_test_aapl.return_value = (date(2026, 5, 15), "ok")
     mock_list.return_value = ["AAPL"]
     mock_get_last_sync.return_value = date.today()  # would be "already up to date" in normal mode
     mock_get_conn.return_value = MagicMock()
@@ -167,6 +174,7 @@ def test_update_intraday_full_rebase_ignores_sync_log(
 
     mock_get_last_sync.assert_not_called()
     assert result["AAPL"] == "ok"
+    # AAPL 测试被 mock，只有批量下载调用 1 次
     mock_yf_download.assert_called_once()
     assert mock_yf_download.call_args[1]["interval"] == "60m"
 
@@ -174,9 +182,12 @@ def test_update_intraday_full_rebase_ignores_sync_log(
 @patch("data.intraday_updater_us.get_conn")
 @patch("data.intraday_updater_us.get_last_sync")
 @patch("data.market_us.list_active_tickers")
-def test_update_intraday_skips_up_to_date_ticker(mock_list, mock_get_last_sync, mock_get_conn):
+@patch("data.intraday_updater_us._test_aapl_intraday")
+def test_update_intraday_skips_up_to_date_ticker(mock_test_aapl, mock_list, mock_get_last_sync, mock_get_conn):
+    # AAPL 测试返回成功，日期匹配
+    mock_test_aapl.return_value = (date(2026, 5, 15), "ok")
     mock_list.return_value = ["AAPL"]
-    mock_get_last_sync.return_value = date.today()
+    mock_get_last_sync.return_value = date(2026, 5, 15)  # 已同步到最新
     mock_get_conn.return_value = MagicMock()
 
     with patch("data.intraday_updater_us.yf.download") as mock_dl:
@@ -184,6 +195,7 @@ def test_update_intraday_skips_up_to_date_ticker(mock_list, mock_get_last_sync, 
         result = update_intraday("15m")
 
     assert result["AAPL"] == "ok"
+    # AAPL 测试被 mock，已同步 ticker 不调用批量下载
     mock_dl.assert_not_called()
 
 

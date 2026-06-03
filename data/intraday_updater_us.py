@@ -76,6 +76,47 @@ def _download_single(ticker: str, yf_symbol: str, start_date: date, end_date: da
         return None
 
 
+def _test_aapl_intraday(interval: str) -> tuple[Optional[date], str]:
+    """
+    测试 AAPL 是否有最近交易日数据，判断 yfinance intraday API 是否可用
+
+    Returns:
+        (latest_date, status) 其中 status 为:
+        - "ok": 有数据，返回最新日期
+        - "no_data": 无数据（周末/假期或未更新）
+        - "error": 其他错误
+    """
+    try:
+        # 计算 Yahoo 730 天限制的有效范围
+        today = date.today()
+        floor = today - timedelta(days=INTERVAL_LOOKBACK_DAYS[interval] - 1)
+        end = today + timedelta(days=1)
+
+        df = yf.download(
+            tickers="AAPL",
+            start=floor.strftime("%Y-%m-%d"),
+            end=end.strftime("%Y-%m-%d"),
+            interval=YF_INTERVAL_MAP[interval],
+            group_by="ticker",
+            auto_adjust=False,
+            actions=False,
+            threads=False,
+            progress=False,
+            timeout=YF_TIMEOUT,
+        )
+
+        if df is None or df.empty:
+            return None, "no_data"
+
+        latest = df.index[-1].date()
+        log.info(f"[AAPL {interval}] 测试成功：最新日期 {latest}，范围 {floor} ~ {latest}")
+        return latest, "ok"
+
+    except Exception as e:
+        log.error(f"[AAPL {interval}] 测试失败: {e}")
+        return None, "error"
+
+
 def _yf_symbol(ticker: str) -> str:
     """DB ticker → yfinance symbol: BRK.B → BRK-B"""
     return ticker.upper().replace(".", "-")
@@ -146,13 +187,25 @@ def update_intraday(interval: str, full_rebase: bool = False) -> dict[str, str]:
     if interval not in SUPPORTED_INTERVALS:
         raise ValueError(f"Unsupported interval: {interval}. Supported: {SUPPORTED_INTERVALS}")
 
+    # 先用 AAPL 测试 API 是否可用，并获取实际最新日期
+    latest_date, status = _test_aapl_intraday(interval)
+
+    if status == "no_data":
+        log.warning(f"[intraday {interval}] AAPL 无数据（周末/假期或未更新），跳过本次更新")
+        return {}
+    elif status == "error":
+        log.error(f"[intraday {interval}] AAPL 测试失败，跳过本次更新")
+        return {}
+
+    # 用 AAPL 的实际最新日期计算 floor_date（而非理论推算）
+    lookback_days = INTERVAL_LOOKBACK_DAYS[interval]
+    floor_date = latest_date - timedelta(days=lookback_days - 1)
+    last_trading = latest_date
+
+    log.info(f"[intraday {interval}] AAPL 验证通过，范围：{floor_date} ~ {last_trading}")
+
     from data.market_us import list_active_tickers
     tickers = list_active_tickers()
-
-    lookback_days = INTERVAL_LOOKBACK_DAYS[interval]
-    last_trading = _last_us_trading_date()  # 最近已收盘的交易日
-    # Yahoo 限制：从当前时间往前推 730 天（不是从 last_trading）
-    floor_date = date.today() - timedelta(days=lookback_days - 1)  # 2024-06-04
 
     result: dict[str, str] = {}
     conn = get_conn()
