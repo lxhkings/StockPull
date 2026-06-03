@@ -157,3 +157,12 @@ def weekly(tickers: list[str] | None = None) -> dict[str, str]:
     from data import stock_updater_us_weekly
     targets = tickers or list_active_tickers()
     return stock_updater_us_weekly.update_weekly_batch(targets)
+
+
+def intraday(intervals: list[str] | None = None) -> dict[str, str]:
+    """Pull intraday prices (15m / 1h) for US universe into prices_intraday."""
+    from data.intraday_updater_us import update_intraday
+    result = {}
+    for ivl in (intervals or ["1h"]):
+        result.update(update_intraday(ivl))
+    return result
