@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**项目架构与结构见 README.md。**
+
+**行为准则见全局 CLAUDE.md（~/.claude/CLAUDE.md）。**
+
+---
+
 ## Commands
 
 ```bash
