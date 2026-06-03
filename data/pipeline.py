@@ -62,4 +62,9 @@ class Pipeline:
         log.info(f"[{mid}] === Step 4: update index price ===")
         rows = self.m.update_index_price()
         log.info(f"[{mid}] index price: +{rows} rows")
+
+        if hasattr(self.m, "intraday"):
+            log.info(f"[{mid}] === Step 5: intraday update ===")
+            self.m.intraday()
+
         log.info(f"[{mid}] === pipeline complete ===")
