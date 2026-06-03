@@ -52,6 +52,30 @@ def _sync_type(interval: str) -> str:
     return f"intraday_{YF_INTERVAL_MAP[interval]}"
 
 
+def _download_single(ticker: str, yf_symbol: str, start_date: date, end_date: date, interval: str) -> Optional[pd.DataFrame]:
+    """单独下载单个 ticker 的数据（批量失败时的 fallback）。"""
+    try:
+        df = yf.download(
+            tickers=yf_symbol,
+            start=start_date.strftime("%Y-%m-%d"),
+            end=end_date.strftime("%Y-%m-%d"),
+            interval=interval,
+            group_by="ticker",
+            auto_adjust=False,
+            actions=False,
+            threads=False,
+            progress=False,
+            timeout=YF_TIMEOUT,
+        )
+        if df is None or df.empty:
+            return None
+        # 单 ticker 返回 plain DataFrame（无 MultiIndex）
+        return df
+    except Exception as e:
+        log.warning(f"[{ticker}] 单独下载失败: {e}")
+        return None
+
+
 def _yf_symbol(ticker: str) -> str:
     """DB ticker → yfinance symbol: BRK.B → BRK-B"""
     return ticker.upper().replace(".", "-")
@@ -231,7 +255,22 @@ def _download_and_save(
         yf_t = _yf_symbol(t)
         if is_multi:
             if yf_t not in top_level:
-                log.warning(f"[{t}] not in yfinance response")
+                log.warning(f"[{t}] not in batch response, retrying solo...")
+                # 尝试单独下载该 ticker
+                solo_df = _download_single(t, yf_t, start_date, end_date, yf_interval)
+                if solo_df is not None and not solo_df.empty:
+                    normalized = _normalize_frame(t, interval, solo_df)
+                    if not normalized.empty:
+                        try:
+                            rows_inserted = _save_rows(conn, normalized)
+                            new_last = normalized["datetime"].max().date()
+                            set_sync_ok(conn, t, sync_type, new_last, rows_inserted)
+                            result[t] = "ok"
+                            log.info(f"[{t}] 单独拉取成功：写入 {rows_inserted} 条")
+                            continue
+                        except Exception as e:
+                            log.error(f"[{t}] 单独拉取写库失败: {e}")
+                # 单独拉取也失败
                 set_sync_error(conn, t, sync_type, "yfinance: ticker not in response")
                 result[t] = "no_data"
                 continue
