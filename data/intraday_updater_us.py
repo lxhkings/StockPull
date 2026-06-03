@@ -108,11 +108,12 @@ def _save_rows(conn, df: pd.DataFrame) -> int:
     return len(rows)
 
 
-def update_intraday(interval: str) -> dict[str, str]:
+def update_intraday(interval: str, full_rebase: bool = False) -> dict[str, str]:
     """批量增量拉取美股 intraday，写入 prices_intraday。
 
     Args:
         interval: '15m' 或 '1h'
+        full_rebase: True 时忽略 sync_log，从 floor_date 全量拉取
     Returns:
         {ticker: 'ok' | 'no_data' | 'error: <msg>'}
     """
@@ -133,14 +134,17 @@ def update_intraday(interval: str) -> dict[str, str]:
 
         pending: list[tuple[str, date]] = []
         for t in tickers:
-            last = get_last_sync(conn, t, sync_type)
-            if last is None:
+            if full_rebase:
                 pending.append((t, floor_date))
-            elif last >= today:
-                result[t] = "ok"
             else:
-                start = max(last + timedelta(days=1), floor_date)
-                pending.append((t, start))
+                last = get_last_sync(conn, t, sync_type)
+                if last is None:
+                    pending.append((t, floor_date))
+                elif last >= today:
+                    result[t] = "ok"
+                else:
+                    start = max(last + timedelta(days=1), floor_date)
+                    pending.append((t, start))
 
         if not pending:
             log.info(f"[intraday {interval}] 所有 ticker 已是最新，无需更新")
