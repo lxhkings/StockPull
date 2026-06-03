@@ -58,6 +58,12 @@ uv run main.py weekly --market us   # 美股周线（SP500 + R1000，yfinance in
 uv run main.py weekly --market cn   # A股周线（全量 A 股，tushare pro_bar freq=W）
 uv run main.py weekly --market us --code AAPL      # 单票调试（美股）
 uv run main.py weekly --market cn --code 600519.SH # 单票调试（A股）
+
+# 分钟线采集（prices_intraday 表，仅美股）
+uv run main.py intraday                  # 美股分钟线（默认：15m + 1h）
+uv run main.py intraday --interval 1h    # 仅 1h（730天最大历史）
+uv run main.py intraday --interval 15m   # 仅 15m（60天最大历史）
+uv run main.py intraday --interval 1h --rebase  # 全量回补，忽略 sync_log
 ```
 
 ## 架构设计
@@ -71,6 +77,7 @@ main.py
 
 data/stock_updater_us_weekly.py  # 美股周线（yfinance 1wk → prices_weekly）
 data/stock_updater_cn_weekly.py  # A股周线（tushare freq=W → prices_weekly）
+data/intraday_updater_us.py      # 美股分钟线（yfinance 15m/60m → prices_intraday）
 
 data/index_updater_*.py        # 各市场成分股快照
   ├── index_updater_us.py      # SP500（GitHub CSV）
@@ -93,6 +100,7 @@ config.py                      # 配置管理
 - `update_index_price()` — 指数日线
 - `rebase(tickers)` — 全量重拉（修复 qfq 漂移）
 - `weekly(tickers)` — 周线增量采集（US/CN，写 prices_weekly）
+- `intraday()` — 分钟线增量采集（仅 US，写 prices_intraday）
 
 ## 数据源
 
@@ -157,6 +165,7 @@ MariaDB 时区设置：`+08:00`（每连接设置）。
 - `stocks` — 股票基础信息（ticker, name, gics_sector, exchange）
 - `prices` — 日线数据（date, ticker, open, high, low, close, volume）
 - `prices_weekly` — 周线数据（同 prices 结构；美股=yfinance 1wk，A股=tushare freq=W）
+- `prices_intraday` — 分钟线数据（ticker, interval, datetime, open, high, low, close, volume；仅美股）
 - `indices` — 指数元数据
 - `index_constituents` — 成分股快照（index_id, snapshot_date, ticker, name, sector）
 - `constituent_changes` — 成分股变动记录（ADDED/REMOVED）
