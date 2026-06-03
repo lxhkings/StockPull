@@ -61,6 +61,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="仅拉取指定 interval（默认：15m 和 1h 均拉）",
     )
+    p_intraday.add_argument(
+        "--rebase",
+        action="store_true",
+        default=False,
+        help="全量回补，忽略 sync_log，拉满最大可得历史（1h=730天，15m=60天）",
+    )
 
     p_ts = sub.add_parser("tushare-backfill", help="Tushare 一次性回填三市场底层数据")
     p_ts.add_argument("--scope", choices=("all", "lists", "prices", "derive", "financial"),
@@ -174,12 +180,12 @@ def cmd_migrate_intraday() -> int:
     return 0
 
 
-def cmd_intraday(interval: str | None) -> int:
+def cmd_intraday(interval: str | None, rebase: bool = False) -> int:
     from data.intraday_updater_us import update_intraday, SUPPORTED_INTERVALS
     intervals = [interval] if interval else SUPPORTED_INTERVALS
     for ivl in intervals:
-        log.info(f"[intraday] 开始拉取 {ivl}")
-        result = update_intraday(ivl)
+        log.info(f"[intraday] 开始拉取 {ivl}" + (" (rebase)" if rebase else ""))
+        result = update_intraday(ivl, full_rebase=rebase)
         ok = sum(1 for v in result.values() if v == "ok")
         err = sum(1 for v in result.values() if v.startswith("error"))
         log.info(f"[intraday {ivl}] 完成: ok={ok}, error={err}")
@@ -249,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "migrate-intraday":
         return cmd_migrate_intraday()
     if args.cmd == "intraday":
-        return cmd_intraday(args.interval)
+        return cmd_intraday(args.interval, args.rebase)
     return 1
 
 

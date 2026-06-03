@@ -213,4 +213,22 @@ def test_cli_intraday_single_interval():
         import main
         ret = main.main(["intraday", "--interval", "15m"])
     assert ret == 0
-    mock_update.assert_called_once_with("15m")
+    mock_update.assert_called_once_with("15m", full_rebase=False)
+
+
+def test_cli_intraday_rebase_flag():
+    with patch("data.intraday_updater_us.update_intraday") as mock_update:
+        mock_update.return_value = {"AAPL": "ok"}
+        import main
+        ret = main.main(["intraday", "--interval", "1h", "--rebase"])
+    assert ret == 0
+    mock_update.assert_called_once_with("1h", full_rebase=True)
+
+
+def test_cli_intraday_no_rebase_flag_default():
+    with patch("data.intraday_updater_us.update_intraday") as mock_update:
+        mock_update.return_value = {"AAPL": "ok"}
+        import main
+        ret = main.main(["intraday", "--interval", "1h"])
+    assert ret == 0
+    mock_update.assert_called_once_with("1h", full_rebase=False)
