@@ -27,6 +27,7 @@ from config import (
     YF_TIMEOUT,
 )
 from data.base import to_float, to_int
+from data.stock_updater_us import _last_us_trading_date
 from db import get_conn, get_last_sync, set_sync_error, set_sync_ok
 
 log = logging.getLogger(__name__)
@@ -125,8 +126,8 @@ def update_intraday(interval: str, full_rebase: bool = False) -> dict[str, str]:
     tickers = list_active_tickers()
 
     lookback_days = INTERVAL_LOOKBACK_DAYS[interval]
-    floor_date = date.today() - timedelta(days=lookback_days - 1)
-    today = date.today()
+    last_trading = _last_us_trading_date()  # 最近已收盘的交易日
+    floor_date = last_trading - timedelta(days=lookback_days - 1)
 
     result: dict[str, str] = {}
     conn = get_conn()
@@ -141,7 +142,7 @@ def update_intraday(interval: str, full_rebase: bool = False) -> dict[str, str]:
                 last = get_last_sync(conn, t, sync_type)
                 if last is None:
                     pending.append((t, floor_date))
-                elif last >= today:
+                elif last >= last_trading:
                     result[t] = "ok"
                 else:
                     start = max(last + timedelta(days=1), floor_date)
@@ -159,7 +160,7 @@ def update_intraday(interval: str, full_rebase: bool = False) -> dict[str, str]:
             batch_pairs = pending[i:i + YF_BATCH_SIZE]
             batch = [t for t, _ in batch_pairs]
             batch_start = min(s for _, s in batch_pairs)
-            _download_and_save(conn, batch, interval, batch_start, result)
+            _download_and_save(conn, batch, interval, batch_start, last_trading, result)
             if i + YF_BATCH_SIZE < len(pending):
                 delay = YF_BATCH_DELAY_BASE + random.uniform(
                     -YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER
@@ -177,15 +178,16 @@ def _download_and_save(
     tickers: list[str],
     interval: str,
     start_date: date,
+    last_trading: date,
     result: dict[str, str],
 ) -> None:
     """下载一批 ticker 的 intraday 数据并保存到 prices_intraday。"""
-    end_date = date.today() + timedelta(days=1)
+    end_date = last_trading + timedelta(days=1)
     yf_interval = YF_INTERVAL_MAP[interval]
     yf_symbols = [_yf_symbol(t) for t in tickers]
     sync_type = _sync_type(interval)
 
-    log.info(f"[intraday {interval}] 下载 {len(tickers)} 只，{start_date} ~ {date.today()}")
+    log.info(f"[intraday {interval}] 下载 {len(tickers)} 只，{start_date} ~ {last_trading}")
 
     df = None
     last_exc: Optional[Exception] = None
