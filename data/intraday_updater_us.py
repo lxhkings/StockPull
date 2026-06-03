@@ -151,7 +151,7 @@ def update_intraday(interval: str, full_rebase: bool = False) -> dict[str, str]:
 
     lookback_days = INTERVAL_LOOKBACK_DAYS[interval]
     last_trading = _last_us_trading_date()  # 最近已收盘的交易日
-    floor_date = last_trading - timedelta(days=lookback_days - 1)
+    floor_date = last_trading - timedelta(days=lookback_days)  # 正好在 API 限制内
 
     result: dict[str, str] = {}
     conn = get_conn()
