@@ -366,13 +366,27 @@ uv run pytest tests/test_cn_index_price.py -v
 
 ```bash
 # 全量采集（首次/重建）
-uv run main.py futu-full             # 全量采集（所有 scope）
-uv run main.py futu-full --scope financial  # 仅财务表
+uv run main.py futu-full                    # 全量采集（所有 scope，~10h）
+uv run main.py futu-full --scope financial  # 仅财务4表（~4.5h）
+uv run main.py futu-full --scope other      # 除财务表外的全部（~5.5h）
 
 # 增量同步（cron 每日；按接口频率节流）
-uv run main.py futu-sync            # 增量同步（所有 scope）
-uv run main.py futu-sync --scope daily  # 仅日频快照
+uv run main.py futu-sync                    # 增量同步（所有 scope）
+uv run main.py futu-sync --scope daily      # 仅日频快照
 ```
+
+**Scope 选项：**
+- `all` — 全部 22 张表
+- `other` — 除 financial 外的 18 张表（已采 financial 后使用）
+- `financial` — 财务4表（利润表/资产负债表/现金流量表/关键指标）
+- `earnings` — 财报发布日 + PIT 回填
+- `actions` — 分红/拆股
+- `profile` — 公司元数据
+- `revenue` — 分部营收 + 财报日涨跌
+- `shareholders` — 5张股东相关表
+- `efficiency` — 运营效率
+- `daily` — 6张日频快照（流通股/分析师/资金流/卖空）
+- `weekly` — 3张周频快照（估值/评级/Morningstar）
 
 前提：本地 OpenD 运行于 `127.0.0.1:11111`，美股行情权限 ≥ LV1。
 
