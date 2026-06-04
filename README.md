@@ -365,23 +365,13 @@ uv run pytest tests/test_cn_index_price.py -v
 ### 数据来源 & 抓取命令
 
 ```bash
-# 一次性全量回填（财报 + 发布日 + 分红 + 拆股），约 2-4 小时
-uv run main.py futu-backfill --scope all
+# 全量采集（首次/重建）
+uv run main.py futu-full             # 全量采集（所有 scope）
+uv run main.py futu-full --scope financial  # 仅财务表
 
-# 分 scope 回填
-uv run main.py futu-backfill --scope financial   # 仅四张财务表
-uv run main.py futu-backfill --scope earnings    # 财报发布日 + PIT 回填 ann_date
-uv run main.py futu-backfill --scope actions     # 分红 + 拆股
-uv run main.py futu-backfill --scope profile     # 公司元数据
-uv run main.py futu-backfill --scope revenue     # 分部营收 + 财报日涨跌
-uv run main.py futu-backfill --scope shareholders  # 股东 + 内部人（5 张表）
-uv run main.py futu-backfill --scope efficiency  # 运营效率
-
-# 每日快照增量（流通股 + 分析师预期 + 资金流 + 卖空），接入 cron
-uv run main.py futu-daily
-
-# 周频快照（估值 + 评级 + Morningstar）
-uv run main.py futu-weekly
+# 增量同步（cron 每日；按接口频率节流）
+uv run main.py futu-sync            # 增量同步（所有 scope）
+uv run main.py futu-sync --scope daily  # 仅日频快照
 ```
 
 前提：本地 OpenD 运行于 `127.0.0.1:11111`，美股行情权限 ≥ LV1。

@@ -30,6 +30,12 @@ uv run main.py daily --market cn --code 600519.SH  # single ticker (debug)
 uv run main.py rebase --market cn   # full hfq re-pull
 uv run main.py status               # DB sync summary
 
+# Futu 美股基本面
+uv run main.py futu-full             # 全量采集（首次/重建）
+uv run main.py futu-full --scope financial
+uv run main.py futu-sync            # 增量（cron 每日；按接口频率节流）
+uv run main.py futu-sync --scope daily
+
 # Tushare 回填（股票基础信息、行业分类）
 uv run main.py tushare-backfill --scope lists --market cn  # A股基础信息+行业
 
