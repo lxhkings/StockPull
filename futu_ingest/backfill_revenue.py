@@ -15,7 +15,6 @@ from futu_ingest.concurrency import run_streams, ticker_stream
 
 log = logging.getLogger(__name__)
 
-SYNC_DATA_TYPE = "us_revenue"
 RECENT_PERIODS = 10  # 限近 ~10 期（2-3 年），避免 71 期全量导致 21hr runtime
 
 

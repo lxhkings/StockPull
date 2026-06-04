@@ -18,8 +18,6 @@ from futu_ingest.concurrency import run_streams, ticker_stream
 
 log = logging.getLogger(__name__)
 
-SYNC_DATA_TYPE = "us_shareholders"
-
 
 def backfill_overview(client, ticker: str) -> int:
     """抓单只股东概览，upsert。返回写入行数。"""
