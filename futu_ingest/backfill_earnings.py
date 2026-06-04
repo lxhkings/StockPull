@@ -12,6 +12,7 @@ import pandas as pd
 
 from db import get_conn, execute
 from futu_ingest.client import get_client, to_futu_code
+from futu_ingest.concurrency import ticker_stream
 
 log = logging.getLogger(__name__)
 
@@ -84,13 +85,9 @@ def run_pit_backfill() -> dict:
     return result
 
 
-def backfill_all(tickers: list[str]) -> dict:
+def backfill_all(tickers: list[str], force: bool = False) -> dict:
     client = get_client()
-    total = 0
-    for t in tickers:
-        try:
-            total += backfill_earnings(client, t)
-        except Exception as e:  # noqa: BLE001
-            log.error(f"earnings {t}: {e}")
+    rows, ok, skipped = ticker_stream(backfill_earnings, client, tickers,
+                                      "us_earnings_dates", force=force)
     pit = run_pit_backfill()
-    return {"earnings_rows": total, "tickers": len(tickers), "pit": pit}
+    return {"earnings_rows": rows, "tickers": ok, "skipped": skipped, "pit": pit}

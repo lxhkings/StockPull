@@ -35,3 +35,16 @@ def test_backfill_profile_skips_empty():
     with patch("futu_ingest.backfill_profile.get_conn"):
         n = backfill_profile(client, "AAPL")
     assert n == 0
+
+
+from futu_ingest.backfill_profile import backfill_all as profile_all
+
+
+def test_profile_backfill_all_uses_ticker_stream():
+    with patch("futu_ingest.backfill_profile.get_client"), \
+         patch("futu_ingest.backfill_profile.ticker_stream",
+               return_value=(5, 1, 1)) as ts:
+        rep = profile_all(["AAPL", "MSFT"], force=True)
+    assert rep == {"rows": 5, "tickers": 1, "skipped": 1}
+    assert ts.call_args[0][3] == "us_company_profile"
+    assert ts.call_args[1]["force"] is True

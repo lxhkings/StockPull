@@ -33,3 +33,20 @@ def test_pit_backfill_sql_targets_all_4_tables():
     # 4 张财务表都要回填 ann_date
     for tbl in ("us_fin_income", "us_fin_balance", "us_fin_cashflow", "us_fin_indicator"):
         assert tbl in PIT_BACKFILL_SQL
+
+
+from futu_ingest.backfill_earnings import backfill_all as earnings_all
+
+
+def test_earnings_backfill_all_uses_ticker_stream_then_pit():
+    with patch("futu_ingest.backfill_earnings.get_client"), \
+         patch("futu_ingest.backfill_earnings.ticker_stream",
+               return_value=(9, 1, 1)) as ts, \
+         patch("futu_ingest.backfill_earnings.run_pit_backfill",
+               return_value={"us_fin_income": 3}) as pit:
+        rep = earnings_all(["AAPL", "MSFT"], force=True)
+    assert ts.call_args[0][3] == "us_earnings_dates"
+    assert rep["earnings_rows"] == 9
+    assert rep["skipped"] == 1
+    assert rep["pit"] == {"us_fin_income": 3}
+    pit.assert_called_once()

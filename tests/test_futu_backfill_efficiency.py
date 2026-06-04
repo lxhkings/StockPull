@@ -41,3 +41,15 @@ def test_backfill_efficiency_upserts():
     assert rows[0][0] == "AAPL"
     assert rows[0][1] == "2025/FY"
     assert rows[0][3] == 164000  # employee_num
+
+
+from futu_ingest.backfill_efficiency import backfill_all as eff_all
+
+
+def test_efficiency_backfill_all_uses_ticker_stream():
+    with patch("futu_ingest.backfill_efficiency.get_client"), \
+         patch("futu_ingest.backfill_efficiency.ticker_stream",
+               return_value=(7, 2, 0)) as ts:
+        rep = eff_all(["AAPL", "MSFT"], force=False)
+    assert rep == {"rows": 7, "tickers": 2, "skipped": 0}
+    assert ts.call_args[0][3] == "us_op_efficiency"

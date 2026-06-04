@@ -6,6 +6,7 @@ from datetime import date
 
 from db import get_conn
 from futu_ingest.client import get_client, to_futu_code
+from futu_ingest.concurrency import ticker_stream
 
 log = logging.getLogger(__name__)
 
@@ -52,15 +53,8 @@ def backfill_profile(client, ticker: str) -> int:
     return len(rows)
 
 
-def backfill_all(tickers: list[str]) -> dict:
+def backfill_all(tickers: list[str], force: bool = False) -> dict:
     client = get_client()
-    total = 0
-    ok = 0
-    for t in tickers:
-        try:
-            n = backfill_profile(client, t)
-            total += n
-            ok += 1
-        except Exception as e:  # noqa: BLE001
-            log.error(f"profile {t}: {e}")
-    return {"rows": total, "tickers": ok}
+    rows, ok, skipped = ticker_stream(backfill_profile, client, tickers,
+                                      "us_company_profile", force=force)
+    return {"rows": rows, "tickers": ok, "skipped": skipped}

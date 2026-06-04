@@ -6,6 +6,7 @@ import logging
 
 from db import get_conn
 from futu_ingest.client import get_client, to_futu_code
+from futu_ingest.concurrency import ticker_stream
 
 log = logging.getLogger(__name__)
 
@@ -61,14 +62,8 @@ def backfill_efficiency(client, ticker: str) -> int:
     return len(rows)
 
 
-def backfill_all(tickers: list[str]) -> dict:
+def backfill_all(tickers: list[str], force: bool = False) -> dict:
     client = get_client()
-    total = 0
-    ok = 0
-    for t in tickers:
-        try:
-            total += backfill_efficiency(client, t)
-            ok += 1
-        except Exception as e:  # noqa: BLE001
-            log.error(f"efficiency {t}: {e}")
-    return {"rows": total, "tickers": ok}
+    rows, ok, skipped = ticker_stream(backfill_efficiency, client, tickers,
+                                      "us_op_efficiency", force=force)
+    return {"rows": rows, "tickers": ok, "skipped": skipped}
