@@ -47,8 +47,34 @@ def test_backfill_splits_paginates_and_upserts():
 
 def test_backfill_all_aggregates_via_streams(monkeypatch):
     import futu_ingest.backfill_actions as m
+
+    def fake_ts(fn, client, tickers, data_type, force=False):
+        # Call the mocked backfill_fn to get row count
+        n = fn(client, tickers[0]) if tickers else 0
+        return (n * len(tickers), len(tickers), 0)
+
     monkeypatch.setattr(m, "get_client", lambda: object())
+    monkeypatch.setattr(m, "ticker_stream", fake_ts)
     monkeypatch.setattr(m, "backfill_dividends", lambda c, t: 2)
     monkeypatch.setattr(m, "backfill_splits", lambda c, t: 3)
     rep = m.backfill_all(["A", "B"])
-    assert rep == {"dividends": 4, "splits": 6, "tickers": 2}
+    assert rep == {"dividends": 4, "splits": 6, "skipped": 0, "tickers": 2}
+
+
+def test_actions_backfill_all_passes_data_types_and_force():
+    """验证 backfill_all 正确传递 data_type 和 force 参数到 ticker_stream。"""
+    from futu_ingest.backfill_actions import backfill_all as actions_all
+
+    captured = []
+
+    def fake_ticker_stream(fn, client, tickers, data_type, force=False):
+        captured.append((data_type, force))
+        return (4, 2, 0)
+
+    with patch("futu_ingest.backfill_actions.get_client"), \
+         patch("futu_ingest.backfill_actions.ticker_stream", side_effect=fake_ticker_stream):
+        rep = actions_all(["AAPL"], force=True)
+    assert ("us_dividends", True) in captured
+    assert ("us_splits", True) in captured
+    assert rep["dividends"] == 4 and rep["splits"] == 4
+    assert rep["skipped"] == 0

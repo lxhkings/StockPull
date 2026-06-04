@@ -78,10 +78,13 @@ def backfill_splits(client, ticker: str) -> int:
     return len(rows)
 
 
-def backfill_all(tickers: list[str]) -> dict:
+def backfill_all(tickers: list[str], force: bool = False) -> dict:
     client = get_client()
     r = run_streams([
-        ("div",   lambda: ticker_stream(backfill_dividends, client, tickers, "dividends")),
-        ("split", lambda: ticker_stream(backfill_splits, client, tickers, "splits")),
+        ("div",   lambda: ticker_stream(backfill_dividends, client, tickers, "us_dividends", force=force)),
+        ("split", lambda: ticker_stream(backfill_splits, client, tickers, "us_splits", force=force)),
     ])
-    return {"dividends": r["div"][0], "splits": r["split"][0], "tickers": len(tickers)}
+    return {
+        "dividends": r["div"][0], "splits": r["split"][0],
+        "skipped": r["div"][2] + r["split"][2], "tickers": r["div"][1],
+    }

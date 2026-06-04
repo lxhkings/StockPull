@@ -135,7 +135,13 @@ def test_backfill_insider_trades_returns_0_on_empty():
 
 def test_backfill_all_aggregates_via_streams(monkeypatch):
     import futu_ingest.backfill_shareholders as m
+
+    def fake_ts(fn, client, tickers, data_type, force=False):
+        n = fn(client, tickers[0]) if tickers else 0
+        return (n * len(tickers), len(tickers), 0)
+
     monkeypatch.setattr(m, "get_client", lambda: object())
+    monkeypatch.setattr(m, "ticker_stream", fake_ts)
     monkeypatch.setattr(m, "backfill_overview", lambda c, t: 1)
     monkeypatch.setattr(m, "backfill_holding_changes", lambda c, t: 2)
     monkeypatch.setattr(m, "backfill_institutional", lambda c, t: 3)
@@ -144,5 +150,26 @@ def test_backfill_all_aggregates_via_streams(monkeypatch):
     rep = m.backfill_all(["A", "B"])
     assert rep == {
         "overview_rows": 2, "changes_rows": 4, "institutional_rows": 6,
-        "insider_holders_rows": 8, "insider_trades_rows": 10, "tickers": 2,
+        "insider_holders_rows": 8, "insider_trades_rows": 10,
+        "skipped": 0, "tickers": 2,
     }
+
+
+def test_shareholders_backfill_all_passes_5_data_types():
+    """验证 backfill_all 正确传递 5 个 data_type 和 force 参数到 ticker_stream。"""
+    from futu_ingest.backfill_shareholders import backfill_all as sh_all
+
+    captured = []
+
+    def fake_ts(fn, client, tickers, data_type, force=False):
+        captured.append(data_type)
+        return (1, 1, 0)
+
+    with patch("futu_ingest.backfill_shareholders.get_client"), \
+         patch("futu_ingest.backfill_shareholders.ticker_stream", side_effect=fake_ts):
+        rep = sh_all(["AAPL"], force=True)
+    assert set(captured) == {
+        "us_shareholders_overview", "us_holding_changes", "us_institutional",
+        "us_insider_holders", "us_insider_trades",
+    }
+    assert rep["tickers"] == 1

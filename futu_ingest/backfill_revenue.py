@@ -140,10 +140,13 @@ def backfill_earnings_move(client, ticker: str) -> int:
     return len(rows)
 
 
-def backfill_all(tickers: list[str]) -> dict:
+def backfill_all(tickers: list[str], force: bool = False) -> dict:
     client = get_client()
     r = run_streams([
-        ("rev",  lambda: ticker_stream(backfill_revenue, client, tickers, "revenue")),
-        ("move", lambda: ticker_stream(backfill_earnings_move, client, tickers, "earnings_move")),
+        ("rev",  lambda: ticker_stream(backfill_revenue, client, tickers, "us_revenue_breakdown", force=force)),
+        ("move", lambda: ticker_stream(backfill_earnings_move, client, tickers, "us_earnings_price_move", force=force)),
     ])
-    return {"revenue_rows": r["rev"][0], "earnings_move_rows": r["move"][0], "tickers": r["rev"][1]}
+    return {
+        "revenue_rows": r["rev"][0], "earnings_move_rows": r["move"][0],
+        "skipped": r["rev"][2] + r["move"][2], "tickers": r["rev"][1],
+    }

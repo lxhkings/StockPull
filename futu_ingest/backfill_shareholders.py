@@ -244,14 +244,14 @@ def backfill_insider_trades(client, ticker: str) -> int:
     return len(rows)
 
 
-def backfill_all(tickers: list[str]) -> dict:
+def backfill_all(tickers: list[str], force: bool = False) -> dict:
     client = get_client()
     r = run_streams([
-        ("overview", lambda: ticker_stream(backfill_overview, client, tickers, "overview")),
-        ("changes",  lambda: ticker_stream(backfill_holding_changes, client, tickers, "changes")),
-        ("inst",     lambda: ticker_stream(backfill_institutional, client, tickers, "inst")),
-        ("holders",  lambda: ticker_stream(backfill_insider_holders, client, tickers, "holders")),
-        ("trades",   lambda: ticker_stream(backfill_insider_trades, client, tickers, "trades")),
+        ("overview", lambda: ticker_stream(backfill_overview, client, tickers, "us_shareholders_overview", force=force)),
+        ("changes",  lambda: ticker_stream(backfill_holding_changes, client, tickers, "us_holding_changes", force=force)),
+        ("inst",     lambda: ticker_stream(backfill_institutional, client, tickers, "us_institutional", force=force)),
+        ("holders",  lambda: ticker_stream(backfill_insider_holders, client, tickers, "us_insider_holders", force=force)),
+        ("trades",   lambda: ticker_stream(backfill_insider_trades, client, tickers, "us_insider_trades", force=force)),
     ])
     return {
         "overview_rows": r["overview"][0],
@@ -259,5 +259,6 @@ def backfill_all(tickers: list[str]) -> dict:
         "institutional_rows": r["inst"][0],
         "insider_holders_rows": r["holders"][0],
         "insider_trades_rows": r["trades"][0],
+        "skipped": sum(r[k][2] for k in r),
         "tickers": r["overview"][1],
     }

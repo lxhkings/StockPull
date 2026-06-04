@@ -61,8 +61,32 @@ def test_backfill_earnings_move_upserts():
 
 def test_backfill_all_aggregates_via_streams(monkeypatch):
     import futu_ingest.backfill_revenue as m
+
+    def fake_ts(fn, client, tickers, data_type, force=False):
+        n = fn(client, tickers[0]) if tickers else 0
+        return (n * len(tickers), len(tickers), 0)
+
     monkeypatch.setattr(m, "get_client", lambda: object())
+    monkeypatch.setattr(m, "ticker_stream", fake_ts)
     monkeypatch.setattr(m, "backfill_revenue", lambda c, t: 7)
     monkeypatch.setattr(m, "backfill_earnings_move", lambda c, t: 11)
     rep = m.backfill_all(["A", "B"])
-    assert rep == {"revenue_rows": 14, "earnings_move_rows": 22, "tickers": 2}
+    assert rep == {"revenue_rows": 14, "earnings_move_rows": 22, "skipped": 0, "tickers": 2}
+
+
+def test_revenue_backfill_all_passes_data_types():
+    """验证 backfill_all 正确传递 data_type 和 force 参数到 ticker_stream。"""
+    from futu_ingest.backfill_revenue import backfill_all as revenue_all
+
+    captured = []
+
+    def fake_ts(fn, client, tickers, data_type, force=False):
+        captured.append((data_type, force))
+        return (6, 3, 1)
+
+    with patch("futu_ingest.backfill_revenue.get_client"), \
+         patch("futu_ingest.backfill_revenue.ticker_stream", side_effect=fake_ts):
+        rep = revenue_all(["AAPL"], force=False)
+    assert ("us_revenue_breakdown", False) in captured
+    assert ("us_earnings_price_move", False) in captured
+    assert rep["revenue_rows"] == 6 and rep["earnings_move_rows"] == 6
