@@ -11,8 +11,10 @@ from datetime import date
 import pandas as pd
 
 from db import get_conn
+from config import FUTU_REFRESH_DAYS
 from futu_ingest.client import get_client, to_futu_code, from_futu_code
 from futu_ingest.concurrency import run_streams, ticker_stream
+from futu_ingest.sync import fresh_tickers, mark_ok, mark_error
 
 log = logging.getLogger(__name__)
 
@@ -98,10 +100,23 @@ def snapshot_analyst(client, ticker: str) -> int:
     return 1
 
 
-def run_daily(tickers: list[str]) -> dict:
+def sync_shares(client, tickers: list[str], force: bool = False) -> tuple[int, int, int]:
+    """批量流通股快照，哨兵 __ALL__ 按日节流。返回 (rows, ok, skipped)。"""
+    if not force:
+        rd = FUTU_REFRESH_DAYS["us_shares_daily"]
+        if "__ALL__" in fresh_tickers("us_shares_daily", rd):
+            return 0, 0, 1
+    n = snapshot_shares(client, tickers)
+    mark_ok("__ALL__", "us_shares_daily", n)
+    return n, 1, 0
+
+
+def run_daily(tickers: list[str], force: bool = False) -> dict:
     client = get_client()
     r = run_streams([
-        ("shares",  lambda: (snapshot_shares(client, tickers), len(tickers))),
-        ("analyst", lambda: ticker_stream(snapshot_analyst, client, tickers, "analyst")),
+        ("shares",  lambda: sync_shares(client, tickers, force=force)),
+        ("analyst", lambda: ticker_stream(snapshot_analyst, client, tickers,
+                                          "us_analyst_consensus", force=force)),
     ])
-    return {"shares": r["shares"][0], "analyst": r["analyst"][0], "tickers": len(tickers)}
+    return {"shares": r["shares"][0], "analyst": r["analyst"][0],
+            "skipped": r["shares"][2] + r["analyst"][2], "tickers": len(tickers)}

@@ -92,9 +92,30 @@ def test_snapshot_morningstar_upserts():
 
 def test_run_weekly_aggregates_via_streams(monkeypatch):
     import futu_ingest.snapshot_weekly as m
+    import futu_ingest.concurrency as conc
     monkeypatch.setattr(m, "get_client", lambda: object())
     monkeypatch.setattr(m, "snapshot_valuation", lambda c, t: 1)
     monkeypatch.setattr(m, "snapshot_rating", lambda c, t: 2)
     monkeypatch.setattr(m, "snapshot_morningstar", lambda c, t: 3)
+    monkeypatch.setattr(conc, "fresh_tickers", lambda dt, rd: set())
+    monkeypatch.setattr(conc, "mark_ok", lambda t, dt, n: None)
+    monkeypatch.setattr(conc, "mark_error", lambda t, dt, msg: None)
     rep = m.run_weekly(["A", "B"])
-    assert rep == {"valuation": 2, "rating": 4, "morningstar": 6, "tickers": 2}
+    assert rep == {"valuation": 2, "rating": 4, "morningstar": 6, "skipped": 0, "tickers": 2}
+
+
+def test_run_weekly_passes_3_data_types():
+    from unittest.mock import patch
+    from futu_ingest.snapshot_weekly import run_weekly as weekly_run
+    captured = []
+
+    def fake_ts(fn, client, tickers, data_type, force=False):
+        captured.append((data_type, force))
+        return (1, 1, 0)
+
+    with patch("futu_ingest.snapshot_daily_ext.get_client"), \
+         patch("futu_ingest.snapshot_weekly.ticker_stream", side_effect=fake_ts):
+        weekly_run(["AAPL"], force=True)
+    assert {c[0] for c in captured} == {
+        "us_valuation_snapshot", "us_rating_summary", "us_morningstar"}
+    assert all(c[1] is True for c in captured)

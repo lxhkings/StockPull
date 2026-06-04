@@ -73,13 +73,35 @@ def test_snapshot_short_interest_handles_3_value_return():
 
 def test_run_daily_ext_aggregates_via_streams(monkeypatch):
     import futu_ingest.snapshot_daily_ext as m
+    import futu_ingest.concurrency as conc
     monkeypatch.setattr(m, "get_client", lambda: object())
     monkeypatch.setattr(m, "snapshot_capital_flow", lambda c, t: 1)
     monkeypatch.setattr(m, "snapshot_capital_dist", lambda c, t: 2)
     monkeypatch.setattr(m, "snapshot_short_interest", lambda c, t: 3)
     monkeypatch.setattr(m, "snapshot_short_volume", lambda c, t: 4)
+    monkeypatch.setattr(conc, "fresh_tickers", lambda dt, rd: set())
+    monkeypatch.setattr(conc, "mark_ok", lambda t, dt, n: None)
+    monkeypatch.setattr(conc, "mark_error", lambda t, dt, msg: None)
     rep = m.run_daily_ext(["A", "B"])
     assert rep == {
         "capital_flow": 2, "capital_dist": 4,
-        "short_interest": 6, "short_volume": 8, "tickers": 2,
+        "short_interest": 6, "short_volume": 8,
+        "skipped": 0, "tickers": 2,
     }
+
+
+def test_run_daily_ext_passes_4_daily_data_types():
+    from unittest.mock import patch
+    from futu_ingest.snapshot_daily_ext import run_daily_ext as ext_run
+    captured = []
+
+    def fake_ts(fn, client, tickers, data_type, force=False):
+        captured.append((data_type, force))
+        return (1, 1, 0)
+
+    with patch("futu_ingest.snapshot_daily_ext.get_client"), \
+         patch("futu_ingest.snapshot_daily_ext.ticker_stream", side_effect=fake_ts):
+        ext_run(["AAPL"], force=False)
+    dtypes = {c[0] for c in captured}
+    assert dtypes == {"us_capital_flow", "us_capital_distribution",
+                      "us_short_interest", "us_daily_short_volume"}

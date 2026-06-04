@@ -11,6 +11,7 @@ from datetime import date
 from db import get_conn
 from futu_ingest.client import get_client, to_futu_code
 from futu_ingest.concurrency import run_streams, ticker_stream
+from futu_ingest.sync import fresh_tickers, mark_ok, mark_error
 
 log = logging.getLogger(__name__)
 
@@ -154,16 +155,17 @@ def snapshot_morningstar(client, ticker: str) -> int:
     return 1
 
 
-def run_weekly(tickers: list[str]) -> dict:
+def run_weekly(tickers: list[str], force: bool = False) -> dict:
     client = get_client()
     r = run_streams([
-        ("val",     lambda: ticker_stream(snapshot_valuation, client, tickers, "valuation")),
-        ("rating",  lambda: ticker_stream(snapshot_rating, client, tickers, "rating")),
-        ("morning", lambda: ticker_stream(snapshot_morningstar, client, tickers, "morningstar")),
+        ("val",     lambda: ticker_stream(snapshot_valuation, client, tickers, "us_valuation_snapshot", force=force)),
+        ("rating",  lambda: ticker_stream(snapshot_rating, client, tickers, "us_rating_summary", force=force)),
+        ("morning", lambda: ticker_stream(snapshot_morningstar, client, tickers, "us_morningstar", force=force)),
     ])
     return {
         "valuation": r["val"][0],
         "rating": r["rating"][0],
         "morningstar": r["morning"][0],
+        "skipped": sum(r[k][2] for k in r),
         "tickers": r["val"][1],
     }

@@ -14,6 +14,7 @@ from datetime import date
 from db import get_conn
 from futu_ingest.client import get_client, to_futu_code
 from futu_ingest.concurrency import run_streams, ticker_stream
+from futu_ingest.sync import fresh_tickers, mark_ok, mark_error
 
 log = logging.getLogger(__name__)
 
@@ -211,19 +212,20 @@ def snapshot_short_volume(client, ticker: str) -> int:
     return len(rows)
 
 
-def run_daily_ext(tickers: list[str]) -> dict:
+def run_daily_ext(tickers: list[str], force: bool = False) -> dict:
     """Batch 2 日频扩展：资金流 + 卖空。"""
     client = get_client()
     r = run_streams([
-        ("flow", lambda: ticker_stream(snapshot_capital_flow, client, tickers, "capital_flow")),
-        ("dist", lambda: ticker_stream(snapshot_capital_dist, client, tickers, "capital_dist")),
-        ("si",   lambda: ticker_stream(snapshot_short_interest, client, tickers, "short_interest")),
-        ("sv",   lambda: ticker_stream(snapshot_short_volume, client, tickers, "short_volume")),
+        ("flow", lambda: ticker_stream(snapshot_capital_flow, client, tickers, "us_capital_flow", force=force)),
+        ("dist", lambda: ticker_stream(snapshot_capital_dist, client, tickers, "us_capital_distribution", force=force)),
+        ("si",   lambda: ticker_stream(snapshot_short_interest, client, tickers, "us_short_interest", force=force)),
+        ("sv",   lambda: ticker_stream(snapshot_short_volume, client, tickers, "us_daily_short_volume", force=force)),
     ])
     return {
         "capital_flow": r["flow"][0],
         "capital_dist": r["dist"][0],
         "short_interest": r["si"][0],
         "short_volume": r["sv"][0],
+        "skipped": sum(r[k][2] for k in r),
         "tickers": r["flow"][1],
     }
