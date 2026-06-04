@@ -10,8 +10,6 @@ from futu_ingest.concurrency import ticker_stream
 
 log = logging.getLogger(__name__)
 
-SYNC_DATA_TYPE = "us_efficiency"
-
 
 def backfill_efficiency(client, ticker: str) -> int:
     """抓单只运营效率，upsert。返回写入行数。"""
