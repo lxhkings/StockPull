@@ -14,7 +14,7 @@ from db import get_conn
 from config import FUTU_REFRESH_DAYS
 from futu_ingest.client import get_client, to_futu_code, from_futu_code
 from futu_ingest.concurrency import run_streams, ticker_stream
-from futu_ingest.sync import fresh_tickers, mark_ok, mark_error
+from futu_ingest.sync import fresh_tickers, mark_ok
 
 log = logging.getLogger(__name__)
 
