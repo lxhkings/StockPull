@@ -74,13 +74,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_ts.add_argument("--market", choices=("all", "cn", "hk", "us"), default="all")
     p_ts.add_argument("--dry-run", action="store_true")
 
-    p_fb = sub.add_parser("futu-backfill", help="Futu 一次性回填美股基本面数据")
-    p_fb.add_argument("--scope", choices=("all", "financial", "earnings", "actions",
-                                           "profile", "revenue", "shareholders", "efficiency"),
-                      default="all")
-
-    sub.add_parser("futu-daily", help="Futu 每日快照增量（流通股 + 分析师预期）")
-    sub.add_parser("futu-weekly", help="Futu 周频快照（估值 + 评级 + Morningstar）")
+    SCOPES = ("all", "daily", "weekly", "financial", "earnings", "actions",
+              "profile", "revenue", "shareholders", "efficiency")
+    p_ff = sub.add_parser("futu-full", help="Futu 全量采集（忽略节流，强制重拉）")
+    p_ff.add_argument("--scope", choices=SCOPES, default="all")
+    p_fs = sub.add_parser("futu-sync", help="Futu 增量采集（按接口频率节流，cron 每日跑）")
+    p_fs.add_argument("--scope", choices=SCOPES, default="all")
 
     return p
 
@@ -199,24 +198,15 @@ def cmd_tushare_backfill(scope: str, market: str, dry_run: bool) -> int:
     return 0
 
 
-def cmd_futu_backfill(scope: str) -> int:
+def cmd_futu_full(scope: str) -> int:
     from futu_ingest.orchestrator import run_sync
-    rep = run_sync(scope=scope, force=True)
-    print(rep)
+    print(run_sync(scope=scope, force=True))
     return 0
 
 
-def cmd_futu_daily() -> int:
+def cmd_futu_sync(scope: str) -> int:
     from futu_ingest.orchestrator import run_sync
-    rep = run_sync(scope="daily", force=False)
-    print(rep)
-    return 0
-
-
-def cmd_futu_weekly() -> int:
-    from futu_ingest.orchestrator import run_sync
-    rep = run_sync(scope="weekly", force=False)
-    print(rep)
+    print(run_sync(scope=scope, force=False))
     return 0
 
 
@@ -246,12 +236,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_rebase(args.market, args.code, args.years, args.index, args.etf_only)
     if args.cmd == "tushare-backfill":
         return cmd_tushare_backfill(args.scope, args.market, args.dry_run)
-    if args.cmd == "futu-backfill":
-        return cmd_futu_backfill(args.scope)
-    if args.cmd == "futu-daily":
-        return cmd_futu_daily()
-    if args.cmd == "futu-weekly":
-        return cmd_futu_weekly()
+    if args.cmd == "futu-full":
+        return cmd_futu_full(args.scope)
+    if args.cmd == "futu-sync":
+        return cmd_futu_sync(args.scope)
     if args.cmd == "migrate-intraday":
         return cmd_migrate_intraday()
     if args.cmd == "intraday":
