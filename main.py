@@ -200,22 +200,22 @@ def cmd_tushare_backfill(scope: str, market: str, dry_run: bool) -> int:
 
 
 def cmd_futu_backfill(scope: str) -> int:
-    from futu_ingest.orchestrator import run_backfill
-    rep = run_backfill(scope=scope)
+    from futu_ingest.orchestrator import run_sync
+    rep = run_sync(scope=scope, force=True)
     print(rep)
     return 0
 
 
 def cmd_futu_daily() -> int:
-    from futu_ingest.orchestrator import run_daily
-    rep = run_daily()
+    from futu_ingest.orchestrator import run_sync
+    rep = run_sync(scope="daily", force=False)
     print(rep)
     return 0
 
 
 def cmd_futu_weekly() -> int:
-    from futu_ingest.orchestrator import run_weekly
-    rep = run_weekly()
+    from futu_ingest.orchestrator import run_sync
+    rep = run_sync(scope="weekly", force=False)
     print(rep)
     return 0
 

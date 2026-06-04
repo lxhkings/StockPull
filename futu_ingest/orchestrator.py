@@ -35,48 +35,48 @@ def list_us_tickers() -> list[str]:
             return [r["ticker"] for r in cur.fetchall()]
 
 
-def run_backfill(scope: str = "all") -> dict:
-    """全量 backfill。scope: all/financial/earnings/actions/profile/revenue/shareholders/efficiency。"""
+def run_sync(scope: str = "all", force: bool = False) -> dict:
+    """统一采集编排。scope 选接口组；force=True 忽略节流全量。
+
+    scope ∈ {all, daily, weekly, financial, earnings, actions,
+             profile, revenue, shareholders, efficiency}。
+    """
     t0 = time.monotonic()
     tickers = list_us_tickers()
-    log.info(f"futu backfill scope={scope}, {len(tickers)} US tickers")
-    rep: dict = {"scope": scope, "tickers": len(tickers)}
+    log.info(f"futu sync scope={scope} force={force}, {len(tickers)} US tickers")
+    rep: dict = {"scope": scope, "force": force, "tickers": len(tickers)}
 
-    if scope in ("all", "financial"):
-        log.info("=== phase: financial ===")
-        rep["financial"] = fin_backfill_all(tickers)
-    if scope in ("all", "earnings"):
-        log.info("=== phase: earnings (+ PIT backfill) ===")
-        rep["earnings"] = earnings_backfill_all(tickers)
-    if scope in ("all", "actions"):
-        log.info("=== phase: actions ===")
-        rep["actions"] = actions_backfill_all(tickers)
-    if scope in ("all", "profile"):
-        log.info("=== phase: profile ===")
-        rep["profile"] = profile_backfill_all(tickers)
-    if scope in ("all", "revenue"):
-        log.info("=== phase: revenue ===")
-        rep["revenue"] = revenue_backfill_all(tickers)
-    if scope in ("all", "shareholders"):
-        log.info("=== phase: shareholders ===")
-        rep["shareholders"] = shareholders_backfill_all(tickers)
-    if scope in ("all", "efficiency"):
-        log.info("=== phase: efficiency ===")
-        rep["efficiency"] = efficiency_backfill_all(tickers)
+    def want(s: str) -> bool:
+        return scope in ("all", s)
+
+    if want("financial"):
+        log.info("=== financial ===")
+        rep["financial"] = fin_backfill_all(tickers, force=force)
+    if want("earnings"):
+        log.info("=== earnings (+ PIT) ===")
+        rep["earnings"] = earnings_backfill_all(tickers, force=force)
+    if want("actions"):
+        log.info("=== actions ===")
+        rep["actions"] = actions_backfill_all(tickers, force=force)
+    if want("profile"):
+        log.info("=== profile ===")
+        rep["profile"] = profile_backfill_all(tickers, force=force)
+    if want("revenue"):
+        log.info("=== revenue ===")
+        rep["revenue"] = revenue_backfill_all(tickers, force=force)
+    if want("shareholders"):
+        log.info("=== shareholders ===")
+        rep["shareholders"] = shareholders_backfill_all(tickers, force=force)
+    if want("efficiency"):
+        log.info("=== efficiency ===")
+        rep["efficiency"] = efficiency_backfill_all(tickers, force=force)
+    if want("daily"):
+        log.info("=== daily snapshot ===")
+        rep["daily"] = snapshot_run_daily(tickers, force=force)
+        rep["daily_ext"] = daily_ext_run(tickers, force=force)
+    if want("weekly"):
+        log.info("=== weekly snapshot ===")
+        rep["weekly"] = snapshot_run_weekly(tickers, force=force)
 
     rep["elapsed_sec"] = round(time.monotonic() - t0, 1)
     return rep
-
-
-def run_daily() -> dict:
-    """每日增量：流通股 + 分析师快照 + 资金流 + 卖空（Batch 2）。"""
-    tickers = list_us_tickers()
-    rep = snapshot_run_daily(tickers)
-    rep.update(daily_ext_run(tickers))
-    return rep
-
-
-def run_weekly() -> dict:
-    """周频快照：估值 + 评级 + Morningstar。"""
-    tickers = list_us_tickers()
-    return snapshot_run_weekly(tickers)
