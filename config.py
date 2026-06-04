@@ -124,6 +124,25 @@ FUTU_LIMIT_INTERVALS = {
     "get_insider_trade_list":             0.312,
 }
 FUTU_DEFAULT_INTERVAL = 1.25
+
+# 各接口刷新周期（天）。futu-sync 增量按此节流：上次成功同步 < N 天则跳过。
+FUTU_REFRESH_DAYS = {
+    # 每日（只返当前值，漏采=永久空洞）
+    "us_shares_daily": 1, "us_analyst_consensus": 1, "us_capital_flow": 1,
+    "us_capital_distribution": 1, "us_short_interest": 1, "us_daily_short_volume": 1,
+    # 周（略小于 7，确保 cron 日跑每周到期）
+    "us_valuation_snapshot": 6, "us_rating_summary": 6, "us_morningstar": 6,
+    # 事件（分红/拆股/财报日，前瞻性需较新）
+    "us_dividends": 20, "us_splits": 20, "us_earnings_dates": 20,
+    # 月
+    "us_company_profile": 25,
+    # 季（每财报季重拉一次，覆盖财报修正）
+    "us_financial": 80, "us_revenue_breakdown": 80, "us_earnings_price_move": 80,
+    "us_shareholders_overview": 80, "us_holding_changes": 80, "us_institutional": 80,
+    "us_insider_holders": 80, "us_insider_trades": 80, "us_op_efficiency": 80,
+}
+FUTU_DEFAULT_REFRESH_DAYS = 80
+
 FUTU_RETRY_COUNT   = 3
 FUTU_RETRY_DELAY   = 3.0
 FUTU_BACKFILL_START = "2010-01-01"   # 财报历史起点
