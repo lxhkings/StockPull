@@ -67,3 +67,28 @@ def test_run_sync_scope_daily_only_runs_daily_groups():
     sd.assert_called_once_with(["AAPL"], force=False)
     de.assert_called_once_with(["AAPL"], force=False)
     assert "daily" in rep
+
+
+def test_run_sync_scope_other_excludes_financial():
+    """other scope 应排除 financial，运行其他所有组。"""
+    with patch.object(orch, "list_us_tickers", return_value=["AAPL"]), \
+         patch.object(orch, "fin_backfill_all") as fin, \
+         patch.object(orch, "earnings_backfill_all", return_value={"earnings_rows": 1}) as ear, \
+         patch.object(orch, "actions_backfill_all", return_value={"dividends": 1}) as act, \
+         patch.object(orch, "profile_backfill_all", return_value={"rows": 1}) as pro, \
+         patch.object(orch, "revenue_backfill_all", return_value={"revenue_rows": 1}) as rev, \
+         patch.object(orch, "shareholders_backfill_all", return_value={"tickers": 1}) as sh, \
+         patch.object(orch, "efficiency_backfill_all", return_value={"rows": 1}) as eff, \
+         patch.object(orch, "snapshot_run_daily", return_value={"shares": 1}) as sd, \
+         patch.object(orch, "daily_ext_run", return_value={"capital_flow": 1}) as de, \
+         patch.object(orch, "snapshot_run_weekly", return_value={"valuation": 1}) as sw:
+        rep = orch.run_sync(scope="other", force=True)
+    # financial 不调用
+    fin.assert_not_called()
+    # 其他都调用
+    for m in (ear, act, pro, rev, sh, eff):
+        m.assert_called_once_with(["AAPL"], force=True)
+    sd.assert_called_once()
+    de.assert_called_once()
+    sw.assert_called_once()
+    assert rep["scope"] == "other" and "financial" not in rep

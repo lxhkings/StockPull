@@ -74,7 +74,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_ts.add_argument("--market", choices=("all", "cn", "hk", "us"), default="all")
     p_ts.add_argument("--dry-run", action="store_true")
 
-    SCOPES = ("all", "daily", "weekly", "financial", "earnings", "actions",
+    SCOPES = ("all", "other", "daily", "weekly", "financial", "earnings", "actions",
               "profile", "revenue", "shareholders", "efficiency")
     p_ff = sub.add_parser("futu-full", help="Futu 全量采集（忽略节流，强制重拉）")
     p_ff.add_argument("--scope", choices=SCOPES, default="all")

@@ -38,8 +38,9 @@ def list_us_tickers() -> list[str]:
 def run_sync(scope: str = "all", force: bool = False) -> dict:
     """统一采集编排。scope 选接口组；force=True 忽略节流全量。
 
-    scope ∈ {all, daily, weekly, financial, earnings, actions,
+    scope ∈ {all, other, daily, weekly, financial, earnings, actions,
              profile, revenue, shareholders, efficiency}。
+    "other" = 除 financial 外的全部。
     """
     t0 = time.monotonic()
     tickers = list_us_tickers()
@@ -47,6 +48,8 @@ def run_sync(scope: str = "all", force: bool = False) -> dict:
     rep: dict = {"scope": scope, "force": force, "tickers": len(tickers)}
 
     def want(s: str) -> bool:
+        if scope == "other":
+            return s != "financial"  # 排除 financial
         return scope in ("all", s)
 
     if want("financial"):
