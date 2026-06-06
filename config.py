@@ -23,6 +23,9 @@ DB = {
 DB_CONNECT_RETRIES = int(os.getenv("DB_CONNECT_RETRIES", "3"))
 DB_CONNECT_BACKOFF = float(os.getenv("DB_CONNECT_BACKOFF", "2.0"))  # 秒，第 n 次重试前 sleep n*backoff
 
+# Futu 本地优先缓冲文件（抓取先落本地，再 flush 到 NAS）
+FUTU_BUFFER_PATH = os.getenv("FUTU_BUFFER_PATH", ".futu_buffer/pending.sqlite")
+
 # History depths per market
 HISTORY_YEARS_US = 5
 HISTORY_YEARS_CN = 15
