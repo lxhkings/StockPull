@@ -150,3 +150,47 @@ def pending_count(buffer_path: str) -> int:
         return 0
     finally:
         conn.close()
+
+
+def _get_nas_for_flush():
+    """flush 用的真 NAS 连接（含 get_conn 的连接重试）。独立函数便于测试 mock。"""
+    from db import get_conn
+    return get_conn()
+
+
+def flush(buffer_path: str) -> dict:
+    """按 seq 顺序重放 pending_writes 到 NAS，每条成功即删（断点续传）。
+
+    连接/重放出错则抛出（缓冲保留已删之外的行，可重跑续传）。
+    返回 {"replayed": n, "remaining": m}。
+    """
+    if not os.path.exists(buffer_path):
+        return {"replayed": 0, "remaining": 0}
+    local = sqlite3.connect(buffer_path)
+    try:
+        rows = local.execute(
+            "SELECT seq, sql, params, is_many FROM pending_writes ORDER BY seq ASC"
+        ).fetchall()
+        if not rows:
+            return {"replayed": 0, "remaining": 0}
+        nas = _get_nas_for_flush()
+        replayed = 0
+        try:
+            for seq, sql, params_json, is_many in rows:
+                params = json.loads(params_json) if params_json else None
+                with nas.cursor() as cur:
+                    if is_many:
+                        cur.executemany(sql, params)
+                    else:
+                        cur.execute(sql, params)
+                nas.commit()
+                local.execute("DELETE FROM pending_writes WHERE seq=?", (seq,))
+                local.commit()
+                replayed += 1
+        finally:
+            nas.close()
+        remaining = local.execute("SELECT COUNT(*) FROM pending_writes").fetchone()[0]
+        log.info(f"flush: replayed={replayed} remaining={remaining}")
+        return {"replayed": replayed, "remaining": remaining}
+    finally:
+        local.close()
