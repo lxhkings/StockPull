@@ -36,6 +36,28 @@ def ticker_stream(backfill_fn, client, tickers: list[str], data_type: str,
     return rows, ok, skipped
 
 
+def batch_with_bisect(client, method: str, codes: list[str], *args, **kwargs) -> list:
+    """批量调 client.call(method, codes, ...)。整批因单个"未知股票"失败时二分隔离，
+    跳过坏 code、保留好 code。返回成功调用的 data 列表（调用方自行解析/落库）。
+
+    非"未知股票"异常照常抛出（真错误应暴露）。batch 接口的容错原语，
+    对应 ticker_stream 之于单票接口。
+    """
+    if not codes:
+        return []
+    try:
+        return [client.call(method, codes, *args, **kwargs)]
+    except RuntimeError as e:
+        if "未知股票" not in str(e):
+            raise
+        if len(codes) == 1:
+            log.warning(f"{method} 跳过未知票 {codes[0]}")
+            return []
+        mid = len(codes) // 2
+        return (batch_with_bisect(client, method, codes[:mid], *args, **kwargs)
+                + batch_with_bisect(client, method, codes[mid:], *args, **kwargs))
+
+
 def run_streams(streams: list[tuple[str, Callable[[], tuple[int, int]]]]) -> dict:
     """streams: [(key, fn)]，fn()->(rows, ok)。并发跑，返回 {key:(rows,ok)}。"""
     with ThreadPoolExecutor(max_workers=len(streams)) as ex:

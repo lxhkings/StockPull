@@ -13,7 +13,7 @@ import pandas as pd
 from db import get_conn
 from config import FUTU_REFRESH_DAYS
 from futu_ingest.client import get_client, to_futu_code, from_futu_code
-from futu_ingest.concurrency import run_streams, ticker_stream
+from futu_ingest.concurrency import batch_with_bisect, run_streams, ticker_stream
 from futu_ingest.sync import fresh_tickers, mark_ok
 
 log = logging.getLogger(__name__)
@@ -27,26 +27,29 @@ def _num(v):
     return v
 
 
+def _share_row(r, today: str) -> tuple:
+    """snapshot 行 -> us_shares_daily 入库元组。"""
+    payload = {k: _num(v) for k, v in r.items()}
+    return (
+        from_futu_code(r.get("code")), today,
+        _num(r.get("issued_shares")),
+        _num(r.get("outstanding_shares")),
+        _num(r.get("total_market_val")),
+        _num(r.get("circular_market_val")),
+        json.dumps(payload, ensure_ascii=False, default=str),
+    )
+
+
 def snapshot_shares(client, tickers: list[str]) -> int:
-    """批量抓快照，写当日流通股/市值。返回写入行数。"""
+    """批量抓快照，写当日流通股/市值。返回写入行数。未知票经二分隔离跳过。"""
     today = date.today().isoformat()
     rows = []
     for i in range(0, len(tickers), SNAPSHOT_BATCH):
         batch = [to_futu_code(t) for t in tickers[i:i + SNAPSHOT_BATCH]]
-        df = client.call("get_market_snapshot", batch)
-        if df is None or not hasattr(df, "iterrows"):
-            continue
-        for _, r in df.iterrows():
-            tk = from_futu_code(r.get("code"))
-            payload = {k: _num(v) for k, v in r.items()}
-            rows.append((
-                tk, today,
-                _num(r.get("issued_shares")),
-                _num(r.get("outstanding_shares")),
-                _num(r.get("total_market_val")),
-                _num(r.get("circular_market_val")),
-                json.dumps(payload, ensure_ascii=False, default=str),
-            ))
+        for df in batch_with_bisect(client, "get_market_snapshot", batch):
+            if df is None or not hasattr(df, "iterrows"):
+                continue
+            rows.extend(_share_row(r, today) for _, r in df.iterrows())
     if not rows:
         return 0
     with get_conn() as conn:

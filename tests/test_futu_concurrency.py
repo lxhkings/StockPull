@@ -1,7 +1,9 @@
 import threading
 import time
 
-from futu_ingest.concurrency import run_streams, ticker_stream
+import pytest
+
+from futu_ingest.concurrency import batch_with_bisect, run_streams, ticker_stream
 
 
 def test_run_streams_aggregates_by_key():
@@ -75,6 +77,46 @@ def test_ticker_stream_force_ignores_freshness():
     ft.assert_not_called()
     assert fn.call_count == 2
     assert (rows, ok, skipped) == (2, 2, 0)
+
+
+def _bisect_client(bad: set[str]):
+    """模拟 client：批含 bad code 即抛'未知股票'，否则返回该批 code 列表。"""
+    from unittest.mock import MagicMock
+
+    client = MagicMock()
+
+    def call(method, codes, *a, **k):
+        hit = next((c for c in codes if c in bad), None)
+        if hit is not None:
+            raise RuntimeError(f"futu.{method} ret=-1: 未知股票 {hit}")
+        return list(codes)
+
+    client.call.side_effect = call
+    return client
+
+
+def test_batch_with_bisect_all_good_single_call():
+    client = _bisect_client(bad=set())
+    out = batch_with_bisect(client, "get_market_snapshot", ["A", "B", "C"])
+    assert out == [["A", "B", "C"]]          # 一次成功，未二分
+    assert client.call.call_count == 1
+
+
+def test_batch_with_bisect_isolates_unknown_ticker():
+    client = _bisect_client(bad={"B"})
+    out = batch_with_bisect(client, "get_market_snapshot", ["A", "B", "C", "D"])
+    # B 被隔离跳过，好 code 全保留（顺序按二分拼接）
+    survived = [c for batch in out for c in batch]
+    assert sorted(survived) == ["A", "C", "D"]
+    assert "B" not in survived
+
+
+def test_batch_with_bisect_reraises_other_errors():
+    from unittest.mock import MagicMock
+    client = MagicMock()
+    client.call.side_effect = RuntimeError("futu.x ret=-1: 限频")
+    with pytest.raises(RuntimeError, match="限频"):
+        batch_with_bisect(client, "get_market_snapshot", ["A", "B"])
 
 
 def test_ticker_stream_marks_error_on_exception():
