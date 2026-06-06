@@ -80,6 +80,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_ff.add_argument("--scope", choices=SCOPES, default="all")
     p_fs = sub.add_parser("futu-sync", help="Futu 增量采集（按接口频率节流，cron 每日跑）")
     p_fs.add_argument("--scope", choices=SCOPES, default="all")
+    sub.add_parser("futu-flush", help="把本地缓冲重放到 NAS（futu-full/sync flush 失败后兜底）")
 
     return p
 
@@ -198,15 +199,48 @@ def cmd_tushare_backfill(scope: str, market: str, dry_run: bool) -> int:
     return 0
 
 
-def cmd_futu_full(scope: str) -> int:
+def _run_futu(scope: str, force: bool) -> int:
+    """两阶段：fetch 写本地缓冲 → 自动 flush 到 NAS。flush 失败则保留缓冲、提示兜底。"""
+    import db
     from futu_ingest.orchestrator import run_sync
-    print(run_sync(scope=scope, force=True))
+    from futu_ingest.local_buffer import flush, pending_count
+    from config import FUTU_BUFFER_PATH
+
+    db.set_local_first(True)
+    try:
+        rep = run_sync(scope=scope, force=force)
+    finally:
+        db.set_local_first(False)
+    print(rep)
+
+    try:
+        fstat = flush(FUTU_BUFFER_PATH)
+        print(f"flush -> NAS: {fstat}")
+    except Exception as e:  # noqa: BLE001
+        n = pending_count(FUTU_BUFFER_PATH)
+        print(f"FETCH 完成并已存本地。FLUSH 失败: {e}\n"
+              f"缓冲 {n} 条待传保留。NAS 恢复后跑: uv run main.py futu-flush")
+        return 1
     return 0
 
 
+def cmd_futu_full(scope: str) -> int:
+    return _run_futu(scope, force=True)
+
+
 def cmd_futu_sync(scope: str) -> int:
-    from futu_ingest.orchestrator import run_sync
-    print(run_sync(scope=scope, force=False))
+    return _run_futu(scope, force=False)
+
+
+def cmd_futu_flush() -> int:
+    from futu_ingest.local_buffer import flush, pending_count
+    from config import FUTU_BUFFER_PATH
+    n = pending_count(FUTU_BUFFER_PATH)
+    if n == 0:
+        print("无待传数据。")
+        return 0
+    print(f"待传 {n} 条，开始 flush -> NAS ...")
+    print(flush(FUTU_BUFFER_PATH))
     return 0
 
 
@@ -240,6 +274,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_futu_full(args.scope)
     if args.cmd == "futu-sync":
         return cmd_futu_sync(args.scope)
+    if args.cmd == "futu-flush":
+        return cmd_futu_flush()
     if args.cmd == "migrate-intraday":
         return cmd_migrate_intraday()
     if args.cmd == "intraday":
