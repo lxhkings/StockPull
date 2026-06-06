@@ -19,6 +19,10 @@ DB = {
     "autocommit": False,
 }
 
+# DB 连接重连（NAS 抖动/重启续命）。get_conn 连不上时线性退避重试。
+DB_CONNECT_RETRIES = int(os.getenv("DB_CONNECT_RETRIES", "3"))
+DB_CONNECT_BACKOFF = float(os.getenv("DB_CONNECT_BACKOFF", "2.0"))  # 秒，第 n 次重试前 sleep n*backoff
+
 # History depths per market
 HISTORY_YEARS_US = 5
 HISTORY_YEARS_CN = 15

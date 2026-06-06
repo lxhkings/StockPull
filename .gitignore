@@ -16,3 +16,4 @@ backups/
 data/.cache/
 docs/superpowers/
 .worktrees/
+.futu_buffer/
