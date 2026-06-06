@@ -3,12 +3,13 @@ db.py — 数据库连接 + sync_log 工具
 所有模块从这里获取连接，统一管理
 """
 
+import time
 import pymysql
 import pymysql.cursors
 import logging
 from datetime import date
 from typing import Optional, List, Dict
-from config import DB
+from config import DB, DB_CONNECT_RETRIES, DB_CONNECT_BACKOFF
 
 log = logging.getLogger(__name__)
 
@@ -18,11 +19,21 @@ log = logging.getLogger(__name__)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def get_conn() -> pymysql.Connection:
-    """获取数据库连接（设置 +08:00 时区，避免 created_at 偏 8 小时）"""
-    conn = pymysql.connect(**DB)
-    with conn.cursor() as cur:
-        cur.execute("SET time_zone = '+08:00'")
-    return conn
+    """获取数据库连接（设置 +08:00 时区）。连不上时线性退避重试。"""
+    last = None
+    for attempt in range(1, DB_CONNECT_RETRIES + 1):
+        try:
+            conn = pymysql.connect(**DB)
+            with conn.cursor() as cur:
+                cur.execute("SET time_zone = '+08:00'")
+            return conn
+        except pymysql.err.OperationalError as e:
+            last = e
+            if attempt < DB_CONNECT_RETRIES:
+                log.warning(f"DB connect failed ({attempt}/{DB_CONNECT_RETRIES}): {e}; "
+                            f"retry in {DB_CONNECT_BACKOFF * attempt}s")
+                time.sleep(DB_CONNECT_BACKOFF * attempt)
+    raise last
 
 
 def query(sql: str, params=None) -> List[Dict]:
