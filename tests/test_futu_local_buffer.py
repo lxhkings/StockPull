@@ -188,3 +188,24 @@ def test_flush_resumable_on_nas_error(tmp_path, monkeypatch):
 def test_flush_no_file(tmp_path):
     from futu_ingest import local_buffer
     assert local_buffer.flush(str(tmp_path / "nope.sqlite")) == {"replayed": 0, "remaining": 0}
+
+
+def test_set_local_first_toggles_get_conn(monkeypatch, tmp_path):
+    import db
+    from futu_ingest.local_buffer import BufferingConnection
+    monkeypatch.setattr(db, "FUTU_BUFFER_PATH", str(tmp_path / "buf.sqlite"))
+
+    db.set_local_first(True)
+    try:
+        conn = db.get_conn()
+        assert isinstance(conn, BufferingConnection)
+        conn.close()
+    finally:
+        db.set_local_first(False)
+
+    # 关闭后走真连接路径（mock pymysql 验证不再返回 Buffering）
+    monkeypatch.setattr(db.pymysql, "connect", lambda **kw: (_ for _ in ()).throw(
+        db.pymysql.err.OperationalError(2003, "Host is down")))
+    monkeypatch.setattr(db, "DB_CONNECT_RETRIES", 1)
+    with pytest.raises(db.pymysql.err.OperationalError):
+        db.get_conn()

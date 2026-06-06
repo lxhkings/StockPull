@@ -9,9 +9,17 @@ import pymysql.cursors
 import logging
 from datetime import date
 from typing import Optional, List, Dict
-from config import DB, DB_CONNECT_RETRIES, DB_CONNECT_BACKOFF
+from config import DB, DB_CONNECT_RETRIES, DB_CONNECT_BACKOFF, FUTU_BUFFER_PATH
 
 log = logging.getLogger(__name__)
+
+_local_first = False   # 进程内全局标志（跨线程可见；futu CLI 调用整进程只做 futu）
+
+
+def set_local_first(on: bool) -> None:
+    """开/关本地优先模式。开启后 get_conn 返回 BufferingConnection（写入本地缓冲）。"""
+    global _local_first
+    _local_first = on
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -19,7 +27,13 @@ log = logging.getLogger(__name__)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def get_conn() -> pymysql.Connection:
-    """获取数据库连接（设置 +08:00 时区）。连不上时线性退避重试。"""
+    """获取数据库连接（设置 +08:00 时区）。连不上时线性退避重试。
+
+    本地优先模式下返回 BufferingConnection：写入本地缓冲，读透传 NAS。
+    """
+    if _local_first:
+        from futu_ingest.local_buffer import BufferingConnection
+        return BufferingConnection(FUTU_BUFFER_PATH, DB)
     last = None
     for attempt in range(1, DB_CONNECT_RETRIES + 1):
         try:
