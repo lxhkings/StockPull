@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS pending_writes (
 
 
 def _is_write(sql: str) -> bool:
+    if not sql:
+        return False
     parts = sql.lstrip().split(None, 1)
     head = parts[0].upper() if parts else ""
     return head in _WRITE_KEYWORDS
