@@ -62,3 +62,35 @@ def test_executemany_buffers_to_local(tmp_path):
     assert json.loads(raw[1]) == [["AAPL", "2026-06-06", 100],
                                   ["MSFT", "2026-06-06", 200]]
     assert raw[2] == 1
+
+
+def test_select_passes_through_to_nas(tmp_path, monkeypatch):
+    """SELECT 不进缓冲，转发到真 NAS 连接（mock）。"""
+    from futu_ingest import local_buffer
+
+    executed = []
+
+    class FakeRealCursor:
+        rowcount = 1
+        def execute(self, sql, params=None): executed.append((sql, params))
+        def fetchall(self): return [("AAPL",)]
+        def close(self): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+
+    class FakeNas:
+        def cursor(self, cursorclass=None): return FakeRealCursor()
+        def close(self): pass
+
+    monkeypatch.setattr(local_buffer.pymysql, "connect", lambda **kw: FakeNas())
+
+    path = str(tmp_path / "buf.sqlite")
+    conn = local_buffer.BufferingConnection(path, db_config={})
+    with conn.cursor() as cur:
+        cur.execute("SELECT ticker FROM stocks")
+        assert cur.fetchall() == [("AAPL",)]
+    conn.close()
+
+    # SELECT 和 SET time_zone 都应透传到 NAS；SELECT 不入缓冲
+    assert ("SELECT ticker FROM stocks", None) in executed
+    assert local_buffer.pending_count(path) == 0
