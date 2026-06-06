@@ -2,13 +2,22 @@
 from __future__ import annotations
 
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable
 
 from config import FUTU_REFRESH_DAYS, FUTU_DEFAULT_REFRESH_DAYS
-from futu_ingest.sync import fresh_tickers, mark_ok, mark_error
+from futu_ingest.client import PERMANENT_ERRORS
+from futu_ingest.sync import fresh_tickers, mark_ok, mark_error, mark_skip
 
 log = logging.getLogger(__name__)
+
+PROGRESS_EVERY = 50   # 每处理 N 票打一次进度条
+
+
+def _fmt_dur(sec: float) -> str:
+    m, s = divmod(int(sec), 60)
+    return f"{m}m{s:02d}s" if m else f"{s}s"
 
 
 def ticker_stream(backfill_fn, client, tickers: list[str], data_type: str,
@@ -19,20 +28,36 @@ def ticker_stream(backfill_fn, client, tickers: list[str], data_type: str,
     单 ticker 异常被吞、记 sync_log error 并 log。
     """
     refresh_days = FUTU_REFRESH_DAYS.get(data_type, FUTU_DEFAULT_REFRESH_DAYS)
-    skip = set() if force else fresh_tickers(data_type, refresh_days)
-    rows = ok = skipped = 0
-    for t in tickers:
-        if t in skip:
-            skipped += 1
-            continue
+    fresh = set() if force else fresh_tickers(data_type, refresh_days)
+    todo = [t for t in tickers if t not in fresh]
+    total = len(todo)
+    skipped = len(tickers) - total          # fresh 跳过先计入
+    rows = ok = err = 0
+    log.info(f"{data_type}: 待采 {total}, fresh跳过 {skipped}")
+    t0 = time.monotonic()
+    for i, t in enumerate(todo, 1):
         try:
             n = backfill_fn(client, t)
             mark_ok(t, data_type, n)
             rows += n
             ok += 1
         except Exception as e:  # noqa: BLE001
-            log.error(f"{data_type} {t}: {e}")
-            mark_error(t, data_type, str(e))
+            # 永久错误（富途无此票/接口不支持该类型，如 REIT）标记跳过，不再每 run 重试
+            if any(m in str(e) for m in PERMANENT_ERRORS):
+                log.warning(f"{data_type} {t}: 永久不支持，标记跳过 ({e})")
+                mark_skip(t, data_type)
+                skipped += 1
+            else:
+                log.error(f"{data_type} {t}: {e}")
+                mark_error(t, data_type, str(e))
+                err += 1
+        if i % PROGRESS_EVERY == 0 or i == total:
+            el = time.monotonic() - t0
+            rate = i / el if el else 0
+            eta = (total - i) / rate if rate else 0
+            log.info(f"{data_type}: {i}/{total} ({i * 100 // total}%) "
+                     f"ok={ok} skip={skipped} err={err} | "
+                     f"{rate:.1f}/s ETA {_fmt_dur(eta)}")
     return rows, ok, skipped
 
 
@@ -48,10 +73,10 @@ def batch_with_bisect(client, method: str, codes: list[str], *args, **kwargs) ->
     try:
         return [client.call(method, codes, *args, **kwargs)]
     except RuntimeError as e:
-        if "未知股票" not in str(e):
+        if not any(m in str(e) for m in PERMANENT_ERRORS):
             raise
         if len(codes) == 1:
-            log.warning(f"{method} 跳过未知票 {codes[0]}")
+            log.warning(f"{method} 跳过不支持的票 {codes[0]}")
             return []
         mid = len(codes) // 2
         return (batch_with_bisect(client, method, codes[:mid], *args, **kwargs)

@@ -119,6 +119,28 @@ def test_batch_with_bisect_reraises_other_errors():
         batch_with_bisect(client, "get_market_snapshot", ["A", "B"])
 
 
+def test_ticker_stream_skips_permanent_error_not_retry():
+    """永久错误(不支持/未知股票)标 skip(mark_skip)、计入 skipped，不进 error 重试。"""
+    from unittest.mock import MagicMock, patch
+
+    client = MagicMock()
+
+    def fn(c, t):
+        if t == "AMT":   # REIT，接口不支持
+            raise RuntimeError("futu.x ret=-1: 只支持港股、美股正股，其他市场或股票类型不支持")
+        return 2
+
+    with patch("futu_ingest.concurrency.fresh_tickers", return_value=set()), \
+         patch("futu_ingest.concurrency.mark_ok"), \
+         patch("futu_ingest.concurrency.mark_skip") as mskip, \
+         patch("futu_ingest.concurrency.mark_error") as merr, \
+         patch("futu_ingest.concurrency.FUTU_REFRESH_DAYS", {"us_x": 80}):
+        rows, ok, skipped = ticker_stream(fn, client, ["AAPL", "AMT", "MSFT"], "us_x")
+    assert (rows, ok, skipped) == (4, 2, 1)   # AMT 标 skip
+    mskip.assert_called_once_with("AMT", "us_x")
+    merr.assert_not_called()                  # 永久错误不记 error
+
+
 def test_ticker_stream_marks_error_on_exception():
     from unittest.mock import MagicMock, patch
 

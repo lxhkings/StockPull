@@ -23,6 +23,10 @@ log = logging.getLogger(__name__)
 
 RET_OK = 0   # futu.RET_OK 的实际值
 
+# 永久性错误标记：富途明确拒绝该票（universe 无此票 / 接口不支持该类型，如 REIT）。
+# 重试无意义，应标记跳过而非 error 重试。
+PERMANENT_ERRORS = ("不支持", "未知股票")
+
 
 def to_futu_code(ticker: str) -> str:
     """canonical 美股 ticker -> Futu 代码。
@@ -112,7 +116,7 @@ class FutuClient:
             except Exception as e:  # noqa: BLE001
                 last_err = e
             # 永久性错误（如"不支持"、"未知股票"）不重试
-            if "不支持" in str(last_err) or "未知股票" in str(last_err):
+            if any(m in str(last_err) for m in PERMANENT_ERRORS):
                 raise last_err
             wait = FUTU_RETRY_DELAY * (2 ** attempt)
             log.warning(f"futu.{method_name} failed (attempt {attempt+1}): {last_err}; sleep {wait}s")

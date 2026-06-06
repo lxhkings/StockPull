@@ -33,6 +33,16 @@ def mark_ok(ticker: str, data_type: str, rows: int = 0) -> None:
         conn.close()
 
 
+def mark_skip(ticker: str, data_type: str) -> None:
+    """永久不支持的票（富途无此票/接口不支持该类型）标记为已处理(ok,0行)，
+    使其进入 fresh 集、后续 run 不再重试该接口。窗口到期自动复检（自愈）。"""
+    conn = get_conn()
+    try:
+        set_sync_ok(conn, ticker, data_type, date.today(), 0)
+    finally:
+        conn.close()
+
+
 def mark_error(ticker: str, data_type: str, message: str) -> None:
     conn = get_conn()
     try:
