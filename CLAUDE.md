@@ -35,6 +35,10 @@ uv run main.py futu-full             # 全量采集（首次/重建）
 uv run main.py futu-full --scope financial
 uv run main.py futu-sync            # 增量（cron 每日；按接口频率节流）
 uv run main.py futu-sync --scope daily
+uv run main.py futu-flush           # 兜底：把本地缓冲重放到 NAS（futu-full/sync flush 失败后）
+
+# futu-full/futu-sync 先写本地缓冲（.futu_buffer/pending.sqlite），收尾自动 flush 到 NAS。
+# NAS 中途宕机不丢数据；flush 失败时跑 futu-flush 兜底。
 
 # Tushare 回填（股票基础信息、行业分类）
 uv run main.py tushare-backfill --scope lists --market cn  # A股基础信息+行业
