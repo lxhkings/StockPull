@@ -34,7 +34,7 @@ def get_conn() -> pymysql.Connection:
     if _local_first:
         from futu_ingest.local_buffer import BufferingConnection
         return BufferingConnection(FUTU_BUFFER_PATH, DB)
-    last = None
+    last: Exception = RuntimeError("DB_CONNECT_RETRIES must be >= 1")
     for attempt in range(1, DB_CONNECT_RETRIES + 1):
         try:
             conn = pymysql.connect(**DB)
