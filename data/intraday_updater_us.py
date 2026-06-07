@@ -197,9 +197,10 @@ def update_intraday(interval: str, full_rebase: bool = False) -> dict[str, str]:
         log.error(f"[intraday {interval}] AAPL 测试失败，跳过本次更新")
         return {}
 
-    # 用 AAPL 的实际最新日期计算 floor_date（而非理论推算）
+    # Yahoo 730 天窗口以「今天」为基准，floor_date 必须 >= today-(lookback-1)，
+    # 否则 start_date 落在窗口外被拒。last_trading 用 AAPL 实际最新日期。
     lookback_days = INTERVAL_LOOKBACK_DAYS[interval]
-    floor_date = latest_date - timedelta(days=lookback_days - 1)
+    floor_date = date.today() - timedelta(days=lookback_days - 1)
     last_trading = latest_date
 
     log.info(f"[intraday {interval}] AAPL 验证通过，范围：{floor_date} ~ {last_trading}")

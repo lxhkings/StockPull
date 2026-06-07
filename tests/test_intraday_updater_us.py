@@ -199,6 +199,35 @@ def test_update_intraday_skips_up_to_date_ticker(mock_test_aapl, mock_list, mock
     mock_dl.assert_not_called()
 
 
+@patch("data.intraday_updater_us.get_conn")
+@patch("data.intraday_updater_us.get_last_sync")
+@patch("data.intraday_updater_us.set_sync_ok")
+@patch("data.intraday_updater_us.set_sync_error")
+@patch("data.intraday_updater_us.yf.download")
+@patch("data.market_us.list_active_tickers")
+@patch("data.intraday_updater_us._test_aapl_intraday")
+def test_update_intraday_floor_within_yahoo_window(
+    mock_test_aapl, mock_list, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
+):
+    """floor_date 必须以 today 为基准，否则 latest_date<today 时 start 落在 730 天窗口外被拒。"""
+    from datetime import timedelta
+
+    # latest_date 比 today 早，模拟非交易日/未收盘
+    latest = date.today() - timedelta(days=3)
+    mock_test_aapl.return_value = (latest, "ok")
+    mock_list.return_value = ["AAPL"]
+    mock_get_conn.return_value = MagicMock()
+    mock_yf_download.return_value = _make_yf_multiindex_df("AAPL")
+
+    with patch("data.intraday_updater_us._save_rows", return_value=2):
+        from data.intraday_updater_us import update_intraday
+        update_intraday("1h", full_rebase=True)
+
+    # 1h lookback=730，start 必须 = today-729，而非 latest-729
+    expected_start = (date.today() - timedelta(days=729)).strftime("%Y-%m-%d")
+    assert mock_yf_download.call_args[1]["start"] == expected_start
+
+
 def test_update_intraday_rejects_unsupported_interval():
     from data.intraday_updater_us import update_intraday
     with pytest.raises(ValueError, match="Unsupported interval"):
