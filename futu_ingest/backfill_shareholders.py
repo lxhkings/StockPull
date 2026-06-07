@@ -13,7 +13,7 @@ import logging
 from datetime import date
 
 from db import get_conn
-from futu_ingest.client import get_client, to_futu_code
+from futu_ingest.client import clean_date, get_client, to_futu_code
 from futu_ingest.concurrency import run_streams, ticker_stream
 
 log = logging.getLogger(__name__)
@@ -83,7 +83,7 @@ def backfill_holding_changes(client, ticker: str) -> int:
             h.get("share_change_num"),
             h.get("shares_change_price"),
             h.get("share_ratio"),
-            h.get("holding_date"),
+            clean_date(h.get("holding_date")),
             json.dumps(h, ensure_ascii=False, default=str),
         ))
 
@@ -124,7 +124,7 @@ def backfill_institutional(client, ticker: str) -> int:
         data.get("holder_qty_change"),
         data.get("holder_pct"),
         data.get("holder_pct_change"),
-        data.get("update_time"),
+        clean_date(data.get("update_time")),
         json.dumps(data, ensure_ascii=False, default=str),
     )
 
@@ -204,10 +204,13 @@ def backfill_insider_trades(client, ticker: str) -> int:
     items = data if isinstance(data, list) else data.get("insider_trade_list", [])
     rows = []
     for h in items:
+        min_trade_date = clean_date(h.get("min_trade_date"))
+        if min_trade_date is None:
+            continue
         rows.append((
             ticker,
             h.get("holder_id"),
-            h.get("min_trade_date"),
+            min_trade_date,
             h.get("holder_name"),
             h.get("title"),
             h.get("transaction_type"),

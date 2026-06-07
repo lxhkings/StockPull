@@ -12,7 +12,7 @@ import logging
 from datetime import date
 
 from db import get_conn
-from futu_ingest.client import get_client, to_futu_code
+from futu_ingest.client import clean_date, get_client, to_futu_code
 from futu_ingest.concurrency import run_streams, ticker_stream
 
 log = logging.getLogger(__name__)
@@ -31,9 +31,12 @@ def snapshot_capital_flow(client, ticker: str) -> int:
     items = data if isinstance(data, list) else data.get("capital_flow_list", [])
     rows = []
     for item in items:
+        flow_date = clean_date(item.get("date"))
+        if flow_date is None:
+            continue
         rows.append((
             ticker,
-            item.get("date"),
+            flow_date,
             item.get("in_flow"),
             item.get("super_in_flow"),
             item.get("big_in_flow"),
@@ -83,7 +86,7 @@ def snapshot_capital_dist(client, ticker: str) -> int:
         data.get("capital_out_big"),
         data.get("capital_out_mid"),
         data.get("capital_out_small"),
-        data.get("update_time"),
+        clean_date(data.get("update_time")),
         json.dumps(data, ensure_ascii=False, default=str),
     )
 
@@ -121,9 +124,12 @@ def snapshot_short_interest(client, ticker: str) -> int:
 
         items = data if isinstance(data, list) else data.get("short_interest_list", [])
         for item in items:
+            timestamp = clean_date(item.get("timestamp"))
+            if timestamp is None:
+                continue
             rows.append((
                 ticker,
-                item.get("timestamp"),
+                timestamp,
                 item.get("shares_short"),
                 item.get("short_percent"),
                 item.get("avg_daily_share_volume"),
@@ -172,9 +178,12 @@ def snapshot_short_volume(client, ticker: str) -> int:
 
         items = data if isinstance(data, list) else data.get("short_volume_list", [])
         for item in items:
+            timestamp = clean_date(item.get("timestamp"))
+            if timestamp is None:
+                continue
             rows.append((
                 ticker,
-                item.get("timestamp"),
+                timestamp,
                 item.get("total_shares_short"),
                 item.get("nasdaq_shares_short"),
                 item.get("nyse_shares_short"),

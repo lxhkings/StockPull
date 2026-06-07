@@ -60,6 +60,14 @@ def from_futu_code(code: str) -> str:
     return code[3:] if code.startswith("US.") else code
 
 
+_MISSING_DATE_VALUES = (None, "", "--")
+
+
+def clean_date(value):
+    """Futu 接口缺失日期/时间字段返回 '--' 占位符，DB DATE/DATETIME 列存不了，统一转 None。"""
+    return None if value in _MISSING_DATE_VALUES else value
+
+
 def _check_opend(host: str, port: int) -> None:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(2)

@@ -5,7 +5,7 @@ import json
 import logging
 
 from db import get_conn
-from futu_ingest.client import get_client, to_futu_code
+from futu_ingest.client import clean_date, get_client, to_futu_code
 from futu_ingest.concurrency import ticker_stream
 
 log = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ def backfill_efficiency(client, ticker: str) -> int:
         rows.append((
             ticker,
             item.get("period_text"),
-            item.get("end_date"),
+            clean_date(item.get("end_date")),
             item.get("employee_num"),
             item.get("employee_num_yoy"),
             item.get("income_per_capita"),

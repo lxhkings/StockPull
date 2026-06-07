@@ -5,7 +5,7 @@ import json
 import logging
 
 from db import get_conn
-from futu_ingest.client import get_client, to_futu_code
+from futu_ingest.client import clean_date, get_client, to_futu_code
 from futu_ingest.concurrency import run_streams, ticker_stream
 
 log = logging.getLogger(__name__)
@@ -19,14 +19,15 @@ def backfill_dividends(client, ticker: str) -> int:
     div_list = (data or {}).get("dividend_list", []) if isinstance(data, dict) else []
     rows = []
     for d in div_list:
-        if not d.get("ex_date"):
+        ex_date = clean_date(d.get("ex_date"))
+        if ex_date is None:
             continue
         rows.append((
             ticker,
-            d.get("ex_date"),
-            d.get("pub_date"),
-            d.get("record_date"),
-            d.get("dividend_payable_date"),
+            ex_date,
+            clean_date(d.get("pub_date")),
+            clean_date(d.get("record_date")),
+            clean_date(d.get("dividend_payable_date")),
             json.dumps(d, ensure_ascii=False, default=str),
         ))
     if not rows:
@@ -56,9 +57,10 @@ def backfill_splits(client, ticker: str) -> int:
                            next_key=next_key, num=PAGE_NUM)
         split_list = (data or {}).get("split_list", []) if isinstance(data, dict) else []
         for s in split_list:
-            if not s.get("ex_date"):
+            ex_date = clean_date(s.get("ex_date"))
+            if ex_date is None:
                 continue
-            rows.append((ticker, s.get("ex_date"),
+            rows.append((ticker, ex_date,
                          json.dumps(s, ensure_ascii=False, default=str)))
         next_key = (data or {}).get("next_key", "-1") if isinstance(data, dict) else "-1"
         if not split_list or next_key == "-1":

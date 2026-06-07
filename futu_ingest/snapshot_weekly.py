@@ -9,7 +9,7 @@ import logging
 from datetime import date
 
 from db import get_conn
-from futu_ingest.client import get_client, to_futu_code
+from futu_ingest.client import clean_date, get_client, to_futu_code
 from futu_ingest.concurrency import run_streams, ticker_stream
 
 log = logging.getLogger(__name__)
@@ -86,7 +86,7 @@ def snapshot_rating(client, ticker: str) -> int:
                 item.get("institution_picture_url"),
                 item.get("rating"),
                 item.get("target_price"),
-                item.get("update_time"),
+                clean_date(item.get("update_time")),
                 json.dumps(item, ensure_ascii=False, default=str),
             ))
 
@@ -125,13 +125,13 @@ def snapshot_morningstar(client, ticker: str) -> int:
     row = (
         ticker, today,
         data.get("star_rating"),
-        data.get("star_update_time"),
+        clean_date(data.get("star_update_time")),
         data.get("fair_value"),
         data.get("economic_moat_label"),
         data.get("uncertainty_label"),
         data.get("capital_allocation_label"),
         data.get("analyst_report_by_line"),
-        data.get("analyst_update_time"),
+        clean_date(data.get("analyst_update_time")),
         json.dumps(data, ensure_ascii=False, default=str),
     )
 

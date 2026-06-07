@@ -11,7 +11,7 @@ import logging
 
 from config import FUTU_FINANCIAL_TYPE, FUTU_CURRENCY_CODE
 from db import get_conn
-from futu_ingest.client import get_client, to_futu_code
+from futu_ingest.client import clean_date, get_client, to_futu_code
 from futu_ingest.concurrency import ticker_stream
 
 log = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ PAGE_NUM = 50
 def _report_to_row(ticker: str, rpt: dict) -> tuple:
     return (
         ticker,
-        rpt.get("date_time_str"),       # period_end
+        clean_date(rpt.get("date_time_str")),       # period_end
         str(rpt.get("financial_type") or ""),
         str(rpt.get("fiscal_year") or ""),
         rpt.get("period_text"),
@@ -58,7 +58,7 @@ def backfill_statement(
         )
         report_list = (data or {}).get("report_list", []) if isinstance(data, dict) else []
         for rpt in report_list:
-            period = rpt.get("date_time_str")
+            period = clean_date(rpt.get("date_time_str"))
             if not period:
                 continue
             if latest_period is None or period > latest_period:

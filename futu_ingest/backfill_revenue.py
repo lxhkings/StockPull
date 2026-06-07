@@ -10,7 +10,7 @@ import logging
 from datetime import date
 
 from db import get_conn
-from futu_ingest.client import get_client, to_futu_code
+from futu_ingest.client import clean_date, get_client, to_futu_code
 from futu_ingest.concurrency import run_streams, ticker_stream
 
 log = logging.getLogger(__name__)
@@ -104,8 +104,8 @@ def backfill_earnings_move(client, ticker: str) -> int:
             item.get("day_offset"),
             item.get("fiscal_year"),
             item.get("financial_type"),
-            item.get("pub_trading_day"),
-            item.get("trading_day"),
+            clean_date(item.get("pub_trading_day")),
+            clean_date(item.get("trading_day")),
             item.get("open"),
             item.get("close"),
             item.get("high"),
