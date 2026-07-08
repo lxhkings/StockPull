@@ -17,13 +17,14 @@ from ts_ingest.backfill_lists import (
 from ts_ingest.backfill_prices import backfill_market
 from ts_ingest.derive_periodic import derive_all
 from ts_ingest.backfill_financial import backfill_all as fin_backfill_all
+from ts_ingest.backfill_valuation import backfill_all as val_backfill_all
 
 log = logging.getLogger(__name__)
 
 PRECHECK_APIS = [
     "stock_basic", "fund_basic", "hs_const", "hk_basic", "us_basic",
     "income_vip", "balancesheet_vip", "cashflow_vip", "fina_indicator_vip",
-    "index_weight",
+    "index_weight", "daily_basic",
 ]
 
 
@@ -123,6 +124,10 @@ def run_full_backfill(scope: str = "all", market: str = "all",
     if scope in ("all", "financial"):
         log.info("=== Phase 4: financial ===")
         rep.phases["financial"] = fin_backfill_all()
+
+    if scope in ("all", "valuation"):
+        log.info("=== Phase 5: valuation ===")
+        rep.phases["valuation"] = val_backfill_all()
 
     rep.elapsed_sec = time.monotonic() - t0
     return rep

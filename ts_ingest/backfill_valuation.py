@@ -1,0 +1,79 @@
+"""A 股每日估值快照，使用 Tushare daily_basic 全市场单日批量接口。"""
+from __future__ import annotations
+
+import logging
+
+import pandas as pd
+import pymysql.cursors
+
+from config import TUSHARE_BACKFILL_START
+from db import get_conn
+from ts_ingest.client import get_client
+
+log = logging.getLogger(__name__)
+
+_COLS = [
+    "close", "turnover_rate", "volume_ratio", "pe", "pe_ttm",
+    "pb", "ps", "ps_ttm", "total_mv", "circ_mv",
+]
+
+
+def _trading_dates(start_yyyymmdd: str) -> list[str]:
+    """从现有 prices 表取 A 股交易日历（YYYYMMDD 字符串，升序）。"""
+    start = f"{start_yyyymmdd[:4]}-{start_yyyymmdd[4:6]}-{start_yyyymmdd[6:8]}"
+    with get_conn() as conn:
+        with conn.cursor(pymysql.cursors.DictCursor) as cur:
+            cur.execute(
+                "SELECT DISTINCT date FROM prices "
+                "WHERE (ticker LIKE '%%.SH' OR ticker LIKE '%%.SZ' OR ticker LIKE '%%.BJ') "
+                "  AND date >= %s ORDER BY date",
+                (start,),
+            )
+            return [r["date"].strftime("%Y%m%d") for r in cur.fetchall()]
+
+
+def backfill_day(trade_date: str) -> int:
+    client = get_client()
+    df: pd.DataFrame = client.call("daily_basic", trade_date=trade_date)
+    if df is None or df.empty:
+        return 0
+
+    rows = []
+    for _, r in df.iterrows():
+        vals = [None if pd.isna(r.get(c)) else float(r[c]) for c in _COLS]
+        rows.append((r["ts_code"], _to_date(r["trade_date"]), *vals))
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO cn_valuation_snapshot "
+                "(ts_code, trade_date, close, turnover_rate, volume_ratio, "
+                " pe, pe_ttm, pb, ps, ps_ttm, total_mv, circ_mv) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+                "ON DUPLICATE KEY UPDATE "
+                "  close=VALUES(close), turnover_rate=VALUES(turnover_rate), "
+                "  volume_ratio=VALUES(volume_ratio), pe=VALUES(pe), pe_ttm=VALUES(pe_ttm), "
+                "  pb=VALUES(pb), ps=VALUES(ps), ps_ttm=VALUES(ps_ttm), "
+                "  total_mv=VALUES(total_mv), circ_mv=VALUES(circ_mv)",
+                rows,
+            )
+        conn.commit()
+    log.info(f"daily_basic@{trade_date}: {len(rows)} rows")
+    return len(rows)
+
+
+def _to_date(v) -> str:
+    s = str(v)
+    return f"{s[:4]}-{s[4:6]}-{s[6:8]}" if len(s) == 8 else s
+
+
+def backfill_all(start: str = TUSHARE_BACKFILL_START) -> dict:
+    dates = _trading_dates(start)
+    log.info(f"valuation backfill: {len(dates)} trading days")
+    total = 0
+    for d in dates:
+        try:
+            total += backfill_day(d)
+        except Exception as e:
+            log.error(f"daily_basic@{d}: {e}")
+    return {"rows": total, "days": len(dates)}
