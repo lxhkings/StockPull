@@ -14,6 +14,10 @@ def test_to_date_handles_none_and_nan():
     assert _to_date(float("nan")) is None
 
 
+def test_to_date_handles_empty_string():
+    assert _to_date("") is None
+
+
 def test_sync_status_updates_matched_rows():
     fake_client = MagicMock()
     fake_client.call.return_value = pd.DataFrame({

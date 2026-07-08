@@ -10,7 +10,7 @@ log = logging.getLogger(__name__)
 
 
 def _to_date(v) -> str | None:
-    if v is None or pd.isna(v):
+    if pd.isna(v) or v in (None, ""):
         return None
     s = str(v)
     return f"{s[:4]}-{s[4:6]}-{s[6:8]}" if len(s) == 8 else s
