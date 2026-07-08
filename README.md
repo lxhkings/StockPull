@@ -44,12 +44,19 @@ uv run main.py rebase --market us --index SP500  # 仅 SP500 成分股
 uv run main.py rebase --market us --years 10  # 指定10年历史
 uv run main.py rebase --market cn --code 600519.SH  # 单只股票全量重拉
 
-# Tushare 回填（股票基础信息+行业分类+财务数据）
+# Tushare 回填（股票基础信息+行业分类+财务数据+估值数据）
 uv run main.py tushare-backfill --scope lists --market cn  # A股基础信息（含行业分类）
 uv run main.py tushare-backfill --scope lists --market hk  # 港股基础信息
 uv run main.py tushare-backfill --scope derive              # 周线/月线聚合（从日线计算）
-uv run main.py tushare-backfill --scope financial           # 财务数据
+uv run main.py tushare-backfill --scope financial           # 财务三表+指标（income/balancesheet/cashflow/indicator）
+uv run main.py tushare-backfill --scope valuation           # 每日估值快照（PE/PB/PS，daily_basic）
 uv run main.py tushare-backfill --dry-run                   # 预检（不执行）
+
+# financial/valuation 均可安全重复运行：
+# - financial 按季度全量重算（低频，全市场单期批量，~66期*4接口 约3小时）
+# - valuation 默认增量（从 cn_valuation_snapshot 里已有的最新交易日之后开始拉，
+#   首次运行/表为空时才会从 2010 年全量回填 ~13 小时）；
+#   显式传 start 可强制指定起点，见 ts_ingest/backfill_valuation.py:backfill_all()
 
 # 注：日线数据通过 daily/rebase 命令拉取（CN: tushare, HK/US: yfinance）
 
@@ -172,6 +179,8 @@ MariaDB 时区设置：`+08:00`（每连接设置）。
 - `index_prices` — 指数日线
 - `sync_log` — 股票同步状态（ticker, last_date, status）
 - `index_sync_log` — 指数同步状态
+- `fin_income` / `fin_balancesheet` / `fin_cashflow` / `fin_indicator` — A股财务三表+指标（ts_code, end_date, ann_date, raw_payload JSON），Tushare `*_vip` 全市场单期接口
+- `cn_valuation_snapshot` — A股每日估值快照（ts_code, trade_date, pe/pe_ttm/pb/ps/ps_ttm/total_mv/circ_mv），Tushare `daily_basic` 全市场单日接口
 
 ## 数据库操作
 

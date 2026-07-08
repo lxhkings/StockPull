@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta
 
 import pandas as pd
 import pymysql.cursors
@@ -67,7 +68,31 @@ def _to_date(v) -> str:
     return f"{s[:4]}-{s[4:6]}-{s[6:8]}" if len(s) == 8 else s
 
 
-def backfill_all(start: str = TUSHARE_BACKFILL_START) -> dict:
+def _last_synced_date() -> str | None:
+    """DB 里已有的最新 trade_date（YYYYMMDD）。空表返回 None（首次运行）。"""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT MAX(trade_date) FROM cn_valuation_snapshot")
+            row = cur.fetchone()
+    if row is None or row[0] is None:
+        return None
+    return row[0].strftime("%Y%m%d")
+
+
+def backfill_all(start: str | None = None) -> dict:
+    """默认增量：从 DB 里已同步的最新交易日之后开始（cron 每日跑安全，
+    不会重新拉全部历史）。首次运行（表为空）时全量回填，从
+    TUSHARE_BACKFILL_START 开始。显式传 start 可强制指定起点（例如
+    补历史缺口或重新全量回填）。
+    """
+    if start is None:
+        last = _last_synced_date()
+        if last is None:
+            start = TUSHARE_BACKFILL_START
+        else:
+            next_day = datetime.strptime(last, "%Y%m%d") + timedelta(days=1)
+            start = next_day.strftime("%Y%m%d")
+
     dates = _trading_dates(start)
     log.info(f"valuation backfill: {len(dates)} trading days")
     total = 0
