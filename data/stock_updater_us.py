@@ -18,6 +18,8 @@ import yfinance as yf
 from datetime import datetime, timedelta, date
 from typing import Optional, List, Dict
 
+from batch_utils import chunked
+
 from config import (
     HISTORY_YEARS_US as HISTORY_YEARS,
     START_DATE_US,
@@ -190,10 +192,10 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
             # full_rebase: 所有 ticker 从历史起点开始拉取
             actual_years = years if years else HISTORY_YEARS
             log.info(f"[batch] rebase: {len(tickers)} ticker 拉取 {actual_years} 年历史")
-            for i in range(0, len(tickers), YF_BATCH_SIZE):
-                batch = tickers[i:i + YF_BATCH_SIZE]
+            batches = list(chunked(tickers, YF_BATCH_SIZE))
+            for idx, batch in enumerate(batches, 1):
                 _download_and_save(conn, batch, None, result, years=actual_years)
-                if i + YF_BATCH_SIZE < len(tickers):
+                if idx < len(batches):
                     delay = YF_BATCH_DELAY_BASE + random.uniform(-YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER)
                     log.debug(f"[batch] 等待 {delay:.1f}s 后继续")
                     time.sleep(delay)
@@ -221,10 +223,10 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
             # 新 ticker 回填历史
             if new_tickers:
                 log.info(f"[batch] {len(new_tickers)} 新 ticker 需回填 {HISTORY_YEARS} 年历史")
-                for i in range(0, len(new_tickers), YF_BATCH_SIZE):
-                    batch_new = new_tickers[i:i + YF_BATCH_SIZE]
+                batches_new = list(chunked(new_tickers, YF_BATCH_SIZE))
+                for idx, batch_new in enumerate(batches_new, 1):
                     _download_and_save(conn, batch_new, None, result)
-                    if i + YF_BATCH_SIZE < len(new_tickers):
+                    if idx < len(batches_new):
                         delay = YF_BATCH_DELAY_BASE + random.uniform(-YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER)
                         log.debug(f"[batch] 等待 {delay:.1f}s 后继续")
                         time.sleep(delay)
@@ -232,10 +234,10 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
             # 待更新 ticker 增量同步
             if pending_tickers:
                 log.info(f"[batch] {len(pending_tickers)} ticker 需增量更新（从 {pending_start} 到 {last_trading}，窗口上限 {YF_LOOKBACK_DAYS} 天）")
-                for i in range(0, len(pending_tickers), YF_BATCH_SIZE):
-                    batch_pending = pending_tickers[i:i + YF_BATCH_SIZE]
+                batches_pending = list(chunked(pending_tickers, YF_BATCH_SIZE))
+                for idx, batch_pending in enumerate(batches_pending, 1):
                     _download_and_save(conn, batch_pending, pending_start, result)
-                    if i + YF_BATCH_SIZE < len(pending_tickers):
+                    if idx < len(batches_pending):
                         delay = YF_BATCH_DELAY_BASE + random.uniform(-YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER)
                         log.debug(f"[batch] 等待 {delay:.1f}s 后继续")
                         time.sleep(delay)

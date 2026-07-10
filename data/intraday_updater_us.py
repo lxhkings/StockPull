@@ -18,6 +18,8 @@ import pandas as pd
 import pymysql.err
 import yfinance as yf
 
+from batch_utils import chunked
+
 from config import (
     YF_BATCH_DELAY_BASE,
     YF_BATCH_DELAY_JITTER,
@@ -235,12 +237,12 @@ def update_intraday(interval: str, full_rebase: bool = False) -> dict[str, str]:
 
         pending.sort(key=lambda x: x[1])
 
-        for i in range(0, len(pending), YF_BATCH_SIZE):
-            batch_pairs = pending[i:i + YF_BATCH_SIZE]
+        pair_batches = list(chunked(pending, YF_BATCH_SIZE))
+        for idx, batch_pairs in enumerate(pair_batches, 1):
             batch = [t for t, _ in batch_pairs]
             batch_start = min(s for _, s in batch_pairs)
             _download_and_save(conn, batch, interval, batch_start, last_trading, result)
-            if i + YF_BATCH_SIZE < len(pending):
+            if idx < len(pair_batches):
                 delay = YF_BATCH_DELAY_BASE + random.uniform(
                     -YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER
                 )

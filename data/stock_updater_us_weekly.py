@@ -16,6 +16,8 @@ import logging
 from datetime import datetime, timedelta, date
 from typing import Optional, List, Dict
 
+from batch_utils import chunked
+
 import pandas as pd
 import yfinance as yf
 
@@ -119,10 +121,10 @@ def update_weekly_batch(tickers: List[str], full_rebase: bool = False) -> Dict[s
     try:
         if full_rebase:
             log.info(f"[weekly batch] rebase: {len(tickers)} ticker 全量历史")
-            for i in range(0, len(tickers), YF_BATCH_SIZE):
-                batch = tickers[i:i + YF_BATCH_SIZE]
+            batches = list(chunked(tickers, YF_BATCH_SIZE))
+            for idx, batch in enumerate(batches, 1):
                 _download_and_save_weekly(conn, batch, None, result)
-                if i + YF_BATCH_SIZE < len(tickers):
+                if idx < len(batches):
                     delay = YF_BATCH_DELAY_BASE + random.uniform(
                         -YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER
                     )
@@ -146,10 +148,10 @@ def update_weekly_batch(tickers: List[str], full_rebase: bool = False) -> Dict[s
 
             if new_tickers:
                 log.info(f"[weekly batch] {len(new_tickers)} 新 ticker 需回填全量历史")
-                for i in range(0, len(new_tickers), YF_BATCH_SIZE):
-                    batch_new = new_tickers[i:i + YF_BATCH_SIZE]
+                batches_new = list(chunked(new_tickers, YF_BATCH_SIZE))
+                for idx, batch_new in enumerate(batches_new, 1):
                     _download_and_save_weekly(conn, batch_new, None, result)
-                    if i + YF_BATCH_SIZE < len(new_tickers):
+                    if idx < len(batches_new):
                         delay = YF_BATCH_DELAY_BASE + random.uniform(
                             -YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER
                         )
@@ -160,10 +162,10 @@ def update_weekly_batch(tickers: List[str], full_rebase: bool = False) -> Dict[s
                     f"[weekly batch] {len(pending_tickers)} ticker 增量更新"
                     f"（从 {pending_start} 到 {target_monday}）"
                 )
-                for i in range(0, len(pending_tickers), YF_BATCH_SIZE):
-                    batch_pending = pending_tickers[i:i + YF_BATCH_SIZE]
+                batches_pending = list(chunked(pending_tickers, YF_BATCH_SIZE))
+                for idx, batch_pending in enumerate(batches_pending, 1):
                     _download_and_save_weekly(conn, batch_pending, pending_start, result)
-                    if i + YF_BATCH_SIZE < len(pending_tickers):
+                    if idx < len(batches_pending):
                         delay = YF_BATCH_DELAY_BASE + random.uniform(
                             -YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER
                         )
