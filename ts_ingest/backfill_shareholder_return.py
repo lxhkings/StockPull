@@ -68,3 +68,67 @@ def backfill_dividend() -> dict:
             log.error(f"dividend@{t}: {e}")
     log.info(f"dividend: {len(tickers)} tickers, {total} rows")
     return {"rows": total, "tickers": len(tickers)}
+
+
+def _date_windows(start_yyyymmdd: str, end_yyyymmdd: str, window_days: int) -> list[tuple[str, str]]:
+    """[start, end] 切成 window_days 天的窗口列表（闭区间，YYYYMMDD 字符串）。"""
+    start = datetime.strptime(start_yyyymmdd, "%Y%m%d")
+    end = datetime.strptime(end_yyyymmdd, "%Y%m%d")
+    windows = []
+    cur = start
+    while cur <= end:
+        win_end = min(cur + timedelta(days=window_days - 1), end)
+        windows.append((cur.strftime("%Y%m%d"), win_end.strftime("%Y%m%d")))
+        cur = win_end + timedelta(days=1)
+    return windows
+
+
+def _last_synced_ann_date(table: str) -> str | None:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT MAX(ann_date) FROM {table}")
+            row = cur.fetchone()
+    if row is None or row[0] is None:
+        return None
+    return row[0].strftime("%Y%m%d")
+
+
+def backfill_repurchase_window(start_date: str, end_date: str) -> int:
+    client = get_client()
+    df = client.call("repurchase", start_date=start_date, end_date=end_date)
+    if df is None or df.empty:
+        return 0
+    rows = transform_repurchase_rows(df)
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO cn_repurchase "
+                "(ts_code, ann_date, end_date, proc, exp_date, vol, amount, high_limit, low_limit) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+                "ON DUPLICATE KEY UPDATE "
+                "  proc=VALUES(proc), exp_date=VALUES(exp_date), vol=VALUES(vol), "
+                "  amount=VALUES(amount), high_limit=VALUES(high_limit), low_limit=VALUES(low_limit)",
+                rows,
+            )
+        conn.commit()
+    log.info(f"repurchase@{start_date}-{end_date}: {len(rows)} rows")
+    return len(rows)
+
+
+def backfill_repurchase(start: str | None = None) -> dict:
+    if start is None:
+        last = _last_synced_ann_date("cn_repurchase")
+        if last is None:
+            start = TUSHARE_BACKFILL_START
+        else:
+            start = (datetime.strptime(last, "%Y%m%d") + timedelta(days=1)).strftime("%Y%m%d")
+    end = date.today().strftime("%Y%m%d")
+    windows = _date_windows(start, end, window_days=365) if start <= end else []
+    total = 0
+    for s, e in windows:
+        try:
+            total += backfill_repurchase_window(s, e)
+        except Exception as ex:
+            log.error(f"repurchase@{s}-{e}: {ex}")
+    log.info(f"repurchase: {len(windows)} windows, {total} rows")
+    return {"rows": total, "windows": len(windows)}
