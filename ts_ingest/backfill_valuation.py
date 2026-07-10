@@ -4,19 +4,14 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 
-import pandas as pd
 import pymysql.cursors
 
 from config import TUSHARE_BACKFILL_START
 from core.db_client import get_conn
 from ts_ingest.client import get_client
+from ts_ingest.transform_valuation import transform_valuation_rows
 
 log = logging.getLogger(__name__)
-
-_COLS = [
-    "close", "turnover_rate", "volume_ratio", "pe", "pe_ttm",
-    "pb", "ps", "ps_ttm", "total_mv", "circ_mv",
-]
 
 
 def _trading_dates(start_yyyymmdd: str) -> list[str]:
@@ -35,15 +30,10 @@ def _trading_dates(start_yyyymmdd: str) -> list[str]:
 
 def backfill_day(trade_date: str) -> int:
     client = get_client()
-    df: pd.DataFrame = client.call("daily_basic", trade_date=trade_date)
+    df = client.call("daily_basic", trade_date=trade_date)
     if df is None or df.empty:
         return 0
-
-    rows = []
-    for _, r in df.iterrows():
-        vals = [None if pd.isna(r.get(c)) else float(r[c]) for c in _COLS]
-        rows.append((r["ts_code"], _to_date(r["trade_date"]), *vals))
-
+    rows = transform_valuation_rows(df)
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.executemany(
@@ -61,11 +51,6 @@ def backfill_day(trade_date: str) -> int:
         conn.commit()
     log.info(f"daily_basic@{trade_date}: {len(rows)} rows")
     return len(rows)
-
-
-def _to_date(v) -> str:
-    s = str(v)
-    return f"{s[:4]}-{s[4:6]}-{s[6:8]}" if len(s) == 8 else s
 
 
 def _last_synced_date() -> str | None:
