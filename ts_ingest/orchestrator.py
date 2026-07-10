@@ -14,6 +14,7 @@ from ts_ingest.backfill_lists import (
     backfill_stocks_a, backfill_stocks_hk, backfill_stocks_us,
     backfill_etf_basic, backfill_hk_connect, backfill_index_weight,
 )
+from ts_ingest.backfill_stock_dates import backfill_stock_dates
 from ts_ingest.backfill_prices import backfill_market
 from ts_ingest.derive_periodic import derive_all
 from ts_ingest.backfill_financial import backfill_all as fin_backfill_all
@@ -75,8 +76,13 @@ def _list_us_tickers() -> list[str]:
 
 
 def run_full_backfill(scope: str = "all", market: str = "all",
-                      dry_run: bool = False) -> ExitReport:
-    """scope ∈ {all, lists, prices, derive, financial}; market ∈ {all, cn, hk, us}."""
+                      dry_run: bool = False, start: str | None = None) -> ExitReport:
+    """scope ∈ {all, lists, prices, derive, financial}; market ∈ {all, cn, hk, us}.
+
+    start: YYYYMMDD，显式指定起点重新回填历史。financial 默认已是
+    TUSHARE_BACKFILL_START 全量拉取；valuation 默认从上次同步点增量续拉，
+    传 start 才会强制往回填。
+    """
     budget.reset()
     rep = ExitReport()
     t0 = time.monotonic()
@@ -101,6 +107,7 @@ def run_full_backfill(scope: str = "all", market: str = "all",
             "stocks_us":  backfill_stocks_us(),
             "etf_basic":  backfill_etf_basic(),
             "hk_connect": backfill_hk_connect(),
+            "stock_dates": backfill_stock_dates(),  # UPDATE，须在 stocks_a/hk/us 之后跑
         }
         # 指数成分（最近一个交易日）— 调用方提供 trade_date，简化为今天前 5 日
         # 留给手动调用 backfill_index_weight，避免猜交易日。
@@ -123,11 +130,11 @@ def run_full_backfill(scope: str = "all", market: str = "all",
 
     if scope in ("all", "financial"):
         log.info("=== Phase 4: financial ===")
-        rep.phases["financial"] = fin_backfill_all()
+        rep.phases["financial"] = fin_backfill_all(start=start) if start else fin_backfill_all()
 
     if scope in ("all", "valuation"):
         log.info("=== Phase 5: valuation ===")
-        rep.phases["valuation"] = val_backfill_all()
+        rep.phases["valuation"] = val_backfill_all(start=start)
 
     rep.elapsed_sec = time.monotonic() - t0
     return rep

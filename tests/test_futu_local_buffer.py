@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import threading
 import pytest
 
 
@@ -188,6 +189,100 @@ def test_flush_resumable_on_nas_error(tmp_path, monkeypatch):
 def test_flush_no_file(tmp_path):
     from futu_ingest import local_buffer
     assert local_buffer.flush(str(tmp_path / "nope.sqlite")) == {"replayed": 0, "remaining": 0}
+
+
+class _FakeNasConnThreadSafe:
+    """线程安全版假 NAS：每个 worker 独立实例，用共享 list+lock 汇总记录。"""
+    def __init__(self, shared_executed, lock, fail_on=None):
+        self._shared = shared_executed
+        self._lock = lock
+        self._fail_on = fail_on or set()
+
+    def cursor(self, cursorclass=None):
+        outer = self
+
+        class Cur:
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+            def execute(self, sql, params=None):
+                if params in outer._fail_on:
+                    raise __import__("pymysql").err.OperationalError(2006, "gone away")
+                with outer._lock:
+                    outer._shared.append(("execute", sql, params))
+            def executemany(self, sql, params=None):
+                key = json.dumps(params, default=str)
+                if key in outer._fail_on:
+                    raise __import__("pymysql").err.OperationalError(2006, "gone away")
+                with outer._lock:
+                    outer._shared.append(("executemany", sql, params))
+            def close(self): pass
+        return Cur()
+
+    def commit(self): pass
+    def close(self): pass
+
+
+def test_flush_parallel_clears_all_disjoint_batches(tmp_path, monkeypatch):
+    """N 条同表独立 upsert，workers=3 并发跑完，全部清空、全部重放。"""
+    from futu_ingest import local_buffer
+    path = str(tmp_path / "buf.sqlite")
+    _seed(path, [
+        (f"INSERT INTO cn_valuation_snapshot VALUES (%s)", [[f"row{i}"]], 1)
+        for i in range(9)
+    ])
+    executed = []
+    lock = threading.Lock()
+    monkeypatch.setattr(
+        local_buffer, "_get_nas_for_flush",
+        lambda: _FakeNasConnThreadSafe(executed, lock),
+    )
+
+    res = local_buffer.flush_parallel(path, workers=3)
+
+    assert res == {"replayed": 9, "remaining": 0}
+    assert len(executed) == 9
+    assert local_buffer.pending_count(path) == 0
+
+
+def test_flush_parallel_resumable_on_partial_failure(tmp_path, monkeypatch):
+    """某个 worker 的某一批失败 → 该批及同 worker 之后的批留在缓冲，其它 worker 成功的批已清除。"""
+    from futu_ingest import local_buffer
+    path = str(tmp_path / "buf.sqlite")
+    _seed(path, [
+        ("INSERT INTO t VALUES (%s)", [["a"]], 1),
+        ("INSERT INTO t VALUES (%s)", [["b"]], 1),
+        ("INSERT INTO t VALUES (%s)", [["FAIL"]], 1),
+        ("INSERT INTO t VALUES (%s)", [["d"]], 1),
+    ])
+    executed = []
+    lock = threading.Lock()
+    fail_on = {json.dumps([["FAIL"]])}
+    monkeypatch.setattr(
+        local_buffer, "_get_nas_for_flush",
+        lambda: _FakeNasConnThreadSafe(executed, lock, fail_on=fail_on),
+    )
+
+    with pytest.raises(local_buffer.pymysql.err.OperationalError):
+        local_buffer.flush_parallel(path, workers=2)
+
+    # 失败批和同 worker 之后没跑到的批仍在缓冲里，其它 worker 已成功的批被清除
+    assert local_buffer.pending_count(path) < 4
+    assert local_buffer.pending_count(path) >= 1
+
+
+def test_flush_parallel_no_file(tmp_path):
+    from futu_ingest import local_buffer
+    assert local_buffer.flush_parallel(str(tmp_path / "nope.sqlite")) == {"replayed": 0, "remaining": 0}
+
+
+def test_flush_parallel_no_pending(tmp_path):
+    from futu_ingest import local_buffer
+    from futu_ingest.local_buffer import _SCHEMA
+    path = str(tmp_path / "buf.sqlite")
+    c = sqlite3.connect(path)
+    c.execute(_SCHEMA)
+    c.commit(); c.close()
+    assert local_buffer.flush_parallel(path) == {"replayed": 0, "remaining": 0}
 
 
 def test_set_local_first_toggles_get_conn(monkeypatch, tmp_path):

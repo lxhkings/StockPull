@@ -13,13 +13,20 @@ from config import DB, DB_CONNECT_RETRIES, DB_CONNECT_BACKOFF, FUTU_BUFFER_PATH
 
 log = logging.getLogger(__name__)
 
-_local_first = False   # 进程内全局标志（跨线程可见；futu CLI 调用整进程只做 futu）
+_local_first = False   # 进程内全局标志（跨线程可见；futu/tushare CLI 调用整进程只做一个）
+_local_buffer_path = FUTU_BUFFER_PATH  # 当前本地优先模式写往哪个缓冲文件，默认沿用 futu 的
 
 
-def set_local_first(on: bool) -> None:
-    """开/关本地优先模式。开启后 get_conn 返回 BufferingConnection（写入本地缓冲）。"""
-    global _local_first
+def set_local_first(on: bool, buffer_path: str | None = None) -> None:
+    """开/关本地优先模式。开启后 get_conn 返回 BufferingConnection（写入本地缓冲）。
+
+    buffer_path 未传时沿用上次设置的路径（默认 FUTU_BUFFER_PATH，向后兼容 futu 的既有调用）；
+    tushare 等其他调用方应显式传自己的缓冲路径（如 TUSHARE_BUFFER_PATH），避免和 futu 混用同一份缓冲。
+    """
+    global _local_first, _local_buffer_path
     _local_first = on
+    if buffer_path is not None:
+        _local_buffer_path = buffer_path
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -33,7 +40,7 @@ def get_conn() -> pymysql.Connection:
     """
     if _local_first:
         from futu_ingest.local_buffer import BufferingConnection
-        return BufferingConnection(FUTU_BUFFER_PATH, DB)
+        return BufferingConnection(_local_buffer_path, DB)
     last: Exception = RuntimeError("DB_CONNECT_RETRIES must be >= 1")
     for attempt in range(1, DB_CONNECT_RETRIES + 1):
         try:

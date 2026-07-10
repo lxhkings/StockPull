@@ -73,6 +73,10 @@ def _build_parser() -> argparse.ArgumentParser:
                       default="all")
     p_ts.add_argument("--market", choices=("all", "cn", "hk", "us"), default="all")
     p_ts.add_argument("--dry-run", action="store_true")
+    p_ts.add_argument("--start", default=None,
+                      help="YYYYMMDD，强制指定起点重新回填历史（valuation 默认从上次同步点增量续拉，"
+                           "需要这个才会往回填；financial 默认已是 TUSHARE_BACKFILL_START 全量，"
+                           "传了就换成这个起点）")
 
     SCOPES = ("all", "other", "daily", "weekly", "financial", "earnings", "actions",
               "profile", "revenue", "shareholders", "efficiency")
@@ -81,6 +85,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p_fs = sub.add_parser("futu-sync", help="Futu 增量采集（按接口频率节流，cron 每日跑）")
     p_fs.add_argument("--scope", choices=SCOPES, default="all")
     sub.add_parser("futu-flush", help="把本地缓冲重放到 NAS（futu-full/sync flush 失败后兜底）")
+    p_tf = sub.add_parser("tushare-flush", help="把本地缓冲重放到 NAS（tushare-backfill flush 失败后兜底）")
+    p_tf.add_argument("--workers", type=int, default=1,
+                       help="并发连接数，默认1(顺序，安全)。>1 时不保证跨行执行顺序，"
+                            "只适合同表无依赖写入（如估值快照按日 upsert）")
 
     return p
 
@@ -192,10 +200,50 @@ def cmd_intraday(interval: str | None, rebase: bool = False) -> int:
     return 0
 
 
-def cmd_tushare_backfill(scope: str, market: str, dry_run: bool) -> int:
+def cmd_tushare_backfill(scope: str, market: str, dry_run: bool, start: str | None = None) -> int:
+    """两阶段：backfill 写本地缓冲 → 自动 flush 到 NAS。flush 失败则保留缓冲、提示兜底。"""
+    import db
     from ts_ingest.orchestrator import run_full_backfill
-    rep = run_full_backfill(scope=scope, market=market, dry_run=dry_run)
+    from futu_ingest.local_buffer import flush, pending_count
+    from config import TUSHARE_BUFFER_PATH
+
+    if dry_run:
+        # 预检不写数据，不需要走本地缓冲
+        rep = run_full_backfill(scope=scope, market=market, dry_run=dry_run, start=start)
+        print(rep.render())
+        return 0
+
+    db.set_local_first(True, buffer_path=TUSHARE_BUFFER_PATH)
+    try:
+        rep = run_full_backfill(scope=scope, market=market, dry_run=dry_run, start=start)
+    finally:
+        db.set_local_first(False)
     print(rep.render())
+
+    try:
+        fstat = flush(TUSHARE_BUFFER_PATH)
+        print(f"flush -> NAS: {fstat}")
+    except Exception as e:  # noqa: BLE001
+        n = pending_count(TUSHARE_BUFFER_PATH)
+        print(f"BACKFILL 完成并已存本地。FLUSH 失败: {e}\n"
+              f"缓冲 {n} 条待传保留。NAS 恢复后跑: uv run main.py tushare-flush")
+        return 1
+    return 0
+
+
+def cmd_tushare_flush(workers: int = 1) -> int:
+    from futu_ingest.local_buffer import flush, flush_parallel, pending_count
+    from config import TUSHARE_BUFFER_PATH
+    n = pending_count(TUSHARE_BUFFER_PATH)
+    if n == 0:
+        print("无待传数据。")
+        return 0
+    if workers > 1:
+        print(f"待传 {n} 条，开始 flush -> NAS (并发 {workers}) ...")
+        print(flush_parallel(TUSHARE_BUFFER_PATH, workers=workers))
+    else:
+        print(f"待传 {n} 条，开始 flush -> NAS ...")
+        print(flush(TUSHARE_BUFFER_PATH))
     return 0
 
 
@@ -269,7 +317,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "rebase":
         return cmd_rebase(args.market, args.code, args.years, args.index, args.etf_only)
     if args.cmd == "tushare-backfill":
-        return cmd_tushare_backfill(args.scope, args.market, args.dry_run)
+        return cmd_tushare_backfill(args.scope, args.market, args.dry_run, args.start)
+    if args.cmd == "tushare-flush":
+        return cmd_tushare_flush(args.workers)
     if args.cmd == "futu-full":
         return cmd_futu_full(args.scope)
     if args.cmd == "futu-sync":

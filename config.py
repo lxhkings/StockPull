@@ -26,6 +26,9 @@ DB_CONNECT_BACKOFF = float(os.getenv("DB_CONNECT_BACKOFF", "2.0"))  # 秒，第 
 # Futu 本地优先缓冲文件（抓取先落本地，再 flush 到 NAS）
 FUTU_BUFFER_PATH = os.getenv("FUTU_BUFFER_PATH", ".futu_buffer/pending.sqlite")
 
+# Tushare 本地优先缓冲文件（同 Futu 机制，backfill 先落本地，再 flush 到 NAS）
+TUSHARE_BUFFER_PATH = os.getenv("TUSHARE_BUFFER_PATH", ".tushare_buffer/pending.sqlite")
+
 # History depths per market
 HISTORY_YEARS_US = 5
 HISTORY_YEARS_CN = 15

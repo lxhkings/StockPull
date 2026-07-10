@@ -10,9 +10,12 @@ import json
 import os
 import sqlite3
 import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pymysql
 import pymysql.cursors
+from tqdm import tqdm
 
 log = logging.getLogger(__name__)
 
@@ -178,7 +181,7 @@ def flush(buffer_path: str) -> dict:
         nas = _get_nas_for_flush()
         replayed = 0
         try:
-            for seq, sql, params_json, is_many in rows:
+            for seq, sql, params_json, is_many in tqdm(rows, desc="flush", unit="batch"):
                 params = json.loads(params_json) if params_json else None
                 with nas.cursor() as cur:
                     if is_many:
@@ -196,3 +199,80 @@ def flush(buffer_path: str) -> dict:
         return {"replayed": replayed, "remaining": remaining}
     finally:
         local.close()
+
+
+def flush_parallel(buffer_path: str, workers: int = 4) -> dict:
+    """并行重放 pending_writes 到 NAS，多个连接各处理一段不重叠的 seq 区间。
+
+    不保证跨 seq 的执行顺序，只适合同表、无跨行依赖的写入（如 tushare
+    估值快照按日批量 upsert）。涉及跨表 JOIN/UPDATE 依赖的缓冲（如 futu
+    PIT 写入，见 test_flush_replays_in_order_and_clears）必须用 flush()，
+    顺序会被打乱导致 UPDATE JOIN 在依赖的 INSERT 之前执行。
+
+    每个成功的行独立 commit + 本地删除，任一行失败不影响其它 worker 已经
+    写成功的行——已成功的行仍会从本地缓冲删除，可安全重跑续传剩余部分。
+    返回 {"replayed": n, "remaining": m}；有 worker 失败则在全部 worker
+    跑完后抛出第一个异常。
+    """
+    if not os.path.exists(buffer_path):
+        return {"replayed": 0, "remaining": 0}
+
+    local = sqlite3.connect(buffer_path)
+    try:
+        rows = local.execute(
+            "SELECT seq, sql, params, is_many FROM pending_writes ORDER BY seq ASC"
+        ).fetchall()
+    finally:
+        local.close()
+
+    if not rows:
+        return {"replayed": 0, "remaining": 0}
+
+    workers = max(1, min(workers, len(rows)))
+    chunk_size = (len(rows) + workers - 1) // workers
+    chunks = [rows[i:i + chunk_size] for i in range(0, len(rows), chunk_size)]
+
+    replayed = 0
+    replayed_lock = threading.Lock()
+    errors: list[Exception] = []
+    pbar = tqdm(total=len(rows), desc="flush_parallel", unit="batch")
+
+    def _worker(chunk):
+        nonlocal replayed
+        nas = _get_nas_for_flush()
+        wlocal = sqlite3.connect(buffer_path, timeout=30)
+        try:
+            for seq, sql, params_json, is_many in chunk:
+                params = json.loads(params_json) if params_json else None
+                with nas.cursor() as cur:
+                    if is_many:
+                        cur.executemany(sql, params)
+                    else:
+                        cur.execute(sql, params)
+                nas.commit()
+                wlocal.execute("DELETE FROM pending_writes WHERE seq=?", (seq,))
+                wlocal.commit()
+                with replayed_lock:
+                    replayed += 1
+                    pbar.update(1)
+        except Exception as e:  # noqa: BLE001 — 汇总到主线程统一抛出
+            errors.append(e)
+        finally:
+            nas.close()
+            wlocal.close()
+
+    try:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [pool.submit(_worker, chunk) for chunk in chunks]
+            for f in as_completed(futures):
+                f.result()
+    finally:
+        pbar.close()
+
+    remaining = pending_count(buffer_path)
+    log.info(f"flush_parallel: replayed={replayed} remaining={remaining} workers={workers}")
+
+    if errors:
+        raise errors[0]
+
+    return {"replayed": replayed, "remaining": remaining}
