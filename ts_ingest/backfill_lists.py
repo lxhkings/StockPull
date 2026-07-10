@@ -5,6 +5,7 @@ import logging
 import pandas as pd
 
 from db import get_conn
+from data.index_base import register_stocks
 from ts_ingest.client import get_client
 from ts_ingest.ticker_map import index_id_to_ts_code
 
@@ -25,29 +26,23 @@ def _to_date(v):
 
 
 def backfill_stocks_a() -> int:
-    """A 股全量股票列表 → stocks (INSERT IGNORE)。"""
+    """A 股全量股票列表 → stocks（复用 data/index_base.py:register_stocks，
+    COALESCE 保护已有 gics_sector 不被空 industry 覆盖）。"""
     client = get_client()
-    dfs = []
-    for ex in ("SSE", "SZSE"):
-        df = client.call("stock_basic", exchange=ex, list_status="L",
-                         fields="ts_code,symbol,name,area,industry,exchange,list_date")
-        dfs.append(df)
-    df = pd.concat(dfs, ignore_index=True)
-    rows = [
-        (r["ts_code"], r["name"], r.get("industry") if pd.notna(r.get("industry")) else None, r["exchange"])
-        for _, r in df.iterrows()
-    ]
+    total = 0
     with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO stocks (ticker, name, gics_sector, exchange) "
-                "VALUES (%s, %s, %s, %s) "
-                "ON DUPLICATE KEY UPDATE name=VALUES(name), gics_sector=VALUES(gics_sector)",
-                rows,
-            )
-        conn.commit()
-    log.info(f"stocks_a: upserted {len(rows)} rows")
-    return len(rows)
+        for ex in ("SSE", "SZSE"):
+            df = client.call("stock_basic", exchange=ex, list_status="L",
+                             fields="ts_code,symbol,name,area,industry,exchange,list_date")
+            stocks_df = pd.DataFrame({
+                "ticker": df["ts_code"],
+                "name": df["name"],
+                "sector": df["industry"],
+            })
+            register_stocks(conn, stocks_df, exchange=ex)
+            total += len(stocks_df)
+    log.info(f"stocks_a: upserted {total} rows")
+    return total
 
 
 def backfill_stocks_hk() -> int:
