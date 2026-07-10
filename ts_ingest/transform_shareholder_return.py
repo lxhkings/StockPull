@@ -32,3 +32,20 @@ def transform_dividend_rows(df: pd.DataFrame) -> list[tuple]:
             to_float(r.get("base_share")),
         ))
     return rows
+
+
+def transform_repurchase_rows(df: pd.DataFrame) -> list[tuple]:
+    rows = []
+    for _, r in df.iterrows():
+        rows.append((
+            r["ts_code"],
+            to_date(r.get("ann_date")),
+            to_date(r.get("end_date")),
+            _to_str(r.get("proc")),
+            to_date(r.get("exp_date")),
+            to_float(r.get("vol")),
+            to_float(r.get("amount")),
+            to_float(r.get("high_limit")),
+            to_float(r.get("low_limit")),
+        ))
+    return rows
