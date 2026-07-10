@@ -12,6 +12,7 @@ import logging
 import threading
 from typing import Optional, Callable, TypeVar
 
+import pandas as pd
 import requests
 
 log = logging.getLogger(__name__)
@@ -161,6 +162,22 @@ def to_int(value) -> Optional[int]:
     """
     f = to_float(value)
     return int(f) if f is not None else None
+
+
+def to_date(value) -> Optional[str]:
+    """
+    YYYYMMDD 字符串/数值 → YYYY-MM-DD
+
+    Args:
+        value: tushare 返回的日期字段（YYYYMMDD 字符串、int、NaN、None 均可能出现）
+
+    Returns:
+        YYYY-MM-DD 字符串；None/NaN/空字符串输入返回 None；非 8 位字符串原样返回
+    """
+    if pd.isna(value) or value in (None, ""):
+        return None
+    s = str(value)
+    return f"{s[:4]}-{s[4:6]}-{s[6:8]}" if len(s) == 8 else s
 
 
 def format_cik(cik) -> Optional[str]:

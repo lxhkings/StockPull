@@ -9,6 +9,7 @@ from core.http_utils import (
     fetch_urls_sequentially,
     to_float,
     to_int,
+    to_date,
     format_cik,
 )
 
@@ -128,3 +129,22 @@ def test_format_cik_empty():
 
 def test_format_cik_invalid():
     assert format_cik("abc") is None
+
+
+# ── to_date ───────────────────────────────────────────────────────
+
+def test_to_date_converts_yyyymmdd():
+    assert to_date("20240403") == "2024-04-03"
+
+
+def test_to_date_handles_none_and_nan():
+    assert to_date(None) is None
+    assert to_date(float("nan")) is None
+
+
+def test_to_date_handles_empty_string():
+    assert to_date("") is None
+
+
+def test_to_date_passes_through_non_8_char_string():
+    assert to_date("2024-04-03") == "2024-04-03"
