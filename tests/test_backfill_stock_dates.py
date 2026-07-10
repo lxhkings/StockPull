@@ -2,20 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
-from ts_ingest.backfill_stock_dates import backfill_stock_dates, _sync_status, _to_date
-
-
-def test_to_date_converts_yyyymmdd():
-    assert _to_date("20240403") == "2024-04-03"
-
-
-def test_to_date_handles_none_and_nan():
-    assert _to_date(None) is None
-    assert _to_date(float("nan")) is None
-
-
-def test_to_date_handles_empty_string():
-    assert _to_date("") is None
+from ts_ingest.backfill_stock_dates import backfill_stock_dates, _sync_status
 
 
 def test_sync_status_updates_matched_rows():

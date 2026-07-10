@@ -4,16 +4,10 @@ import logging
 import pandas as pd
 
 from core.db_client import get_conn
+from core.http_utils import to_date
 from ts_ingest.client import get_client
 
 log = logging.getLogger(__name__)
-
-
-def _to_date(v) -> str | None:
-    if pd.isna(v) or v in (None, ""):
-        return None
-    s = str(v)
-    return f"{s[:4]}-{s[4:6]}-{s[6:8]}" if len(s) == 8 else s
 
 
 def _sync_status(list_status: str) -> dict:
@@ -29,8 +23,8 @@ def _sync_status(list_status: str) -> dict:
     with get_conn() as conn:
         with conn.cursor() as cur:
             for _, r in df.iterrows():
-                list_date = _to_date(r.get("list_date"))
-                delist_date = _to_date(r.get("delist_date"))
+                list_date = to_date(r.get("list_date"))
+                delist_date = to_date(r.get("delist_date"))
                 cur.execute(
                     "UPDATE stocks SET list_date=%s, delist_date=%s WHERE ticker=%s",
                     (list_date, delist_date, r["ts_code"]),
