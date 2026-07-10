@@ -9,6 +9,7 @@ import pymysql.cursors
 
 from core.db_client import get_conn
 from core.progress import log_progress
+from ts_ingest.transform_periodic import resample_ohlcv, periodic_rows
 
 log = logging.getLogger(__name__)
 
@@ -24,32 +25,10 @@ def _read_daily(ticker: str) -> pd.DataFrame:
             return pd.DataFrame(cur.fetchall())
 
 
-def resample_ohlcv(daily: pd.DataFrame, freq: str) -> pd.DataFrame:
-    if daily.empty:
-        return pd.DataFrame()
-    df = daily.copy()
-    df["date"] = pd.to_datetime(df["date"])
-    df = df.set_index("date")
-    out = df.resample(freq).agg({
-        "open":   "first",
-        "high":   "max",
-        "low":    "min",
-        "close":  "last",
-        "volume": "sum",
-    }).dropna(subset=["close"])
-    out = out.reset_index()
-    out["date"] = out["date"].dt.date
-    return out
-
-
 def _write_periodic(table: str, ticker: str, df: pd.DataFrame) -> int:
-    if df.empty:
+    rows = periodic_rows(ticker, df)
+    if not rows:
         return 0
-    rows = [
-        (ticker, r["date"], float(r["open"]), float(r["high"]),
-         float(r["low"]), float(r["close"]), int(r["volume"]))
-        for _, r in df.iterrows()
-    ]
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.executemany(
