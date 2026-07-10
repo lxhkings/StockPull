@@ -94,7 +94,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def cmd_init() -> int:
-    from db import execute
+    from core.db_client import execute
     from config import INDEX_CONFIG
     rows = [
         (idx, cfg["name"], cfg["etf"], cfg["description"])
@@ -110,7 +110,7 @@ def cmd_init() -> int:
 
 
 def cmd_status() -> int:
-    from db import show_status
+    from modules.db_admin import show_status
     show_status()
     return 0
 
@@ -182,7 +182,7 @@ def cmd_rebase(market: str, codes: list[str] | None, years: int | None, index: s
 
 
 def cmd_migrate_intraday() -> int:
-    from db import create_prices_intraday_table
+    from modules.db_admin import create_prices_intraday_table
     create_prices_intraday_table()
     print("prices_intraday table ready")
     return 0
@@ -202,7 +202,7 @@ def cmd_intraday(interval: str | None, rebase: bool = False) -> int:
 
 def cmd_tushare_backfill(scope: str, market: str, dry_run: bool, start: str | None = None) -> int:
     """两阶段：backfill 写本地缓冲 → 自动 flush 到 NAS。flush 失败则保留缓冲、提示兜底。"""
-    import db
+    from core.db_client import set_local_first
     from ts_ingest.orchestrator import run_full_backfill
     from core.local_buffer import flush, pending_count
     from config import TUSHARE_BUFFER_PATH
@@ -213,11 +213,11 @@ def cmd_tushare_backfill(scope: str, market: str, dry_run: bool, start: str | No
         print(rep.render())
         return 0
 
-    db.set_local_first(True, buffer_path=TUSHARE_BUFFER_PATH)
+    set_local_first(True, buffer_path=TUSHARE_BUFFER_PATH)
     try:
         rep = run_full_backfill(scope=scope, market=market, dry_run=dry_run, start=start)
     finally:
-        db.set_local_first(False)
+        set_local_first(False)
     print(rep.render())
 
     try:
@@ -249,16 +249,16 @@ def cmd_tushare_flush(workers: int = 1) -> int:
 
 def _run_futu(scope: str, force: bool) -> int:
     """两阶段：fetch 写本地缓冲 → 自动 flush 到 NAS。flush 失败则保留缓冲、提示兜底。"""
-    import db
+    from core.db_client import set_local_first
     from futu_ingest.orchestrator import run_sync
     from core.local_buffer import flush, pending_count
     from config import FUTU_BUFFER_PATH
 
-    db.set_local_first(True)
+    set_local_first(True)
     try:
         rep = run_sync(scope=scope, force=force)
     finally:
-        db.set_local_first(False)
+        set_local_first(False)
     print(rep)
 
     try:

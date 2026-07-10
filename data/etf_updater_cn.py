@@ -10,7 +10,7 @@ from typing import Optional
 import pandas as pd
 
 from ts_ingest.client import get_client
-from db import query, execute
+from core.db_client import query, execute
 from config import CN_SECTOR_ETFS
 from core.http_utils import to_float
 

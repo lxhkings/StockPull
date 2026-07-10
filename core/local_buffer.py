@@ -161,7 +161,7 @@ def pending_count(buffer_path: str) -> int:
 
 def _get_nas_for_flush():
     """flush 用的真 NAS 连接（含 get_conn 的连接重试）。独立函数便于测试 mock。"""
-    from db import get_conn
+    from core.db_client import get_conn
     return get_conn()
 
 

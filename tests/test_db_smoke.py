@@ -17,10 +17,9 @@ pytestmark = pytest.mark.skipif(not _nas_reachable(), reason="NAS DB not reachab
 
 
 def test_get_conn_succeeds():
-    from db import get_conn
+    from core.db_client import get_conn
     conn = get_conn()
     try:
-        assert conn.open
         with conn.cursor() as cur:
             cur.execute("SELECT 1")
             assert cur.fetchone() == (1,)
@@ -30,7 +29,7 @@ def test_get_conn_succeeds():
 
 def test_existing_schema_tables_present():
     """Confirm we are talking to the right DB (the one stock_system uses)."""
-    from db import query
+    from core.db_client import query
     rows = query("SHOW TABLES")
     table_names = {next(iter(r.values())) for r in rows}
     expected = {"stocks", "prices", "indices", "index_constituents",
@@ -40,7 +39,8 @@ def test_existing_schema_tables_present():
 
 def test_sync_log_roundtrip():
     """Write/read a probe row in sync_log."""
-    from db import get_conn, set_sync_ok, get_last_sync
+    from core.db_client import get_conn
+    from modules.sync_log import set_sync_ok, get_last_sync
     conn = get_conn()
     try:
         probe_ticker = "__PROBE__"

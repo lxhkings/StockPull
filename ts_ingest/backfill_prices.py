@@ -9,7 +9,8 @@ import pandas as pd
 
 from config import TUSHARE_BACKFILL_START
 from core.http_utils import to_float, to_int
-from db import get_conn, set_sync_error, set_sync_ok
+from core.db_client import get_conn
+from modules.sync_log import set_sync_error, set_sync_ok
 from core.progress import log_progress
 from ts_ingest.client import get_client
 

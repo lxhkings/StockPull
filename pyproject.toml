@@ -21,6 +21,7 @@ dependencies = [
     "tushare>=1.4.0",
     "cloudscraper>=1.2.71",
     "futu-api>=9.1.0",
+    "dbutils>=3.1.2",
 ]
 
 [tool.setuptools.packages.find]

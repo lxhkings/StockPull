@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import pandas as pd
 
-from db import get_conn
+from core.db_client import get_conn
 from data.index_base import register_stocks
 from ts_ingest.client import get_client
 from ts_ingest.ticker_map import index_id_to_ts_code

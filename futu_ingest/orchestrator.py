@@ -6,7 +6,7 @@ import time
 
 import pymysql.cursors
 
-from db import get_conn
+from core.db_client import get_conn
 from futu_ingest.backfill_financial import backfill_all as fin_backfill_all
 from futu_ingest.backfill_earnings import backfill_all as earnings_backfill_all
 from futu_ingest.backfill_actions import backfill_all as actions_backfill_all

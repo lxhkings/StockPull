@@ -10,7 +10,7 @@ from datetime import date
 
 import pandas as pd
 
-from db import get_conn
+from core.db_client import get_conn
 from config import FUTU_REFRESH_DAYS
 from futu_ingest.client import get_client, to_futu_code, from_futu_code
 from core.batch_utils import chunked

@@ -10,7 +10,7 @@ import json
 import logging
 
 from config import FUTU_FINANCIAL_TYPE, FUTU_CURRENCY_CODE
-from db import get_conn
+from core.db_client import get_conn
 from futu_ingest.client import clean_date, get_client, to_futu_code
 from futu_ingest.concurrency import ticker_stream
 

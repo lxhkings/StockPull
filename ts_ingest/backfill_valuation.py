@@ -8,7 +8,7 @@ import pandas as pd
 import pymysql.cursors
 
 from config import TUSHARE_BACKFILL_START
-from db import get_conn
+from core.db_client import get_conn
 from ts_ingest.client import get_client
 
 log = logging.getLogger(__name__)

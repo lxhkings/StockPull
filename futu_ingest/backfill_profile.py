@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from datetime import date
 
-from db import get_conn
+from core.db_client import get_conn
 from futu_ingest.client import get_client, to_futu_code
 from futu_ingest.concurrency import ticker_stream
 

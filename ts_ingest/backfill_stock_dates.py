@@ -3,7 +3,7 @@ import logging
 
 import pandas as pd
 
-from db import get_conn
+from core.db_client import get_conn
 from ts_ingest.client import get_client
 
 log = logging.getLogger(__name__)

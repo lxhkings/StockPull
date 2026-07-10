@@ -8,7 +8,7 @@ from typing import Optional
 
 import pandas as pd
 
-from db import get_conn, query, execute
+from core.db_client import get_conn, query, execute
 from data import stock_updater_cn_tushare as stock_updater_cn
 from core.http_utils import to_float
 from ts_ingest.backfill_lists import backfill_stocks_a

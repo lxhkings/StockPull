@@ -23,6 +23,11 @@ DB = {
 DB_CONNECT_RETRIES = int(os.getenv("DB_CONNECT_RETRIES", "3"))
 DB_CONNECT_BACKOFF = float(os.getenv("DB_CONNECT_BACKOFF", "2.0"))  # 秒，第 n 次重试前 sleep n*backoff
 
+# DB 连接池 (DBUtils.PooledDB)
+DB_POOL_MAX_CONNECTIONS = int(os.getenv("DB_POOL_MAX_CONNECTIONS", "20"))
+DB_POOL_MIN_CACHED = int(os.getenv("DB_POOL_MIN_CACHED", "2"))
+DB_POOL_MAX_CACHED = int(os.getenv("DB_POOL_MAX_CACHED", "10"))
+
 # Futu 本地优先缓冲文件（抓取先落本地，再 flush 到 NAS）
 FUTU_BUFFER_PATH = os.getenv("FUTU_BUFFER_PATH", ".futu_buffer/pending.sqlite")
 

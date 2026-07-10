@@ -11,7 +11,7 @@ import os
 
 import pandas as pd
 
-from db import get_conn
+from core.db_client import get_conn
 from data.index_base import (
     get_last_snapshot_date,
     save_snapshot,

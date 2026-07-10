@@ -16,7 +16,8 @@ from typing import Dict, List, Tuple, Optional
 import pandas as pd
 
 from config import TUSHARE_BACKFILL_START
-from db import get_conn, get_last_sync
+from core.db_client import get_conn
+from modules.sync_log import get_last_sync
 from core.http_utils import to_float, to_int
 from data.stock_updater_cn_tushare import _last_cn_trading_date
 from core.progress import log_progress

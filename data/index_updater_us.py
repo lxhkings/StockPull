@@ -11,7 +11,7 @@ from io import StringIO
 from datetime import date
 
 from config import INDEX_DELAY
-from db import get_conn
+from core.db_client import get_conn
 from core.http_utils import fetch_urls_sequentially, format_cik
 from data.index_base import (
     get_last_snapshot_date,

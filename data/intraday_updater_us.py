@@ -30,7 +30,8 @@ from config import (
 from core.http_utils import to_float, to_int
 from data.stock_updater_us import _last_us_trading_date
 from data.yf_client import download_with_retry
-from db import get_conn, get_last_sync, set_sync_error, set_sync_ok
+from core.db_client import get_conn
+from modules.sync_log import get_last_sync, set_sync_error, set_sync_ok
 
 log = logging.getLogger(__name__)
 

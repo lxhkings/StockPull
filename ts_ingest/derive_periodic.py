@@ -7,7 +7,7 @@ import time
 import pandas as pd
 import pymysql.cursors
 
-from db import get_conn
+from core.db_client import get_conn
 from core.progress import log_progress
 
 log = logging.getLogger(__name__)

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 import pymysql.cursors
 
-from db import get_conn
+from core.db_client import get_conn
 from ts_ingest import budget
 from ts_ingest.client import get_client
 from ts_ingest.backfill_lists import (

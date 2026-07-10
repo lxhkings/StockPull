@@ -267,6 +267,15 @@ wheels = [
 ]
 
 [[package]]
+name = "dbutils"
+version = "3.1.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/55/33/b739e991d8234b3fb0602d501b4aacda88ad1fd5d061b5b9d6022fa35ed6/dbutils-3.1.2.tar.gz", hash = "sha256:160b5788154f1adeddc61080daff1530b4df2ba0d45af1c3bfbac76db24186b3", size = 95869, upload-time = "2025-09-07T17:01:31.713Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/98/a7/4fe7da3082241028e62c390bf9357d60522dd03d9329e3a560045fe14dfd/dbutils-3.1.2-py3-none-any.whl", hash = "sha256:0cb388a89eeecf04089aef113a7007c3fac9199e9580c8549829f954870c403a", size = 32936, upload-time = "2025-09-07T17:01:30.466Z" },
+]
+
+[[package]]
 name = "decorator"
 version = "5.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -651,6 +660,7 @@ source = { editable = "." }
 dependencies = [
     { name = "akshare" },
     { name = "cloudscraper" },
+    { name = "dbutils" },
     { name = "efinance" },
     { name = "futu-api" },
     { name = "numpy" },
@@ -673,6 +683,7 @@ dev = [
 requires-dist = [
     { name = "akshare", specifier = ">=1.16.0" },
     { name = "cloudscraper", specifier = ">=1.2.71" },
+    { name = "dbutils", specifier = ">=3.1.2" },
     { name = "efinance", specifier = ">=0.5.4" },
     { name = "futu-api", specifier = ">=9.1.0" },
     { name = "numpy", specifier = ">=1.23.0" },

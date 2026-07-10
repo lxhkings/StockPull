@@ -10,8 +10,8 @@ import pytest
 # ─── DB migration ────────────────────────────────────────────────────────────
 
 def test_create_prices_intraday_table_executes_ddl():
-    with patch("db.execute") as mock_execute:
-        from db import create_prices_intraday_table
+    with patch("modules.db_admin.execute") as mock_execute:
+        from modules.db_admin import create_prices_intraday_table
         create_prices_intraday_table()
         mock_execute.assert_called_once()
         sql = mock_execute.call_args[0][0]

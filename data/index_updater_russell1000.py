@@ -21,7 +21,7 @@ import pandas as pd
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from db import get_conn
+from core.db_client import get_conn
 from core.http_utils import fetch_with_retry
 from data.index_base import register_stocks, get_last_snapshot_date
 

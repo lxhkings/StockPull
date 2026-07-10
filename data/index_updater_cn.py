@@ -15,7 +15,7 @@ from datetime import date
 
 import pandas as pd
 
-from db import get_conn, query
+from core.db_client import get_conn, query
 from ts_ingest.client import get_client
 from ts_ingest.ticker_map import index_id_to_ts_code
 from data.index_base import (

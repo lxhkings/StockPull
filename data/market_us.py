@@ -15,7 +15,8 @@ import logging
 from datetime import date, timedelta
 from typing import Optional
 
-from db import get_conn, get_index_tickers, get_latest_snapshot_tickers, query, execute
+from core.db_client import get_conn, query, execute
+from modules.db_admin import get_index_tickers
 from data import index_updater_us
 from data import index_updater_russell1000
 from data import stock_updater_us
@@ -34,16 +35,16 @@ def update_index() -> tuple[list[str], int, int]:
         (new_added_tickers, total_inserted_rows, removed_count)
     """
     # SP500
-    prev_sp500 = set(get_latest_snapshot_tickers("SP500"))
+    prev_sp500 = set(get_index_tickers("SP500"))
     index_updater_us.update_sp500()
-    curr_sp500 = set(get_latest_snapshot_tickers("SP500"))
+    curr_sp500 = set(get_index_tickers("SP500"))
     sp500_new = sorted(curr_sp500 - prev_sp500)
     sp500_removed = len(prev_sp500 - curr_sp500)
 
     # Russell 1000
-    prev_r1k = set(get_latest_snapshot_tickers("RUSSELL1000"))
+    prev_r1k = set(get_index_tickers("RUSSELL1000"))
     index_updater_russell1000.update_russell1000()
-    curr_r1k = set(get_latest_snapshot_tickers("RUSSELL1000"))
+    curr_r1k = set(get_index_tickers("RUSSELL1000"))
     r1k_new = sorted(curr_r1k - prev_r1k)
     r1k_removed = len(prev_r1k - curr_r1k)
 

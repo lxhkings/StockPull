@@ -10,7 +10,7 @@ import logging
 
 import pandas as pd
 
-from db import get_conn, execute
+from core.db_client import get_conn, execute
 from futu_ingest.client import get_client, to_futu_code
 from futu_ingest.concurrency import ticker_stream
 

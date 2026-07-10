@@ -4,7 +4,8 @@ from __future__ import annotations
 import logging
 from datetime import date
 
-from db import get_conn, set_sync_ok, set_sync_error
+from core.db_client import get_conn
+from modules.sync_log import set_sync_ok, set_sync_error
 
 log = logging.getLogger(__name__)
 

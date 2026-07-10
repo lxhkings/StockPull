@@ -12,7 +12,7 @@ def _fake_report():
 
 
 def test_backfill_uses_local_buffer_and_flushes():
-    with patch("db.set_local_first") as set_local, \
+    with patch("core.db_client.set_local_first") as set_local, \
          patch("ts_ingest.orchestrator.run_full_backfill", return_value=_fake_report()) as run, \
          patch("core.local_buffer.flush", return_value={"replayed": 5, "remaining": 0}) as flush:
         rc = cmd_tushare_backfill(scope="valuation", market="cn", dry_run=False, start="20100101")
@@ -26,7 +26,7 @@ def test_backfill_uses_local_buffer_and_flushes():
 
 
 def test_backfill_dry_run_skips_local_buffer():
-    with patch("db.set_local_first") as set_local, \
+    with patch("core.db_client.set_local_first") as set_local, \
          patch("ts_ingest.orchestrator.run_full_backfill", return_value=_fake_report()) as run:
         rc = cmd_tushare_backfill(scope="all", market="all", dry_run=True)
 
@@ -36,7 +36,7 @@ def test_backfill_dry_run_skips_local_buffer():
 
 
 def test_backfill_flush_failure_keeps_buffer_and_returns_1():
-    with patch("db.set_local_first"), \
+    with patch("core.db_client.set_local_first"), \
          patch("ts_ingest.orchestrator.run_full_backfill", return_value=_fake_report()), \
          patch("core.local_buffer.flush", side_effect=RuntimeError("NAS down")), \
          patch("core.local_buffer.pending_count", return_value=42):

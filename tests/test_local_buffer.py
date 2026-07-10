@@ -6,16 +6,20 @@ import pytest
 
 def test_get_conn_retries_on_operational_error(monkeypatch):
     """连接失败 2 次后第 3 次成功 → pymysql.connect 调 3 次，sleep 不真睡。"""
-    import db
+    import core.db_client as db
+    # 重置连接池（避免前次测试缓存影响）
+    monkeypatch.setattr(db, "_pool", None)
     calls = {"n": 0}
 
     class FakeCursor:
         def __enter__(self): return self
         def __exit__(self, *a): pass
         def execute(self, *a): pass
+        def close(self): pass
 
     class FakeConn:
         def cursor(self): return FakeCursor()
+        def close(self): pass
 
     def fake_connect(**kw):
         calls["n"] += 1
@@ -25,12 +29,14 @@ def test_get_conn_retries_on_operational_error(monkeypatch):
 
     monkeypatch.setattr(db.pymysql, "connect", fake_connect)
     monkeypatch.setattr(db.time, "sleep", lambda s: None)
+    monkeypatch.setattr(db, "DB_POOL_MIN_CACHED", 0)
     monkeypatch.setattr(db, "DB_CONNECT_RETRIES", 3)
     monkeypatch.setattr(db, "DB_CONNECT_BACKOFF", 0.01)
 
     conn = db.get_conn()
     assert calls["n"] == 3
-    assert isinstance(conn, FakeConn)
+    # 连接池包装后返回 PooledDedicatedDBConnection，底层是 FakeConn
+    assert isinstance(conn._con._con, FakeConn)
 
 
 def test_is_write_classification():
@@ -286,7 +292,7 @@ def test_flush_parallel_no_pending(tmp_path):
 
 
 def test_set_local_first_toggles_get_conn(monkeypatch, tmp_path):
-    import db
+    import core.db_client as db
     from core.local_buffer import BufferingConnection
     monkeypatch.setattr(db, "FUTU_BUFFER_PATH", str(tmp_path / "buf.sqlite"))
 
@@ -299,6 +305,7 @@ def test_set_local_first_toggles_get_conn(monkeypatch, tmp_path):
         db.set_local_first(False)
 
     # 关闭后走真连接路径（mock pymysql 验证不再返回 Buffering）
+    monkeypatch.setattr(db, "_pool", None)  # 重置连接池
     monkeypatch.setattr(db.pymysql, "connect", lambda **kw: (_ for _ in ()).throw(
         db.pymysql.err.OperationalError(2003, "Host is down")))
     monkeypatch.setattr(db, "DB_CONNECT_RETRIES", 1)

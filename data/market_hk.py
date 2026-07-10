@@ -7,7 +7,8 @@ from typing import Optional
 import yfinance as yf
 import pandas as pd
 
-from db import get_conn, get_index_tickers, get_latest_snapshot_tickers, query, execute
+from core.db_client import get_conn, query, execute
+from modules.db_admin import get_index_tickers
 from data import index_updater_hk
 from data import stock_updater_hk
 from core.http_utils import to_float
@@ -18,11 +19,11 @@ market_id = "hk"
 
 
 def update_index() -> tuple[list[str], int, int]:
-    prev = set(get_latest_snapshot_tickers("HSI"))
+    prev = set(get_index_tickers("HSI"))
 
     index_updater_hk.update_hsi()
 
-    curr = set(get_latest_snapshot_tickers("HSI"))
+    curr = set(get_index_tickers("HSI"))
     new_added = sorted(curr - prev)
     return new_added, len(curr), len(prev - curr)
 
