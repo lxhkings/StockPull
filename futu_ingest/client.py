@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import socket
-import time
 from functools import lru_cache
 from threading import Lock
 
@@ -18,6 +17,7 @@ from config import (
     FUTU_LIMIT_INTERVALS, FUTU_RETRY_COUNT, FUTU_RETRY_DELAY,
 )
 from data.base import RateLimiter
+from retry_utils import retry_with_backoff
 
 log = logging.getLogger(__name__)
 
@@ -107,30 +107,28 @@ class FutuClient:
     def call(self, method_name: str, *args, **kwargs):
         """调用 ctx.<method_name>(*args, **kwargs)，返回 data（ret 校验在内部）。"""
         ctx = self._ensure_ctx()
-        last_err = None
         limiter = self._limiter_for(method_name)
-        for attempt in range(FUTU_RETRY_COUNT):
+
+        def _call():
             limiter.wait()
-            try:
-                result = getattr(ctx, method_name)(*args, **kwargs)
-                # 适配 3 值返回 (short_interest/daily_short_volume)
-                if isinstance(result, tuple) and len(result) == 3:
-                    ret, data, _ = result
-                else:
-                    ret, data = result
-                if ret == RET_OK:
-                    return data
-                last_err = RuntimeError(f"futu.{method_name} ret={ret}: {data}")
-            except Exception as e:  # noqa: BLE001
-                last_err = e
+            result = getattr(ctx, method_name)(*args, **kwargs)
+            # 适配 3 值返回 (short_interest/daily_short_volume)
+            if isinstance(result, tuple) and len(result) == 3:
+                ret, data, _ = result
+            else:
+                ret, data = result
+            if ret != RET_OK:
+                raise RuntimeError(f"futu.{method_name} ret={ret}: {data}")
+            return data
+
+        def _should_retry(e: Exception) -> bool:
             # 永久性错误（如"不支持"、"未知股票"）不重试
-            if any(m in str(last_err) for m in PERMANENT_ERRORS):
-                raise last_err
-            wait = FUTU_RETRY_DELAY * (2 ** attempt)
-            log.warning(f"futu.{method_name} failed (attempt {attempt+1}): {last_err}; sleep {wait}s")
-            time.sleep(wait)
-        assert last_err is not None
-        raise last_err
+            return not any(m in str(e) for m in PERMANENT_ERRORS)
+
+        return retry_with_backoff(
+            _call, retry_count=FUTU_RETRY_COUNT, base_delay=FUTU_RETRY_DELAY,
+            multiplier=2, should_retry=_should_retry, context=f"futu.{method_name}",
+        )
 
     def close(self):
         if self._ctx is not None:
