@@ -22,6 +22,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from db import get_conn
+from data.base import fetch_with_retry
 from data.index_base import register_stocks, get_last_snapshot_date
 
 log = logging.getLogger(__name__)
@@ -106,12 +107,12 @@ def _valid_us_ticker(t: str) -> bool:
 
 def _build_name_ticker_lookup() -> dict[str, str]:
     """从 SEC company_tickers_exchange.json 构建标准化名称 → ticker 查找表。"""
-    resp = requests.get(
+    resp = fetch_with_retry(
         "https://www.sec.gov/files/company_tickers_exchange.json",
         headers=EDGAR_HEADERS,
         timeout=15,
+        context="russell1000.name_ticker_lookup",
     )
-    resp.raise_for_status()
     data = resp.json()
     fields = data["fields"]
     name_idx = fields.index("name")
@@ -169,12 +170,12 @@ def _find_iwb_accession() -> str:
     if cached:
         log.info(f"使用缓存的 IWB accession: {cached}")
         return cached
-    resp = requests.get(
+    resp = fetch_with_retry(
         f"https://data.sec.gov/submissions/CIK{ISHARES_TRUST_CIK_PADDED}.json",
         headers=EDGAR_HEADERS,
         timeout=15,
+        context="russell1000.submissions",
     )
-    resp.raise_for_status()
     data = resp.json()
 
     filings = data["filings"]["recent"]
@@ -257,8 +258,7 @@ def fetch_russell1000_data() -> pd.DataFrame:
 
     acc_path = acc.replace("-", "")
     url = f"https://www.sec.gov/Archives/edgar/data/{ISHARES_TRUST_CIK}/{acc_path}/primary_doc.xml"
-    resp = requests.get(url, headers=EDGAR_HEADERS, timeout=30)
-    resp.raise_for_status()
+    resp = fetch_with_retry(url, headers=EDGAR_HEADERS, timeout=30, context="russell1000.nport_xml")
 
     df = _parse_nport_holdings(resp.text, name_lookup)
     df = df.where(pd.notnull(df), None)  # NaN → None（MySQL 不接受 NaN）
