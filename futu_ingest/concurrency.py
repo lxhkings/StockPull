@@ -9,15 +9,11 @@ from typing import Callable
 from config import FUTU_REFRESH_DAYS, FUTU_DEFAULT_REFRESH_DAYS
 from futu_ingest.client import PERMANENT_ERRORS
 from futu_ingest.sync import fresh_tickers, mark_ok, mark_error, mark_skip
+from progress import log_progress
 
 log = logging.getLogger(__name__)
 
 PROGRESS_EVERY = 50   # 每处理 N 票打一次进度条
-
-
-def _fmt_dur(sec: float) -> str:
-    m, s = divmod(int(sec), 60)
-    return f"{m}m{s:02d}s" if m else f"{s}s"
 
 
 def ticker_stream(backfill_fn, client, tickers: list[str], data_type: str,
@@ -51,13 +47,8 @@ def ticker_stream(backfill_fn, client, tickers: list[str], data_type: str,
                 log.error(f"{data_type} {t}: {e}")
                 mark_error(t, data_type, str(e))
                 err += 1
-        if i % PROGRESS_EVERY == 0 or i == total:
-            el = time.monotonic() - t0
-            rate = i / el if el else 0
-            eta = (total - i) / rate if rate else 0
-            log.info(f"{data_type}: {i}/{total} ({i * 100 // total}%) "
-                     f"ok={ok} skip={skipped} err={err} | "
-                     f"{rate:.1f}/s ETA {_fmt_dur(eta)}")
+        log_progress(i, total, t0, every=PROGRESS_EVERY, context=f"{data_type}: ",
+                     extra=f"ok={ok} skip={skipped} err={err}")
     return rows, ok, skipped
 
 
