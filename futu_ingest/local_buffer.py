@@ -17,6 +17,8 @@ import pymysql
 import pymysql.cursors
 from tqdm import tqdm
 
+from batch_utils import chunked
+
 log = logging.getLogger(__name__)
 
 _WRITE_KEYWORDS = ("INSERT", "REPLACE", "UPDATE", "DELETE")
@@ -230,7 +232,7 @@ def flush_parallel(buffer_path: str, workers: int = 4) -> dict:
 
     workers = max(1, min(workers, len(rows)))
     chunk_size = (len(rows) + workers - 1) // workers
-    chunks = [rows[i:i + chunk_size] for i in range(0, len(rows), chunk_size)]
+    chunks = list(chunked(rows, chunk_size))
 
     replayed = 0
     replayed_lock = threading.Lock()

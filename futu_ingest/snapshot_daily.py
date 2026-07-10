@@ -13,6 +13,7 @@ import pandas as pd
 from db import get_conn
 from config import FUTU_REFRESH_DAYS
 from futu_ingest.client import get_client, to_futu_code, from_futu_code
+from batch_utils import chunked
 from futu_ingest.concurrency import batch_with_bisect, run_streams, ticker_stream
 from futu_ingest.sync import fresh_tickers, mark_ok
 
@@ -44,8 +45,8 @@ def snapshot_shares(client, tickers: list[str]) -> int:
     """批量抓快照，写当日流通股/市值。返回写入行数。未知票经二分隔离跳过。"""
     today = date.today().isoformat()
     rows = []
-    for i in range(0, len(tickers), SNAPSHOT_BATCH):
-        batch = [to_futu_code(t) for t in tickers[i:i + SNAPSHOT_BATCH]]
+    for batch_tickers in chunked(tickers, SNAPSHOT_BATCH):
+        batch = [to_futu_code(t) for t in batch_tickers]
         for df in batch_with_bisect(client, "get_market_snapshot", batch):
             if df is None or not hasattr(df, "iterrows"):
                 continue
