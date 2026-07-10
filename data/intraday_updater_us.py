@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 import random
-import signal
 import time
 from datetime import date, timedelta
 from typing import Optional
@@ -28,6 +27,7 @@ from config import (
 )
 from data.base import to_float, to_int
 from data.stock_updater_us import _last_us_trading_date
+from data.yf_client import download_with_retry
 from db import get_conn, get_last_sync, set_sync_error, set_sync_ok
 
 log = logging.getLogger(__name__)
@@ -268,33 +268,18 @@ def _download_and_save(
 
     log.info(f"[intraday {interval}] 下载 {len(tickers)} 只，{start_date} ~ {last_trading}")
 
-    df = None
-    last_exc: Optional[Exception] = None
-    for attempt in range(YF_RETRY_COUNT):
-        try:
-            signal.signal(signal.SIGINT, signal.SIG_DFL)
-            df = yf.download(
-                tickers=yf_symbols,
-                start=start_date.strftime("%Y-%m-%d"),
-                end=end_date.strftime("%Y-%m-%d"),
-                interval=yf_interval,
-                group_by="ticker",
-                auto_adjust=False,
-                actions=False,
-                threads=False,
-                progress=False,
-                timeout=YF_TIMEOUT,
-            )
-            last_exc = None
-            break
-        except Exception as e:
-            last_exc = e
-            if attempt < YF_RETRY_COUNT - 1:
-                backoff = 5 * (3 ** attempt)
-                log.warning(f"yf.download attempt {attempt + 1} failed, retry in {backoff}s: {e}")
-                time.sleep(backoff)
-
-    if last_exc is not None:
+    try:
+        df = download_with_retry(
+            tickers=yf_symbols,
+            start=start_date.strftime("%Y-%m-%d"),
+            end=end_date.strftime("%Y-%m-%d"),
+            interval=yf_interval,
+            threads=False,
+            timeout=YF_TIMEOUT,
+            retry_count=YF_RETRY_COUNT,
+            context=f"[intraday {interval}] ",
+        )
+    except Exception as last_exc:
         msg = f"yfinance failed after {YF_RETRY_COUNT} retries: {last_exc}"
         log.error(msg)
         for t in tickers:

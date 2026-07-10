@@ -127,7 +127,7 @@ def _make_yf_multiindex_df(symbol: str) -> pd.DataFrame:
 @patch("data.intraday_updater_us.get_last_sync")
 @patch("data.intraday_updater_us.set_sync_ok")
 @patch("data.intraday_updater_us.set_sync_error")
-@patch("data.intraday_updater_us.yf.download")
+@patch("data.yf_client.yf.download")
 @patch("data.market_us.list_active_tickers")
 @patch("data.intraday_updater_us._test_aapl_intraday")
 def test_update_intraday_calls_yf_download(
@@ -154,7 +154,7 @@ def test_update_intraday_calls_yf_download(
 @patch("data.intraday_updater_us.get_last_sync")
 @patch("data.intraday_updater_us.set_sync_ok")
 @patch("data.intraday_updater_us.set_sync_error")
-@patch("data.intraday_updater_us.yf.download")
+@patch("data.yf_client.yf.download")
 @patch("data.market_us.list_active_tickers")
 @patch("data.intraday_updater_us._test_aapl_intraday")
 def test_update_intraday_full_rebase_ignores_sync_log(
@@ -190,7 +190,7 @@ def test_update_intraday_skips_up_to_date_ticker(mock_test_aapl, mock_list, mock
     mock_get_last_sync.return_value = date(2026, 5, 15)  # 已同步到最新
     mock_get_conn.return_value = MagicMock()
 
-    with patch("data.intraday_updater_us.yf.download") as mock_dl:
+    with patch("data.yf_client.yf.download") as mock_dl:
         from data.intraday_updater_us import update_intraday
         result = update_intraday("15m")
 
@@ -203,7 +203,7 @@ def test_update_intraday_skips_up_to_date_ticker(mock_test_aapl, mock_list, mock
 @patch("data.intraday_updater_us.get_last_sync")
 @patch("data.intraday_updater_us.set_sync_ok")
 @patch("data.intraday_updater_us.set_sync_error")
-@patch("data.intraday_updater_us.yf.download")
+@patch("data.yf_client.yf.download")
 @patch("data.market_us.list_active_tickers")
 @patch("data.intraday_updater_us._test_aapl_intraday")
 def test_update_intraday_floor_within_yahoo_window(

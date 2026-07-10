@@ -7,7 +7,6 @@ import time
 from datetime import date, timedelta
 from typing import Dict, List, Optional
 
-import yfinance as yf
 import pandas as pd
 
 from config import (
@@ -15,6 +14,7 @@ from config import (
 )
 from db import get_conn, get_last_sync, set_sync_ok, set_sync_error
 from data.base import to_float, to_int
+from data.yf_client import history_with_retry
 
 log = logging.getLogger(__name__)
 
@@ -65,8 +65,9 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
 
 def _fetch_one_yfinance(ticker: str, start: date, end: date) -> pd.DataFrame:
     """Fetch HK stock via yfinance."""
-    t = yf.Ticker(ticker)
-    df = t.history(start=start.isoformat(), end=end.isoformat())
+    df = history_with_retry(
+        ticker, start=start.isoformat(), end=end.isoformat(), context=f"[{ticker}] ",
+    )
     if df is None or df.empty:
         return pd.DataFrame(columns=["ticker", "date", "open", "high", "low", "close", "volume"])
 

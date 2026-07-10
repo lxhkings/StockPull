@@ -15,13 +15,12 @@ import logging
 from datetime import date, timedelta
 from typing import Optional
 
-import yfinance as yf
-
 from db import get_conn, get_index_tickers, get_latest_snapshot_tickers, query, execute
 from data import index_updater_us
 from data import index_updater_russell1000
 from data import stock_updater_us
 from data.base import to_float
+from data.yf_client import download_with_retry
 
 log = logging.getLogger(__name__)
 
@@ -122,8 +121,14 @@ def update_index_price() -> int:
 
         start = last_date.isoformat() if last_date else "2010-01-01"
         end = (last_trading + timedelta(days=1)).isoformat()
-        df = yf.download(symbol, start=start, end=end, interval="1d",
-                         auto_adjust=False, actions=False, progress=False)
+        try:
+            df = download_with_retry(
+                tickers=symbol, start=start, end=end, interval="1d",
+                group_by="column", context=f"[{symbol} index price] ",
+            )
+        except Exception as e:
+            log.warning(f"[{symbol}] index price yfinance 失败，跳过: {e}")
+            continue
         if df.empty:
             continue
 
