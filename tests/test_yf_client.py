@@ -8,7 +8,7 @@ def test_download_with_retry_success_first_attempt():
     from data.yf_client import download_with_retry
     df = pd.DataFrame({"Close": [1.0]})
     with patch("data.yf_client.yf.download", return_value=df) as mock_dl, \
-         patch("data.yf_client.time.sleep") as mock_sleep:
+         patch("retry_utils.time.sleep") as mock_sleep:
         result = download_with_retry(
             tickers=["AAPL"], start="2026-01-01", end="2026-01-02", interval="1d",
         )
@@ -48,7 +48,7 @@ def test_download_with_retry_retries_then_succeeds():
     from data.yf_client import download_with_retry
     df = pd.DataFrame({"Close": [1.0]})
     with patch("data.yf_client.yf.download", side_effect=[ConnectionError("boom"), df]) as mock_dl, \
-         patch("data.yf_client.time.sleep") as mock_sleep:
+         patch("retry_utils.time.sleep") as mock_sleep:
         result = download_with_retry(
             tickers=["AAPL"], start="2026-01-01", end="2026-01-02", interval="1d",
             retry_count=3,
@@ -63,7 +63,7 @@ def test_download_with_retry_exhausts_and_raises_last_exception():
     err1 = ConnectionError("first")
     err2 = TimeoutError("second")
     with patch("data.yf_client.yf.download", side_effect=[err1, err2]) as mock_dl, \
-         patch("data.yf_client.time.sleep") as mock_sleep:
+         patch("retry_utils.time.sleep") as mock_sleep:
         with pytest.raises(TimeoutError) as exc_info:
             download_with_retry(
                 tickers=["AAPL"], start="2026-01-01", end="2026-01-02", interval="1d",
@@ -93,7 +93,7 @@ def test_history_with_retry_success_first_attempt():
     mock_ticker = MagicMock()
     mock_ticker.history.return_value = df
     with patch("data.yf_client.yf.Ticker", return_value=mock_ticker) as mock_tk, \
-         patch("data.yf_client.time.sleep") as mock_sleep:
+         patch("retry_utils.time.sleep") as mock_sleep:
         result = history_with_retry("00700.HK", start="2026-01-01", end="2026-01-02")
     assert result is df
     mock_tk.assert_called_once_with("00700.HK")
@@ -107,7 +107,7 @@ def test_history_with_retry_retries_then_succeeds():
     mock_ticker = MagicMock()
     mock_ticker.history.side_effect = [ConnectionError("boom"), df]
     with patch("data.yf_client.yf.Ticker", return_value=mock_ticker), \
-         patch("data.yf_client.time.sleep") as mock_sleep:
+         patch("retry_utils.time.sleep") as mock_sleep:
         result = history_with_retry("00700.HK", start="2026-01-01", end="2026-01-02", retry_count=3)
     assert result is df
     assert mock_ticker.history.call_count == 2
@@ -121,7 +121,7 @@ def test_history_with_retry_exhausts_and_raises_last_exception():
     mock_ticker = MagicMock()
     mock_ticker.history.side_effect = [err1, err2]
     with patch("data.yf_client.yf.Ticker", return_value=mock_ticker), \
-         patch("data.yf_client.time.sleep"):
+         patch("retry_utils.time.sleep"):
         with pytest.raises(TimeoutError) as exc_info:
             history_with_retry("00700.HK", start="2026-01-01", end="2026-01-02", retry_count=2)
     assert exc_info.value is err2
