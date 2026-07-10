@@ -8,6 +8,10 @@ from core.db_client import get_conn
 from data.index_base import register_stocks
 from ts_ingest.client import get_client
 from ts_ingest.ticker_map import index_id_to_ts_code
+from ts_ingest.transform_lists import (
+    transform_stocks_a, transform_stocks_hk, transform_etf_basic,
+    transform_hk_connect, transform_index_weight,
+)
 
 log = logging.getLogger(__name__)
 
@@ -16,13 +20,6 @@ def _to_str(v) -> str | None:
     if v is None or (isinstance(v, float) and pd.isna(v)):
         return None
     return str(v)
-
-
-def _to_date(v):
-    if pd.isna(v) or v in (None, ""):
-        return None
-    s = str(v)
-    return f"{s[:4]}-{s[4:6]}-{s[6:8]}" if len(s) == 8 else s
 
 
 def backfill_stocks_a() -> int:
@@ -34,11 +31,7 @@ def backfill_stocks_a() -> int:
         for ex in ("SSE", "SZSE"):
             df = client.call("stock_basic", exchange=ex, list_status="L",
                              fields="ts_code,symbol,name,area,industry,exchange,list_date")
-            stocks_df = pd.DataFrame({
-                "ticker": df["ts_code"],
-                "name": df["name"],
-                "sector": df["industry"],
-            })
+            stocks_df = transform_stocks_a(df)
             register_stocks(conn, stocks_df, exchange=ex)
             total += len(stocks_df)
     log.info(f"stocks_a: upserted {total} rows")
@@ -48,7 +41,7 @@ def backfill_stocks_a() -> int:
 def backfill_stocks_hk() -> int:
     client = get_client()
     df = client.call("hk_basic", fields="ts_code,name,fullname,list_status,list_date")
-    rows = [(r["ts_code"], r["name"], None, "HKEX") for _, r in df.iterrows()]
+    rows = transform_stocks_hk(df)
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.executemany(
@@ -80,16 +73,9 @@ def backfill_stocks_us() -> int:
 
 def backfill_etf_basic() -> int:
     client = get_client()
-    fields = "ts_code,name,management,custodian,fund_type,market,list_date,issue_date,delist_date,status"
     dfs = [client.call("fund_basic", market=m) for m in ("E", "O")]
     df = pd.concat(dfs, ignore_index=True)
-    rows = [
-        (r["ts_code"], r.get("name"), r.get("management"), r.get("custodian"),
-         r.get("fund_type"), r.get("market"),
-         _to_date(r.get("list_date")), _to_date(r.get("issue_date")),
-         _to_date(r.get("delist_date")), r.get("status"))
-        for _, r in df.iterrows()
-    ]
+    rows = transform_etf_basic(df)
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.executemany(
@@ -111,9 +97,7 @@ def backfill_hk_connect() -> int:
     total = 0
     for hs_type in ("SH", "SZ"):
         df = client.call("hs_const", hs_type=hs_type)
-        rows = [(hs_type, r["ts_code"], r.get("name"),
-                 _to_date(r.get("in_date")), _to_date(r.get("out_date")))
-                for _, r in df.iterrows()]
+        rows = transform_hk_connect(df, hs_type)
         with get_conn() as conn:
             with conn.cursor() as cur:
                 cur.executemany(
@@ -134,9 +118,7 @@ def backfill_index_weight(index_id: str, trade_date: str) -> int:
     client = get_client()
     ts_code = index_id_to_ts_code(index_id)
     df = client.call("index_weight", index_code=ts_code, trade_date=trade_date)
-    snap_date = _to_date(trade_date)
-    rows = [(index_id, snap_date, r["con_code"], r.get("con_code"), None)
-            for _, r in df.iterrows()]
+    rows = transform_index_weight(df, index_id, trade_date)
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.executemany(
@@ -146,5 +128,5 @@ def backfill_index_weight(index_id: str, trade_date: str) -> int:
                 rows,
             )
         conn.commit()
-    log.info(f"index_weight[{index_id}@{snap_date}]: {len(rows)} rows")
+    log.info(f"index_weight[{index_id}@{trade_date}]: {len(rows)} rows")
     return len(rows)
