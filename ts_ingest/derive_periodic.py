@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import logging
+import time
+
 import pandas as pd
 import pymysql.cursors
 
 from db import get_conn
+from progress import log_progress
 
 log = logging.getLogger(__name__)
 
@@ -72,6 +75,7 @@ def derive_for_ticker(ticker: str) -> dict[str, int]:
 
 def derive_all(tickers: list[str]) -> dict:
     total_w = total_m = 0
+    t0 = time.monotonic()
     for i, t in enumerate(tickers, 1):
         try:
             res = derive_for_ticker(t)
@@ -79,6 +83,6 @@ def derive_all(tickers: list[str]) -> dict:
             total_m += res["monthly"]
         except Exception as e:
             log.error(f"derive {t}: {e}")
-        if i % 500 == 0:
-            log.info(f"derive progress {i}/{len(tickers)} weekly={total_w} monthly={total_m}")
+        log_progress(i, len(tickers), t0, every=500,
+                     context="derive ", extra=f"weekly={total_w} monthly={total_m}")
     return {"weekly_rows": total_w, "monthly_rows": total_m}

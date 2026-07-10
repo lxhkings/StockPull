@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import date
 
 import pandas as pd
@@ -9,6 +10,7 @@ import pandas as pd
 from config import TUSHARE_BACKFILL_START
 from data.base import to_float, to_int
 from db import get_conn, set_sync_error, set_sync_ok
+from progress import log_progress
 from ts_ingest.client import get_client
 
 log = logging.getLogger(__name__)
@@ -72,6 +74,7 @@ def backfill_market(tickers: list[str], market: str,
     """全 ticker 顺序 backfill；失败计入 sync_log error 并继续。"""
     ok = 0
     failed: list[str] = []
+    t0 = time.monotonic()
     for i, t in enumerate(tickers, 1):
         try:
             backfill_one(t, market=market, start=start)
@@ -84,6 +87,6 @@ def backfill_market(tickers: list[str], market: str,
                     set_sync_error(conn, t, SYNC_DATA_TYPE, str(e))
             except Exception:
                 pass
-        if i % 100 == 0:
-            log.info(f"[{market}] progress {i}/{len(tickers)}, ok={ok}, failed={len(failed)}")
+        log_progress(i, len(tickers), t0, every=100, context=f"[{market}] ",
+                     extra=f"ok={ok}, failed={len(failed)}")
     return {"ok": ok, "failed": failed, "total": len(tickers)}
