@@ -37,7 +37,7 @@ def test_client_call_retries_then_raises_on_ret_error():
     c = FutuClient()
     c._ctx = fake_ctx
     c._limiter_for = MagicMock()   # 跳过真实限频 sleep
-    with patch("retry_utils.time.sleep"):
+    with patch("core.retry_utils.time.sleep"):
         try:
             c.call("get_market_snapshot", ["US.AAPL"])
             assert False, "should raise"
@@ -86,7 +86,7 @@ def test_client_call_3_value_retries_on_error():
     c = FutuClient()
     c._ctx = fake_ctx
     c._limiter_for = MagicMock()   # 跳过真实限频 sleep
-    with patch("retry_utils.time.sleep"):
+    with patch("core.retry_utils.time.sleep"):
         try:
             c.call("get_short_interest", "US.AAPL")
             assert False, "should raise"

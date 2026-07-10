@@ -8,7 +8,7 @@ import pandas as pd
 import pymysql.cursors
 
 from db import get_conn
-from progress import log_progress
+from core.progress import log_progress
 
 log = logging.getLogger(__name__)
 

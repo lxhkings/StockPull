@@ -13,7 +13,7 @@ import pandas as pd
 from db import get_conn
 from config import FUTU_REFRESH_DAYS
 from futu_ingest.client import get_client, to_futu_code, from_futu_code
-from batch_utils import chunked
+from core.batch_utils import chunked
 from futu_ingest.concurrency import batch_with_bisect, run_streams, ticker_stream
 from futu_ingest.sync import fresh_tickers, mark_ok
 

@@ -17,7 +17,7 @@ import pymysql
 import pymysql.cursors
 from tqdm import tqdm
 
-from batch_utils import chunked
+from core.batch_utils import chunked
 
 log = logging.getLogger(__name__)
 

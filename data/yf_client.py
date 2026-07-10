@@ -13,7 +13,7 @@ import pandas as pd
 import yfinance as yf
 
 from config import YF_RETRY_COUNT, YF_TIMEOUT, YF_THREADS
-from retry_utils import retry_with_backoff
+from core.retry_utils import retry_with_backoff
 
 log = logging.getLogger(__name__)
 

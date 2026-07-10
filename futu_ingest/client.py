@@ -17,7 +17,7 @@ from config import (
     FUTU_LIMIT_INTERVALS, FUTU_RETRY_COUNT, FUTU_RETRY_DELAY,
 )
 from data.base import RateLimiter
-from retry_utils import retry_with_backoff
+from core.retry_utils import retry_with_backoff
 
 log = logging.getLogger(__name__)
 

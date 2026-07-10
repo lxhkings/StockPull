@@ -18,7 +18,7 @@ import yfinance as yf
 from datetime import datetime, timedelta, date
 from typing import Optional, List, Dict
 
-from batch_utils import chunked
+from core.batch_utils import chunked
 
 from config import (
     HISTORY_YEARS_US as HISTORY_YEARS,

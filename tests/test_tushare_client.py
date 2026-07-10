@@ -46,7 +46,7 @@ def test_call_retries_then_succeeds():
         pd.DataFrame({"ts_code": ["600519.SH"]}),
     ]
     with patch("ts_ingest.client.ts.pro_api", return_value=fake_pro), \
-         patch("retry_utils.time.sleep"):
+         patch("core.retry_utils.time.sleep"):
         from ts_ingest import client
         client.get_client.cache_clear()
         client_obj = client.get_client()
@@ -59,7 +59,7 @@ def test_call_raises_after_retry_exhaustion():
     fake_pro = MagicMock()
     fake_pro.stock_basic.side_effect = Exception("permanent failure")
     with patch("ts_ingest.client.ts.pro_api", return_value=fake_pro), \
-         patch("retry_utils.time.sleep"):
+         patch("core.retry_utils.time.sleep"):
         from ts_ingest import client
         client.get_client.cache_clear()
         client_obj = client.get_client()

@@ -18,7 +18,7 @@ import pandas as pd
 import pymysql.err
 import yfinance as yf
 
-from batch_utils import chunked
+from core.batch_utils import chunked
 
 from config import (
     YF_BATCH_DELAY_BASE,

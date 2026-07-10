@@ -9,7 +9,7 @@ from typing import Callable
 from config import FUTU_REFRESH_DAYS, FUTU_DEFAULT_REFRESH_DAYS
 from futu_ingest.client import PERMANENT_ERRORS
 from futu_ingest.sync import fresh_tickers, mark_ok, mark_error, mark_skip
-from progress import log_progress
+from core.progress import log_progress
 
 log = logging.getLogger(__name__)
 

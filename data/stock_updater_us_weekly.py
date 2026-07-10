@@ -16,7 +16,7 @@ import logging
 from datetime import datetime, timedelta, date
 from typing import Optional, List, Dict
 
-from batch_utils import chunked
+from core.batch_utils import chunked
 
 import pandas as pd
 import yfinance as yf
