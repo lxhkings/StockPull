@@ -20,7 +20,7 @@ from config import (
     TUSHARE_RETRY_COUNT,
     TUSHARE_RETRY_DELAY,
 )
-from data.base import RateLimiter
+from core.http_utils import RateLimiter
 from core.retry_utils import retry_with_backoff
 from ts_ingest import budget
 

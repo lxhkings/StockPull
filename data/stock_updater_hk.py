@@ -13,7 +13,7 @@ from config import (
     START_DATE_HK, YF_LOOKBACK_DAYS,
 )
 from db import get_conn, get_last_sync, set_sync_ok, set_sync_error
-from data.base import to_float, to_int
+from core.http_utils import to_float, to_int
 from data.yf_client import history_with_retry
 
 log = logging.getLogger(__name__)

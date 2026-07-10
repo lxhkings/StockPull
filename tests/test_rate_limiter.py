@@ -2,7 +2,7 @@
 import threading
 import time
 
-from data.base import RateLimiter
+from core.http_utils import RateLimiter
 
 
 def test_rate_limiter_threadsafe_spacing():

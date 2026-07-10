@@ -22,7 +22,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from db import get_conn
-from data.base import fetch_with_retry
+from core.http_utils import fetch_with_retry
 from data.index_base import register_stocks, get_last_snapshot_date
 
 log = logging.getLogger(__name__)

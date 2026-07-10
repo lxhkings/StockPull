@@ -10,7 +10,7 @@ import pandas as pd
 
 from db import get_conn, query, execute
 from data import stock_updater_cn_tushare as stock_updater_cn
-from data.base import to_float
+from core.http_utils import to_float
 from ts_ingest.backfill_lists import backfill_stocks_a
 from ts_ingest.client import get_client
 from ts_ingest.ticker_map import index_id_to_ts_code

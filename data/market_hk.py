@@ -10,7 +10,7 @@ import pandas as pd
 from db import get_conn, get_index_tickers, get_latest_snapshot_tickers, query, execute
 from data import index_updater_hk
 from data import stock_updater_hk
-from data.base import to_float
+from core.http_utils import to_float
 
 log = logging.getLogger(__name__)
 

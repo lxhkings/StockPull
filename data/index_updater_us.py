@@ -12,7 +12,7 @@ from datetime import date
 
 from config import INDEX_DELAY
 from db import get_conn
-from data.base import fetch_urls_sequentially, format_cik
+from core.http_utils import fetch_urls_sequentially, format_cik
 from data.index_base import (
     get_last_snapshot_date,
     save_snapshot,

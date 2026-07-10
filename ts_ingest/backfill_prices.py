@@ -8,7 +8,7 @@ from datetime import date
 import pandas as pd
 
 from config import TUSHARE_BACKFILL_START
-from data.base import to_float, to_int
+from core.http_utils import to_float, to_int
 from db import get_conn, set_sync_error, set_sync_ok
 from core.progress import log_progress
 from ts_ingest.client import get_client

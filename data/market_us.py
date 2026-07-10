@@ -19,7 +19,7 @@ from db import get_conn, get_index_tickers, get_latest_snapshot_tickers, query, 
 from data import index_updater_us
 from data import index_updater_russell1000
 from data import stock_updater_us
-from data.base import to_float
+from core.http_utils import to_float
 from data.yf_client import download_with_retry
 
 log = logging.getLogger(__name__)

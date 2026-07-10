@@ -17,7 +17,7 @@ import pandas as pd
 
 from config import TUSHARE_BACKFILL_START
 from db import get_conn, get_last_sync
-from data.base import to_float, to_int
+from core.http_utils import to_float, to_int
 from data.stock_updater_cn_tushare import _last_cn_trading_date
 from core.progress import log_progress
 from ts_ingest.client import get_client

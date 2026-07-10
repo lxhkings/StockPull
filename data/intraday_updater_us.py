@@ -27,7 +27,7 @@ from config import (
     YF_RETRY_COUNT,
     YF_TIMEOUT,
 )
-from data.base import to_float, to_int
+from core.http_utils import to_float, to_int
 from data.stock_updater_us import _last_us_trading_date
 from data.yf_client import download_with_retry
 from db import get_conn, get_last_sync, set_sync_error, set_sync_ok
