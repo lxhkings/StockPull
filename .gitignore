@@ -17,3 +17,5 @@ data/.cache/
 docs/superpowers/
 .worktrees/
 .futu_buffer/
+.tushare_buffer/
+.codegraph/

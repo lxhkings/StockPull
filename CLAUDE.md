@@ -87,6 +87,30 @@ Three-market daily-K ingest (US/CN/HK) into shared MariaDB on Synology NAS (192.
 - akshare HK: 5-digit with leading zeros (`00700`)
 - efinance: same as akshare
 
+## 扩展新功能前必读（强制）
+
+新增/修改功能前，先判断属于哪个模块家族，MUST 遵循该家族既有模式，不允许绕过或新建平行结构。
+
+**三条模块家族：**
+
+| 家族 | 入口 | 扩展点模式 | 客户端/限速层 |
+|---|---|---|---|
+| `data/` 日线主流程 | `data/pipeline.py` | 新市场 MUST 实现 `MarketModule` protocol（见下），在 `data/market_*.py` 实现，`pipeline.py` 里注册 | 各 `market_*.py` 自带；跨市场共享逻辑放 `data/base.py` / `data/index_base.py`；所有 yfinance 调用 MUST 走 `data/yf_client.py`（限速+重试），不得自建 retry 循环 |
+| `ts_ingest/` Tushare 回填 | `ts_ingest/orchestrator.py`（phase: lists→prices→derive→financial→valuation） | 新回填域 MUST 新建 `ts_ingest/backfill_<domain>.py`，暴露 `backfill_all()`，在 orchestrator 里按 phase 顺序挂载 | `ts_ingest/client.py`（限速+重试）+ `ts_ingest/budget.py`（调用预算），MUST 复用，不得自建 API 调用逻辑 |
+| `futu_ingest/` Futu 回填 | `futu_ingest/orchestrator.py`（`run_sync(scope)` 分发表） | 新数据域 MUST 新建 `futu_ingest/backfill_<domain>.py` 或 `snapshot_<domain>.py`，暴露 `backfill_all()`/`run_daily()`，在 orchestrator 的 `want()` 分发表里挂 scope | `futu_ingest/client.py` + `futu_ingest/concurrency.py` + `futu_ingest/local_buffer.py`（断网本地缓冲，收尾 flush 到 NAS），MUST 复用 |
+
+**`MarketModule` protocol**（`data/pipeline.py` 定义，`market_us.py`/`market_cn.py`/`market_hk.py` 各自实现）：
+`update_index()` / `list_active_tickers()` / `backfill_new(tickers)` / `incremental(tickers)` / `update_index_price()` / `rebase(tickers)` / `weekly(tickers)` / `intraday()`
+
+**强制规则：**
+1. 新市场/新数据源 MUST 走对应家族的既有 protocol/orchestrator 接入点，不得在 `main.py` 里直接写一次性脚本逻辑。
+2. 跨市场/跨模块共享逻辑复用 `data/base.py`（HTTP重试/限速/类型转换）、`data/index_base.py`（成分股快照通用操作）；不得每个市场模块各写一份重复代码。
+3. 数据库访问统一走 `db.py`（`query`/`execute`/`get_conn`），不得散落裸 `pymysql` 连接。
+4. 每个新增 backfill/updater/snapshot 模块 MUST 有对应 `tests/test_<module>.py`（现有 1:1 命名约定，见 `tests/` 目录）。
+5. 不确定该归入哪个家族、或是否需要新建第四套平行结构 → 先问用户，不要自行决定。
+
+详细字段/表/命令见 README.md「架构设计」「数据源明细」章节；本节是强制执行层，README 是描述层。
+
 ## Configuration
 
 Secrets in `.env` (see `.env.example`). `DB_PASSWORD` and `TUSHARE_TOKEN` are required.
