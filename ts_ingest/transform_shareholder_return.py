@@ -49,3 +49,24 @@ def transform_repurchase_rows(df: pd.DataFrame) -> list[tuple]:
             to_float(r.get("low_limit")),
         ))
     return rows
+
+
+def transform_holdertrade_rows(df: pd.DataFrame) -> list[tuple]:
+    rows = []
+    for _, r in df.iterrows():
+        rows.append((
+            r["ts_code"],
+            to_date(r.get("ann_date")),
+            _to_str(r.get("holder_name")),
+            _to_str(r.get("holder_type")),
+            _to_str(r.get("in_de")),
+            to_float(r.get("change_vol")),
+            to_float(r.get("change_ratio")),
+            to_float(r.get("after_share")),
+            to_float(r.get("after_ratio")),
+            to_float(r.get("avg_price")),
+            to_float(r.get("total_share")),
+            to_date(r.get("begin_date")),
+            to_date(r.get("close_date")),
+        ))
+    return rows
