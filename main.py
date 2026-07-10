@@ -204,7 +204,7 @@ def cmd_tushare_backfill(scope: str, market: str, dry_run: bool, start: str | No
     """两阶段：backfill 写本地缓冲 → 自动 flush 到 NAS。flush 失败则保留缓冲、提示兜底。"""
     import db
     from ts_ingest.orchestrator import run_full_backfill
-    from futu_ingest.local_buffer import flush, pending_count
+    from core.local_buffer import flush, pending_count
     from config import TUSHARE_BUFFER_PATH
 
     if dry_run:
@@ -232,7 +232,7 @@ def cmd_tushare_backfill(scope: str, market: str, dry_run: bool, start: str | No
 
 
 def cmd_tushare_flush(workers: int = 1) -> int:
-    from futu_ingest.local_buffer import flush, flush_parallel, pending_count
+    from core.local_buffer import flush, flush_parallel, pending_count
     from config import TUSHARE_BUFFER_PATH
     n = pending_count(TUSHARE_BUFFER_PATH)
     if n == 0:
@@ -251,7 +251,7 @@ def _run_futu(scope: str, force: bool) -> int:
     """两阶段：fetch 写本地缓冲 → 自动 flush 到 NAS。flush 失败则保留缓冲、提示兜底。"""
     import db
     from futu_ingest.orchestrator import run_sync
-    from futu_ingest.local_buffer import flush, pending_count
+    from core.local_buffer import flush, pending_count
     from config import FUTU_BUFFER_PATH
 
     db.set_local_first(True)
@@ -281,7 +281,7 @@ def cmd_futu_sync(scope: str) -> int:
 
 
 def cmd_futu_flush() -> int:
-    from futu_ingest.local_buffer import flush, pending_count
+    from core.local_buffer import flush, pending_count
     from config import FUTU_BUFFER_PATH
     n = pending_count(FUTU_BUFFER_PATH)
     if n == 0:

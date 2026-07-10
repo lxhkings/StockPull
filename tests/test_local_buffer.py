@@ -34,7 +34,7 @@ def test_get_conn_retries_on_operational_error(monkeypatch):
 
 
 def test_is_write_classification():
-    from futu_ingest.local_buffer import _is_write
+    from core.local_buffer import _is_write
     assert _is_write("INSERT INTO t VALUES (1)")
     assert _is_write("  update t set a=1")
     assert _is_write("REPLACE INTO t VALUES (1)")
@@ -46,7 +46,7 @@ def test_is_write_classification():
 
 def test_executemany_buffers_to_local(tmp_path):
     """executemany(INSERT) → pending_writes 增 1 行，params json 往返还原。"""
-    from futu_ingest.local_buffer import BufferingConnection, pending_count
+    from core.local_buffer import BufferingConnection, pending_count
     path = str(tmp_path / "buf.sqlite")
     rows = [("AAPL", "2026-06-06", 100), ("MSFT", "2026-06-06", 200)]
     conn = BufferingConnection(path, db_config={})
@@ -67,7 +67,7 @@ def test_executemany_buffers_to_local(tmp_path):
 
 def test_select_passes_through_to_nas(tmp_path, monkeypatch):
     """SELECT 不进缓冲，转发到真 NAS 连接（mock）。"""
-    from futu_ingest import local_buffer
+    from core import local_buffer
 
     executed = []
 
@@ -131,7 +131,7 @@ class _FakeNasConn:
 def _seed(path, items):
     """items: list[(sql, params, is_many)]。"""
     import sqlite3
-    from futu_ingest.local_buffer import _SCHEMA
+    from core.local_buffer import _SCHEMA
     c = sqlite3.connect(path)
     c.execute(_SCHEMA)
     for sql, params, many in items:
@@ -141,7 +141,7 @@ def _seed(path, items):
 
 
 def test_flush_replays_in_order_and_clears(tmp_path, monkeypatch):
-    from futu_ingest import local_buffer
+    from core import local_buffer
     path = str(tmp_path / "buf.sqlite")
     _seed(path, [
         ("INSERT INTO us_fin_income VALUES (%s)", [["A"]], 1),
@@ -162,7 +162,7 @@ def test_flush_replays_in_order_and_clears(tmp_path, monkeypatch):
 
 
 def test_flush_resumable_on_nas_error(tmp_path, monkeypatch):
-    from futu_ingest import local_buffer
+    from core import local_buffer
     path = str(tmp_path / "buf.sqlite")
     _seed(path, [
         ("INSERT INTO a VALUES (%s)", [["x"]], 1),
@@ -187,7 +187,7 @@ def test_flush_resumable_on_nas_error(tmp_path, monkeypatch):
 
 
 def test_flush_no_file(tmp_path):
-    from futu_ingest import local_buffer
+    from core import local_buffer
     assert local_buffer.flush(str(tmp_path / "nope.sqlite")) == {"replayed": 0, "remaining": 0}
 
 
@@ -224,7 +224,7 @@ class _FakeNasConnThreadSafe:
 
 def test_flush_parallel_clears_all_disjoint_batches(tmp_path, monkeypatch):
     """N 条同表独立 upsert，workers=3 并发跑完，全部清空、全部重放。"""
-    from futu_ingest import local_buffer
+    from core import local_buffer
     path = str(tmp_path / "buf.sqlite")
     _seed(path, [
         (f"INSERT INTO cn_valuation_snapshot VALUES (%s)", [[f"row{i}"]], 1)
@@ -246,7 +246,7 @@ def test_flush_parallel_clears_all_disjoint_batches(tmp_path, monkeypatch):
 
 def test_flush_parallel_resumable_on_partial_failure(tmp_path, monkeypatch):
     """某个 worker 的某一批失败 → 该批及同 worker 之后的批留在缓冲，其它 worker 成功的批已清除。"""
-    from futu_ingest import local_buffer
+    from core import local_buffer
     path = str(tmp_path / "buf.sqlite")
     _seed(path, [
         ("INSERT INTO t VALUES (%s)", [["a"]], 1),
@@ -271,13 +271,13 @@ def test_flush_parallel_resumable_on_partial_failure(tmp_path, monkeypatch):
 
 
 def test_flush_parallel_no_file(tmp_path):
-    from futu_ingest import local_buffer
+    from core import local_buffer
     assert local_buffer.flush_parallel(str(tmp_path / "nope.sqlite")) == {"replayed": 0, "remaining": 0}
 
 
 def test_flush_parallel_no_pending(tmp_path):
-    from futu_ingest import local_buffer
-    from futu_ingest.local_buffer import _SCHEMA
+    from core import local_buffer
+    from core.local_buffer import _SCHEMA
     path = str(tmp_path / "buf.sqlite")
     c = sqlite3.connect(path)
     c.execute(_SCHEMA)
@@ -287,7 +287,7 @@ def test_flush_parallel_no_pending(tmp_path):
 
 def test_set_local_first_toggles_get_conn(monkeypatch, tmp_path):
     import db
-    from futu_ingest.local_buffer import BufferingConnection
+    from core.local_buffer import BufferingConnection
     monkeypatch.setattr(db, "FUTU_BUFFER_PATH", str(tmp_path / "buf.sqlite"))
 
     db.set_local_first(True)

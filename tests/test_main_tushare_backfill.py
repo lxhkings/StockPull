@@ -14,7 +14,7 @@ def _fake_report():
 def test_backfill_uses_local_buffer_and_flushes():
     with patch("db.set_local_first") as set_local, \
          patch("ts_ingest.orchestrator.run_full_backfill", return_value=_fake_report()) as run, \
-         patch("futu_ingest.local_buffer.flush", return_value={"replayed": 5, "remaining": 0}) as flush:
+         patch("core.local_buffer.flush", return_value={"replayed": 5, "remaining": 0}) as flush:
         rc = cmd_tushare_backfill(scope="valuation", market="cn", dry_run=False, start="20100101")
 
     assert rc == 0
@@ -38,16 +38,16 @@ def test_backfill_dry_run_skips_local_buffer():
 def test_backfill_flush_failure_keeps_buffer_and_returns_1():
     with patch("db.set_local_first"), \
          patch("ts_ingest.orchestrator.run_full_backfill", return_value=_fake_report()), \
-         patch("futu_ingest.local_buffer.flush", side_effect=RuntimeError("NAS down")), \
-         patch("futu_ingest.local_buffer.pending_count", return_value=42):
+         patch("core.local_buffer.flush", side_effect=RuntimeError("NAS down")), \
+         patch("core.local_buffer.pending_count", return_value=42):
         rc = cmd_tushare_backfill(scope="financial", market="cn", dry_run=False)
 
     assert rc == 1
 
 
 def test_tushare_flush_no_pending():
-    with patch("futu_ingest.local_buffer.pending_count", return_value=0), \
-         patch("futu_ingest.local_buffer.flush") as flush:
+    with patch("core.local_buffer.pending_count", return_value=0), \
+         patch("core.local_buffer.flush") as flush:
         rc = cmd_tushare_flush()
 
     assert rc == 0
@@ -55,8 +55,8 @@ def test_tushare_flush_no_pending():
 
 
 def test_tushare_flush_replays_pending():
-    with patch("futu_ingest.local_buffer.pending_count", return_value=10), \
-         patch("futu_ingest.local_buffer.flush", return_value={"replayed": 10, "remaining": 0}) as flush:
+    with patch("core.local_buffer.pending_count", return_value=10), \
+         patch("core.local_buffer.flush", return_value={"replayed": 10, "remaining": 0}) as flush:
         rc = cmd_tushare_flush()
 
     assert rc == 0

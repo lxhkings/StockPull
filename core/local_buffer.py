@@ -1,4 +1,4 @@
-"""Futu 本地优先缓冲：抓取写本地 SQLite，flush 阶段重放到 NAS。
+"""本地优先写缓冲组件（futu/tushare 共用）：抓取写本地 SQLite，flush 阶段重放到 NAS。
 
 本地优先模式下 db.get_conn() 返回 BufferingConnection（鸭子类型兼容 pymysql）：
 写(INSERT/REPLACE/UPDATE/DELETE)入本地 pending_writes；读(SELECT/SHOW/SET)透传真 NAS。
