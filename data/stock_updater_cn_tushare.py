@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 
@@ -16,6 +17,7 @@ import pandas as pd
 from config import HISTORY_YEARS_CN, START_DATE_CN, TUSHARE_BACKFILL_START
 from db import get_conn, get_last_sync
 from data.base import to_float, to_int
+from progress import log_progress
 from ts_ingest.client import get_client
 
 log = logging.getLogger(__name__)
@@ -118,6 +120,7 @@ def _process_tickers_batched(
     """批量处理ticker，返回未flush的buffer。"""
     prices_buf: List[Tuple] = []
     sync_buf: List[Tuple] = []
+    t0 = time.monotonic()
 
     for i, t in enumerate(tickers, 1):
         try:
@@ -167,7 +170,8 @@ def _process_tickers_batched(
             # 达到batch size时flush
             if len(sync_buf) >= BATCH_COMMIT_SIZE:
                 _flush_batch(conn, prices_buf, sync_buf)
-                log.info(f"[cn] {progress_label}进度 {i}/{len(tickers)} (batch flush)")
+                log_progress(i, len(tickers), t0, every=1,
+                             context=f"[cn] {progress_label}进度 ", extra="(batch flush)")
                 prices_buf.clear()
                 sync_buf.clear()
 
@@ -183,8 +187,8 @@ def _process_tickers_batched(
             log.error(f"[{t}] {progress_label}失败: {e}")
             result[t] = f"error: {e}"
 
-        if i % 100 == 0 and len(sync_buf) < BATCH_COMMIT_SIZE:
-            log.info(f"[cn] {progress_label}进度 {i}/{len(tickers)}")
+        if len(sync_buf) < BATCH_COMMIT_SIZE:
+            log_progress(i, len(tickers), t0, every=100, context=f"[cn] {progress_label}进度 ")
 
     return prices_buf, sync_buf
 
