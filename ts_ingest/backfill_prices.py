@@ -5,32 +5,16 @@ import logging
 import time
 from datetime import date
 
-import pandas as pd
-
 from config import TUSHARE_BACKFILL_START
-from core.http_utils import to_float, to_int
 from core.db_client import get_conn
 from modules.sync_log import set_sync_error, set_sync_ok
 from core.progress import log_progress
 from ts_ingest.client import get_client
+from ts_ingest.transform_prices import pro_bar_rows
 
 log = logging.getLogger(__name__)
 
 SYNC_DATA_TYPE = "price"
-
-
-def _normalize_pro_bar(df: pd.DataFrame) -> pd.DataFrame:
-    if df is None or df.empty:
-        return pd.DataFrame()
-    out = pd.DataFrame({
-        "date": pd.to_datetime(df["trade_date"], format="%Y%m%d").dt.date,
-        "open": df["open"].apply(to_float),
-        "high": df["high"].apply(to_float),
-        "low":  df["low"].apply(to_float),
-        "close": df["close"].apply(to_float),
-        "volume": df["vol"].apply(to_int),
-    })
-    return out.sort_values("date").reset_index(drop=True)
 
 
 def _pro_bar_kwargs(ticker: str, market: str, start: str) -> dict:
@@ -46,14 +30,10 @@ def _pro_bar_kwargs(ticker: str, market: str, start: str) -> dict:
 def backfill_one(ticker: str, market: str, start: str = TUSHARE_BACKFILL_START) -> int:
     client = get_client()
     df_raw = client.pro_bar(**_pro_bar_kwargs(ticker, market, start))
-    df = _normalize_pro_bar(df_raw)
-    if df.empty:
+    rows = pro_bar_rows(df_raw, ticker)
+    if not rows:
         log.warning(f"{ticker}: no bars returned")
         return 0
-    rows = [
-        (ticker, r["date"], r["open"], r["high"], r["low"], r["close"], r["volume"])
-        for _, r in df.iterrows()
-    ]
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.executemany(

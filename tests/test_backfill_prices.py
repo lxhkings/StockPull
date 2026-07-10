@@ -2,9 +2,7 @@ from unittest.mock import patch, MagicMock
 import pandas as pd
 import pytest
 
-from ts_ingest.backfill_prices import (
-    _normalize_pro_bar, backfill_one, backfill_market,
-)
+from ts_ingest.backfill_prices import backfill_one, backfill_market
 
 
 def _bar_df():
@@ -17,17 +15,6 @@ def _bar_df():
         "close": [1715.0, 1705.5],
         "vol":  [12345.0, 23456.0],
     })
-
-
-def test_normalize_returns_canonical_columns():
-    out = _normalize_pro_bar(_bar_df())
-    assert list(out.columns) == ["date", "open", "high", "low", "close", "volume"]
-    assert str(out.iloc[0]["date"]) == "2024-01-02"
-
-
-def test_normalize_handles_empty_df():
-    out = _normalize_pro_bar(pd.DataFrame())
-    assert out.empty
 
 
 def test_backfill_one_writes_with_on_duplicate():
