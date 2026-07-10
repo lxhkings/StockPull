@@ -1,15 +1,13 @@
 """A 股财务三表 + 财务指标，使用 Tushare VIP 全市场单期接口。"""
 from __future__ import annotations
 
-import json
 import logging
 from datetime import date
-
-import pandas as pd
 
 from config import TUSHARE_BACKFILL_START
 from core.db_client import get_conn
 from ts_ingest.client import get_client
+from ts_ingest.transform_financial import transform_financial_rows
 
 log = logging.getLogger(__name__)
 
@@ -37,38 +35,13 @@ def quarterly_periods(start_yyyymmdd: str, end_yyyymmdd: str) -> list[str]:
     return periods
 
 
-def _to_date(v):
-    if v is None or pd.isna(v):
-        return None
-    s = str(v)
-    return f"{s[:4]}-{s[4:6]}-{s[6:8]}" if len(s) == 8 else s
-
-
 def backfill_period(api_name: str, table: str, period: str) -> int:
     client = get_client()
     df = client.call(api_name, period=period)
     if df is None or df.empty:
         return 0
     has_report_type = api_name != "fina_indicator_vip"
-
-    rows = []
-    for _, r in df.iterrows():
-        payload = {k: (None if pd.isna(v) else (float(v) if isinstance(v, (int, float)) else v))
-                   for k, v in r.items()}
-        if has_report_type:
-            rows.append((
-                r["ts_code"], _to_date(r.get("end_date")),
-                _to_date(r.get("ann_date")), _to_date(r.get("f_ann_date")),
-                str(r.get("report_type") or "1"),
-                str(r.get("comp_type") or ""),
-                json.dumps(payload, ensure_ascii=False),
-            ))
-        else:
-            rows.append((
-                r["ts_code"], _to_date(r.get("end_date")),
-                _to_date(r.get("ann_date")),
-                json.dumps(payload, ensure_ascii=False),
-            ))
+    rows = transform_financial_rows(df, has_report_type)
 
     with get_conn() as conn:
         with conn.cursor() as cur:
