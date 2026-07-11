@@ -39,13 +39,13 @@ def backfill_day(trade_date: str) -> int:
             cur.executemany(
                 "INSERT INTO cn_valuation_snapshot "
                 "(ts_code, trade_date, close, turnover_rate, volume_ratio, "
-                " pe, pe_ttm, pb, ps, ps_ttm, total_mv, circ_mv) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+                " pe, pe_ttm, pb, ps, ps_ttm, total_mv, circ_mv, dv_ratio) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
                 "ON DUPLICATE KEY UPDATE "
                 "  close=VALUES(close), turnover_rate=VALUES(turnover_rate), "
                 "  volume_ratio=VALUES(volume_ratio), pe=VALUES(pe), pe_ttm=VALUES(pe_ttm), "
                 "  pb=VALUES(pb), ps=VALUES(ps), ps_ttm=VALUES(ps_ttm), "
-                "  total_mv=VALUES(total_mv), circ_mv=VALUES(circ_mv)",
+                "  total_mv=VALUES(total_mv), circ_mv=VALUES(circ_mv), dv_ratio=VALUES(dv_ratio)",
                 rows,
             )
         conn.commit()
