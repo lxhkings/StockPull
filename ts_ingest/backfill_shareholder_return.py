@@ -5,6 +5,7 @@ import logging
 from datetime import date, datetime, timedelta
 
 import pymysql.cursors
+from tqdm import tqdm
 
 from config import TUSHARE_BACKFILL_START
 from core.db_client import get_conn
@@ -54,14 +55,14 @@ def backfill_dividend_one(ts_code: str) -> int:
                 rows,
             )
         conn.commit()
-    log.info(f"dividend@{ts_code}: {len(rows)} rows")
+    log.debug(f"dividend@{ts_code}: {len(rows)} rows")
     return len(rows)
 
 
 def backfill_dividend() -> dict:
     tickers = _list_a_share_tickers()
     total = 0
-    for t in tickers:
+    for t in tqdm(tickers, desc="dividend", unit="ticker"):
         try:
             total += backfill_dividend_one(t)
         except Exception as e:

@@ -27,7 +27,7 @@ def test_show_status_connects_and_prints(capsys):
     from modules.db_admin import show_status
 
     class FakeCursor:
-        def execute(self, sql): pass
+        def execute(self, sql, params=None): pass
         def fetchone(self):
             return [100]
         def __enter__(self): return self
@@ -43,3 +43,29 @@ def test_show_status_connects_and_prints(capsys):
     captured = capsys.readouterr()
     assert "股票总数" in captured.out
     assert "100" in captured.out
+
+
+def test_show_status_includes_fundamental_table_row_estimates(capsys):
+    """show_status 附带基本面表(财务/估值/股东回报)的近似行数。"""
+    from modules.db_admin import show_status
+
+    class FakeCursor:
+        def execute(self, sql, params=None): pass
+        def fetchone(self):
+            return [42]
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+        def close(self): pass
+
+    with patch("modules.db_admin.get_conn", return_value=FakeConn()):
+        show_status()
+    captured = capsys.readouterr()
+    assert "fin_income=42" in captured.out
+    assert "cn_valuation_snapshot=42" in captured.out
+    assert "dividend=42" in captured.out
+    assert "repurchase=42" in captured.out
+    assert "holdertrade=42" in captured.out

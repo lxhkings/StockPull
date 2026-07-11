@@ -52,6 +52,17 @@ def test_backfill_dividend_loops_all_tickers():
     assert result == {"rows": 4, "tickers": 2}
 
 
+def test_backfill_dividend_shows_progress_bar():
+    with patch("ts_ingest.backfill_shareholder_return._list_a_share_tickers",
+               return_value=["600519.SH", "000001.SZ"]), \
+         patch("ts_ingest.backfill_shareholder_return.backfill_dividend_one", return_value=0), \
+         patch("ts_ingest.backfill_shareholder_return.tqdm", wraps=lambda it, **kw: it) as bar:
+        backfill_dividend()
+    bar.assert_called_once()
+    assert bar.call_args[0][0] == ["600519.SH", "000001.SZ"]
+    assert bar.call_args[1]["desc"] == "dividend"
+
+
 def test_date_windows_splits_by_window_days():
     windows = _date_windows("20240101", "20240301", window_days=31)
     assert windows[0] == ("20240101", "20240131")

@@ -73,6 +73,12 @@ def create_prices_intraday_table() -> None:
     """)
 
 
+_FUNDAMENTAL_TABLES = (
+    "fin_income", "fin_balancesheet", "fin_cashflow", "fin_indicator",
+    "cn_valuation_snapshot", "cn_dividend", "cn_repurchase", "cn_holdertrade",
+)
+
+
 def show_status():
     """打印数据库同步状态摘要"""
     conn = get_conn()
@@ -85,8 +91,28 @@ def show_status():
         last_price = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM sync_log WHERE status='error'")
         errors = cur.fetchone()[0]
+
+        rows = {}
+        for t in _FUNDAMENTAL_TABLES:
+            cur.execute(
+                "SELECT table_rows FROM information_schema.tables "
+                "WHERE table_schema = DATABASE() AND table_name = %s",
+                (t,),
+            )
+            r = cur.fetchone()
+            rows[t] = r[0] if r and r[0] is not None else 0
     conn.close()
     print(f"股票总数:     {total}")
     print(f"有行情数据:   {with_prices}")
     print(f"行情最新日期: {last_price}")
     print(f"同步错误数:   {errors}")
+    print()
+    print("基本面数据（约数，information_schema 统计，非精确 COUNT）：")
+    print(f"  财务三表+指标: fin_income={rows['fin_income']} "
+          f"fin_balancesheet={rows['fin_balancesheet']} "
+          f"fin_cashflow={rows['fin_cashflow']} "
+          f"fin_indicator={rows['fin_indicator']}")
+    print(f"  估值快照: cn_valuation_snapshot={rows['cn_valuation_snapshot']}")
+    print(f"  股东回报: dividend={rows['cn_dividend']} "
+          f"repurchase={rows['cn_repurchase']} "
+          f"holdertrade={rows['cn_holdertrade']}")
