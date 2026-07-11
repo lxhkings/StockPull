@@ -112,8 +112,9 @@ uv run main.py tushare-backfill --scope lists --market cn  # A股基础信息（
 uv run main.py tushare-backfill --scope lists --market hk  # 港股基础信息
 uv run main.py tushare-backfill --scope derive              # 周线/月线聚合（从日线计算）
 uv run main.py tushare-backfill --scope financial           # 财务三表+指标（income/balancesheet/cashflow/indicator）
-uv run main.py tushare-backfill --scope valuation           # 每日估值快照（PE/PB/PS，daily_basic）
+uv run main.py tushare-backfill --scope valuation           # 每日估值快照（PE/PB/PS/dv_ratio，daily_basic）
 uv run main.py tushare-backfill --scope valuation --start 20100101  # 强制重新回填估值历史（见下方⚠️）
+uv run main.py tushare-backfill --scope shareholder_return   # 分红送股/股票回购/股东增减持（dividend/repurchase/stk_holdertrade）
 uv run main.py tushare-backfill --dry-run                   # 预检（不执行）
 ```
 
@@ -431,13 +432,14 @@ uv run pytest tests/test_cn_index_price.py -v
 
 `cn_valuation_snapshot` 默认增量拉取，只有从**第一次跑 `--scope valuation`** 那天起的数据（不会自动补历史）。要做2020-2026这种多年回测，必须显式 `--start 20100101`（或更早）跑一次强制历史回填，否则早期日期查不到估值数据，因子直接为 null。
 
-**`--scope lists`/`financial`/`valuation` 具体各更新什么，不要混淆：**
+**`--scope lists`/`financial`/`valuation`/`shareholder_return` 具体各更新什么，不要混淆：**
 
 - `--scope lists`：股票/ETF/港股通名单 + 行业分类 + list_date/delist_date。**不含**财务、估值。
 - `--scope financial`：财务报表（ROE等质量因子用）。
-- `--scope valuation`：估值快照（PE/PB等因子用）。
+- `--scope valuation`：估值快照（PE/PB/dv_ratio等因子用）。
+- `--scope shareholder_return`：分红送股/股票回购/股东增减持（`cn_dividend`/`cn_repurchase`/`cn_holdertrade`）。`dividend` 域按全量A股ticker逐个拉取（无日期范围参数），每次运行约5000次接口调用；`repurchase`/`holdertrade` 按公告日期窗口增量续拉。
 
-`--scope all` 会依次跑完 lists → prices → derive → financial → valuation 全部阶段。
+`--scope all` 会依次跑完 lists → prices → derive → financial → valuation → shareholder_return 全部阶段。
 
 ## 实现计划
 
