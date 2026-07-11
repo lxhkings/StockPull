@@ -98,7 +98,7 @@ Three-market daily-K ingest (US/CN/HK) into shared MariaDB on Synology NAS (192.
 
 | 层 | 定位 | 内容 |
 |---|---|---|
-| `core/` | 纯组件（无业务状态、无 DB 表语义） | `db_client.py`（连接池）、`http_utils.py`（HTTP 重试/限速/类型转换）、`retry_utils.py`（指数退避）、`progress.py`（进度日志）、`batch_utils.py`（切片）、`local_buffer.py`（本地缓冲） |
+| `core/` | 纯组件（无业务状态、无 DB 表语义） | `db_client.py`（连接池）、`http_utils.py`（HTTP 重试/限速/类型转换）、`retry_utils.py`（指数退避）、`batch_utils.py`（切片）、`local_buffer.py`（本地缓冲）。进度可视化统一用 `tqdm`，不再自建进度日志组件 |
 | `modules/` | 跨家族业务模块（有 DB 表/业务规则语义） | `sync_log.py`（同步状态追踪）、`db_admin.py`（管理查询/DDL） |
 
 **判断标准：** 不依赖特定表结构/业务规则 → `core/`；依赖 sync_log 等业务表语义 → `modules/`。

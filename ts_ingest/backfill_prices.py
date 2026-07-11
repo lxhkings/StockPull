@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import logging
-import time
+
+from tqdm import tqdm
 
 from config import TUSHARE_BACKFILL_START
 from core.db_client import get_conn
 from modules.sync_log import set_sync_error, set_sync_ok
-from core.progress import log_progress
 from ts_ingest.client import get_client
 from ts_ingest.transform_prices import pro_bar_rows
 
@@ -54,8 +54,8 @@ def backfill_market(tickers: list[str], market: str,
     """全 ticker 顺序 backfill；失败计入 sync_log error 并继续。"""
     ok = 0
     failed: list[str] = []
-    t0 = time.monotonic()
-    for i, t in enumerate(tickers, 1):
+    pbar = tqdm(tickers, desc=f"[{market}]", unit="ticker")
+    for t in pbar:
         try:
             backfill_one(t, market=market, start=start)
             ok += 1
@@ -67,6 +67,5 @@ def backfill_market(tickers: list[str], market: str,
                     set_sync_error(conn, t, SYNC_DATA_TYPE, str(e))
             except Exception:
                 pass
-        log_progress(i, len(tickers), t0, every=100, context=f"[{market}] ",
-                     extra=f"ok={ok}, failed={len(failed)}")
+        pbar.set_postfix(ok=ok, failed=len(failed))
     return {"ok": ok, "failed": failed, "total": len(tickers)}

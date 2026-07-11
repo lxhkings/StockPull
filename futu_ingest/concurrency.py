@@ -2,18 +2,16 @@
 from __future__ import annotations
 
 import logging
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable
+
+from tqdm import tqdm
 
 from config import FUTU_REFRESH_DAYS, FUTU_DEFAULT_REFRESH_DAYS
 from futu_ingest.client import PERMANENT_ERRORS
 from futu_ingest.sync import fresh_tickers, mark_ok, mark_error, mark_skip
-from core.progress import log_progress
 
 log = logging.getLogger(__name__)
-
-PROGRESS_EVERY = 50   # 每处理 N 票打一次进度条
 
 
 def ticker_stream(backfill_fn, client, tickers: list[str], data_type: str,
@@ -30,8 +28,8 @@ def ticker_stream(backfill_fn, client, tickers: list[str], data_type: str,
     skipped = len(tickers) - total          # fresh 跳过先计入
     rows = ok = err = 0
     log.info(f"{data_type}: 待采 {total}, fresh跳过 {skipped}")
-    t0 = time.monotonic()
-    for i, t in enumerate(todo, 1):
+    pbar = tqdm(todo, desc=data_type, unit="ticker")
+    for t in pbar:
         try:
             n = backfill_fn(client, t)
             mark_ok(t, data_type, n)
@@ -47,8 +45,7 @@ def ticker_stream(backfill_fn, client, tickers: list[str], data_type: str,
                 log.error(f"{data_type} {t}: {e}")
                 mark_error(t, data_type, str(e))
                 err += 1
-        log_progress(i, total, t0, every=PROGRESS_EVERY, context=f"{data_type}: ",
-                     extra=f"ok={ok} skip={skipped} err={err}")
+        pbar.set_postfix(ok=ok, skip=skipped, err=err)
     return rows, ok, skipped
 
 

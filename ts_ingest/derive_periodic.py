@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 import logging
-import time
 
 import pandas as pd
 import pymysql.cursors
+from tqdm import tqdm
 
 from core.db_client import get_conn
-from core.progress import log_progress
 from ts_ingest.transform_periodic import resample_ohlcv, periodic_rows
 
 log = logging.getLogger(__name__)
@@ -54,14 +53,13 @@ def derive_for_ticker(ticker: str) -> dict[str, int]:
 
 def derive_all(tickers: list[str]) -> dict:
     total_w = total_m = 0
-    t0 = time.monotonic()
-    for i, t in enumerate(tickers, 1):
+    pbar = tqdm(tickers, desc="derive", unit="ticker")
+    for t in pbar:
         try:
             res = derive_for_ticker(t)
             total_w += res["weekly"]
             total_m += res["monthly"]
         except Exception as e:
             log.error(f"derive {t}: {e}")
-        log_progress(i, len(tickers), t0, every=500,
-                     context="derive ", extra=f"weekly={total_w} monthly={total_m}")
+        pbar.set_postfix(weekly=total_w, monthly=total_m)
     return {"weekly_rows": total_w, "monthly_rows": total_m}
