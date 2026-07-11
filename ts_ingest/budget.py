@@ -58,6 +58,9 @@ _SAMPLE_KWARGS = {
     "us_basic": {"limit": 1},
     "hk_basic": {"limit": 1},
     "index_weight": {"index_code": "000906.SH", "trade_date": "20240329"},
+    "dividend": {"ts_code": "600519.SH"},
+    "repurchase": {"start_date": "20240101", "end_date": "20240110"},
+    "stk_holdertrade": {"start_date": "20240101", "end_date": "20240110"},
 }
 
 

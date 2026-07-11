@@ -48,3 +48,19 @@ def test_lists_scope_calls_stock_dates_backfill():
         rep = run_full_backfill(scope="lists")
     dates.assert_called_once()
     assert "stock_dates" in rep.phases["lists"]
+
+
+def test_shareholder_return_scope_calls_backfill_all():
+    with patch("ts_ingest.orchestrator.get_client"), \
+         patch("ts_ingest.orchestrator.budget.precheck", return_value=[]), \
+         patch("ts_ingest.orchestrator.sr_backfill_all", return_value={"rows": 0}) as sr:
+        run_full_backfill(scope="shareholder_return", start="20200101")
+    sr.assert_called_once_with(start="20200101")
+
+
+def test_shareholder_return_scope_no_start_passes_none():
+    with patch("ts_ingest.orchestrator.get_client"), \
+         patch("ts_ingest.orchestrator.budget.precheck", return_value=[]), \
+         patch("ts_ingest.orchestrator.sr_backfill_all", return_value={"rows": 0}) as sr:
+        run_full_backfill(scope="shareholder_return")
+    sr.assert_called_once_with(start=None)
