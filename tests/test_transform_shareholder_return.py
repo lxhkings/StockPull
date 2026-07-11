@@ -42,6 +42,22 @@ def test_transform_dividend_rows_handles_nan_fields():
     assert row[9] is None   # record_date
 
 
+def test_transform_dividend_rows_skips_null_ann_date():
+    df = pd.DataFrame({
+        "ts_code": ["600519.SH", "000001.SZ"], "end_date": ["20231231", "19960630"],
+        "ann_date": ["20240328", None],
+        "div_proc": ["实施", "预案"], "stk_div": [0.0, 0.0], "stk_bo_rate": [0.0, 0.0],
+        "stk_co_rate": [0.0, 0.0], "cash_div": [19.29, 1.0], "cash_div_tax": [21.43, 1.0],
+        "record_date": ["20240612", None], "ex_date": ["20240613", None],
+        "pay_date": ["20240613", None], "div_listdate": [None, None],
+        "imp_ann_date": ["20240608", None], "base_date": ["20231231", None],
+        "base_share": [1256197.8, None],
+    })
+    rows = transform_dividend_rows(df)
+    assert len(rows) == 1
+    assert rows[0][0] == "600519.SH"
+
+
 def test_transform_repurchase_rows_converts_dates_and_floats():
     df = pd.DataFrame({
         "ts_code": ["600519.SH"], "ann_date": ["20240115"], "end_date": ["20241231"],

@@ -13,6 +13,8 @@ def _to_str(value) -> str | None:
 def transform_dividend_rows(df: pd.DataFrame) -> list[tuple]:
     rows = []
     for _, r in df.iterrows():
+        if pd.isna(r.get("ann_date")):
+            continue
         rows.append((
             r["ts_code"],
             to_date(r.get("end_date")),
