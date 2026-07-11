@@ -13,6 +13,7 @@ def test_backfill_day_writes_flat_columns():
         "close": [1524.0], "turnover_rate": [0.31], "volume_ratio": [1.9],
         "pe": [25.6], "pe_ttm": [23.15], "pb": [9.22], "ps": [12.96],
         "ps_ttm": [11.59], "total_mv": [191444544.72], "circ_mv": [191444544.72],
+        "dv_ratio": [3.85],
     })
     with patch("ts_ingest.backfill_valuation.get_conn") as mock_conn, \
          patch("ts_ingest.backfill_valuation.get_client", return_value=fake_client):
@@ -25,6 +26,7 @@ def test_backfill_day_writes_flat_columns():
     sql = args[0][0]
     assert "INSERT INTO cn_valuation_snapshot" in sql
     assert "ON DUPLICATE KEY UPDATE" in sql
+    assert "dv_ratio" in sql
     row = args[0][1][0]
     assert row[0] == "600519.SH"
     assert row[1] == "2026-07-06"

@@ -69,7 +69,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     p_ts = sub.add_parser("tushare-backfill", help="Tushare 一次性回填三市场底层数据")
-    p_ts.add_argument("--scope", choices=("all", "lists", "prices", "derive", "financial", "valuation"),
+    p_ts.add_argument("--scope", choices=("all", "lists", "prices", "derive", "financial",
+                                          "valuation", "shareholder_return"),
                       default="all")
     p_ts.add_argument("--market", choices=("all", "cn", "hk", "us"), default="all")
     p_ts.add_argument("--dry-run", action="store_true")

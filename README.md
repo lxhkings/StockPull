@@ -229,7 +229,8 @@ MariaDB 时区设置：`+08:00`（每连接设置）。
 | 表 | 内容 | 来源 |
 |---|---|---|
 | `fin_income` / `fin_balancesheet` / `fin_cashflow` / `fin_indicator` | A股财务三表+指标（ts_code, end_date, ann_date, raw_payload JSON） | Tushare `*_vip` 全市场单期接口 |
-| `cn_valuation_snapshot` | A股每日估值快照（ts_code, trade_date, pe/pe_ttm/pb/ps/ps_ttm/total_mv/circ_mv） | Tushare `daily_basic` 全市场单日接口 |
+| `cn_valuation_snapshot` | A股每日估值快照（ts_code, trade_date, pe/pe_ttm/pb/ps/ps_ttm/total_mv/circ_mv/dv_ratio） | Tushare `daily_basic` 全市场单日接口 |
+| `cn_dividend` / `cn_repurchase` / `cn_holdertrade` | A股股东回报：分红送股/股票回购/股东增减持 | Tushare `dividend`/`repurchase`/`stk_holdertrade` |
 
 **US基本面表（Futu，22张）：** 见 [美股基本面数据](#美股基本面数据-futu-openapi) 一节的完整表清单。
 

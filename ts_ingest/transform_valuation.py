@@ -7,7 +7,7 @@ from core.http_utils import to_date
 
 _COLS = [
     "close", "turnover_rate", "volume_ratio", "pe", "pe_ttm",
-    "pb", "ps", "ps_ttm", "total_mv", "circ_mv",
+    "pb", "ps", "ps_ttm", "total_mv", "circ_mv", "dv_ratio",
 ]
 
 
