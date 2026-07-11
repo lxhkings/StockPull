@@ -40,8 +40,11 @@ uv run main.py futu-flush           # 兜底：把本地缓冲重放到 NAS（fu
 # futu-full/futu-sync 先写本地缓冲（.futu_buffer/pending.sqlite），收尾自动 flush 到 NAS。
 # NAS 中途宕机不丢数据；flush 失败时跑 futu-flush 兜底。
 
-# Tushare 回填（股票基础信息、行业分类）
-uv run main.py tushare-backfill --scope lists --market cn  # A股基础信息+行业
+# Tushare 回填（股票基础信息、行业分类、财务、估值、股东回报）
+uv run main.py tushare-sync --scope lists --market cn  # 增量/日常用（=tushare-backfill 不带--start）
+uv run main.py tushare-full --scope valuation           # 全量强制回填（=tushare-backfill --start 2010起）
+uv run main.py tushare-backfill --scope valuation --start 20200101  # 自定义起点才用这个
+# tushare-*: 手动一次性回填工具，不在 daily cron 里；本地缓冲同 futu，flush 失败跑 tushare-flush 兜底
 
 # Cron
 ./scripts/daily_update.sh [us|cn|hk|all]

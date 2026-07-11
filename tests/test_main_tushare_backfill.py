@@ -2,7 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
-from main import cmd_tushare_backfill, cmd_tushare_flush
+from main import cmd_tushare_backfill, cmd_tushare_flush, cmd_tushare_full, cmd_tushare_sync
+from main import main as main_cli
 
 
 def _fake_report():
@@ -61,3 +62,35 @@ def test_tushare_flush_replays_pending():
 
     assert rc == 0
     flush.assert_called_once()
+
+
+def test_tushare_full_forces_start_from_backfill_start():
+    with patch("main.cmd_tushare_backfill", return_value=0) as backfill:
+        rc = cmd_tushare_full(scope="all", market="cn", dry_run=False)
+
+    assert rc == 0
+    backfill.assert_called_once_with("all", "cn", False, start="20100101")
+
+
+def test_tushare_sync_passes_no_start():
+    with patch("main.cmd_tushare_backfill", return_value=0) as backfill:
+        rc = cmd_tushare_sync(scope="valuation", market="cn", dry_run=False)
+
+    assert rc == 0
+    backfill.assert_called_once_with("valuation", "cn", False, start=None)
+
+
+def test_tushare_full_cli_dispatch():
+    with patch("main.cmd_tushare_full", return_value=0) as full:
+        rc = main_cli(["tushare-full", "--scope", "valuation", "--market", "cn"])
+
+    assert rc == 0
+    full.assert_called_once_with("valuation", "cn", False)
+
+
+def test_tushare_sync_cli_dispatch():
+    with patch("main.cmd_tushare_sync", return_value=0) as sync:
+        rc = main_cli(["tushare-sync", "--scope", "shareholder_return"])
+
+    assert rc == 0
+    sync.assert_called_once_with("shareholder_return", "all", False)

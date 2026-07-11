@@ -68,16 +68,29 @@ def _build_parser() -> argparse.ArgumentParser:
         help="全量回补，忽略 sync_log，拉满最大可得历史（1h=730天，15m=60天）",
     )
 
-    p_ts = sub.add_parser("tushare-backfill", help="Tushare 一次性回填三市场底层数据")
-    p_ts.add_argument("--scope", choices=("all", "lists", "prices", "derive", "financial",
-                                          "valuation", "shareholder_return"),
-                      default="all")
+    _TS_SCOPES = ("all", "lists", "prices", "derive", "financial", "valuation", "shareholder_return")
+
+    p_ts = sub.add_parser("tushare-backfill", help="Tushare 回填（--start 自定义起点，需要精细控制时用）")
+    p_ts.add_argument("--scope", choices=_TS_SCOPES, default="all")
     p_ts.add_argument("--market", choices=("all", "cn", "hk", "us"), default="all")
     p_ts.add_argument("--dry-run", action="store_true")
     p_ts.add_argument("--start", default=None,
                       help="YYYYMMDD，强制指定起点重新回填历史（valuation 默认从上次同步点增量续拉，"
                            "需要这个才会往回填；financial 默认已是 TUSHARE_BACKFILL_START 全量，"
                            "传了就换成这个起点）")
+
+    p_tfull = sub.add_parser("tushare-full", help="Tushare 全量强制回填（=tushare-backfill --start 2010起；"
+                                                   "financial/dividend 接口本来就每次全量，无实际差异）")
+    p_tfull.add_argument("--scope", choices=_TS_SCOPES, default="all")
+    p_tfull.add_argument("--market", choices=("all", "cn", "hk", "us"), default="all")
+    p_tfull.add_argument("--dry-run", action="store_true")
+
+    p_tsync = sub.add_parser("tushare-sync", help="Tushare 增量拉取（=tushare-backfill 不带 --start；"
+                                                    "valuation/repurchase/holdertrade 从上次同步点续拉，"
+                                                    "financial/dividend 接口限制仍是全量）")
+    p_tsync.add_argument("--scope", choices=_TS_SCOPES, default="all")
+    p_tsync.add_argument("--market", choices=("all", "cn", "hk", "us"), default="all")
+    p_tsync.add_argument("--dry-run", action="store_true")
 
     SCOPES = ("all", "other", "daily", "weekly", "financial", "earnings", "actions",
               "profile", "revenue", "shareholders", "efficiency")
@@ -232,6 +245,18 @@ def cmd_tushare_backfill(scope: str, market: str, dry_run: bool, start: str | No
     return 0
 
 
+def cmd_tushare_full(scope: str, market: str, dry_run: bool) -> int:
+    """全量强制回填：起点固定为 TUSHARE_BACKFILL_START，等价 tushare-backfill --start 2010起。"""
+    from config import TUSHARE_BACKFILL_START
+    return cmd_tushare_backfill(scope, market, dry_run, start=TUSHARE_BACKFILL_START)
+
+
+def cmd_tushare_sync(scope: str, market: str, dry_run: bool) -> int:
+    """增量拉取：不传 start，各 domain 走自己的默认行为（能增量的增量，financial/dividend 接口限制仍全量）。"""
+    return cmd_tushare_backfill(scope, market, dry_run, start=None)
+    return 0
+
+
 def cmd_tushare_flush(workers: int = 1) -> int:
     from core.local_buffer import flush, flush_parallel, pending_count
     from config import TUSHARE_BUFFER_PATH
@@ -319,6 +344,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_rebase(args.market, args.code, args.years, args.index, args.etf_only)
     if args.cmd == "tushare-backfill":
         return cmd_tushare_backfill(args.scope, args.market, args.dry_run, args.start)
+    if args.cmd == "tushare-full":
+        return cmd_tushare_full(args.scope, args.market, args.dry_run)
+    if args.cmd == "tushare-sync":
+        return cmd_tushare_sync(args.scope, args.market, args.dry_run)
     if args.cmd == "tushare-flush":
         return cmd_tushare_flush(args.workers)
     if args.cmd == "futu-full":
