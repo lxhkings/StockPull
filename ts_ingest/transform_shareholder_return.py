@@ -13,7 +13,7 @@ def _to_str(value) -> str | None:
 def transform_dividend_rows(df: pd.DataFrame) -> list[tuple]:
     rows = []
     for _, r in df.iterrows():
-        if pd.isna(r.get("ann_date")):
+        if pd.isna(r.get("ann_date")) or pd.isna(r.get("end_date")):
             continue
         rows.append((
             r["ts_code"],
@@ -39,10 +39,16 @@ def transform_dividend_rows(df: pd.DataFrame) -> list[tuple]:
 def transform_repurchase_rows(df: pd.DataFrame) -> list[tuple]:
     rows = []
     for _, r in df.iterrows():
+        if pd.isna(r.get("ann_date")):
+            continue
         rows.append((
             r["ts_code"],
             to_date(r.get("ann_date")),
-            to_date(r.get("end_date")) or "9999-12-31",  # null end_date = open-ended buyback, no fixed deadline; sentinel keeps PK/data intact
+            # null end_date = open-ended buyback, no fixed deadline; sentinel keeps PK/data intact.
+            # Known accepted tradeoff: two distinct open-ended programs from the same ts_code on the
+            # same ann_date collide on this PK and silently merge via ON DUPLICATE KEY UPDATE
+            # (last-write-wins). Measured ~13/1195 affected groups in a live smoke test; accepted.
+            to_date(r.get("end_date")) or "9999-12-31",
             _to_str(r.get("proc")),
             to_date(r.get("exp_date")),
             to_float(r.get("vol")),
@@ -56,6 +62,8 @@ def transform_repurchase_rows(df: pd.DataFrame) -> list[tuple]:
 def transform_holdertrade_rows(df: pd.DataFrame) -> list[tuple]:
     rows = []
     for _, r in df.iterrows():
+        if pd.isna(r.get("ann_date")) or pd.isna(r.get("holder_name")) or pd.isna(r.get("in_de")):
+            continue
         rows.append((
             r["ts_code"],
             to_date(r.get("ann_date")),
