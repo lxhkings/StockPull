@@ -127,3 +127,57 @@ def test_backfill_repurchase_explicit_start_overrides_incremental_default():
         mock_windows.return_value = []
         backfill_repurchase(start="20200101")
     assert mock_windows.call_args[0][0] == "20200101"
+
+
+from ts_ingest.backfill_shareholder_return import (
+    backfill_holdertrade_window, backfill_holdertrade, backfill_all,
+)
+
+
+def test_backfill_holdertrade_window_writes_flat_columns():
+    fake_client = MagicMock()
+    fake_client.call.return_value = pd.DataFrame({
+        "ts_code": ["600519.SH"], "ann_date": ["20240115"], "holder_name": ["某某股东"],
+        "holder_type": ["G"], "in_de": ["DE"], "change_vol": [-50000.0],
+        "change_ratio": [-0.04], "after_share": [1200000.0], "after_ratio": [0.1],
+        "avg_price": [1650.5], "total_share": [1200000.0],
+        "begin_date": ["20240110"], "close_date": ["20240115"],
+    })
+    with patch("ts_ingest.backfill_shareholder_return.get_conn") as mock_conn, \
+         patch("ts_ingest.backfill_shareholder_return.get_client", return_value=fake_client):
+        cur = MagicMock()
+        mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
+        mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
+        n = backfill_holdertrade_window("20240101", "20240331")
+    assert n == 1
+    sql = cur.executemany.call_args[0][0]
+    assert "INSERT INTO cn_holdertrade" in sql
+    assert "ON DUPLICATE KEY UPDATE" in sql
+
+
+def test_backfill_holdertrade_falls_back_to_full_history_when_table_empty():
+    with patch("ts_ingest.backfill_shareholder_return._last_synced_ann_date", return_value=None), \
+         patch("ts_ingest.backfill_shareholder_return._date_windows") as mock_windows, \
+         patch("ts_ingest.backfill_shareholder_return.backfill_holdertrade_window", return_value=0):
+        mock_windows.return_value = []
+        backfill_holdertrade()
+    assert mock_windows.call_args[0][0] == "20100101"
+    assert mock_windows.call_args.kwargs["window_days"] == 90  # 切细一点，跟 repurchase 的 365 区分
+
+
+def test_backfill_all_aggregates_three_domains():
+    with patch("ts_ingest.backfill_shareholder_return.backfill_dividend",
+               return_value={"rows": 1, "tickers": 1}) as d, \
+         patch("ts_ingest.backfill_shareholder_return.backfill_repurchase",
+               return_value={"rows": 2, "windows": 1}) as r, \
+         patch("ts_ingest.backfill_shareholder_return.backfill_holdertrade",
+               return_value={"rows": 3, "windows": 1}) as h:
+        result = backfill_all(start="20200101")
+    d.assert_called_once_with()
+    r.assert_called_once_with(start="20200101")
+    h.assert_called_once_with(start="20200101")
+    assert result == {
+        "dividend": {"rows": 1, "tickers": 1},
+        "repurchase": {"rows": 2, "windows": 1},
+        "holdertrade": {"rows": 3, "windows": 1},
+    }

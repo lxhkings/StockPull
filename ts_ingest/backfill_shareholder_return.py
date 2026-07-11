@@ -132,3 +132,56 @@ def backfill_repurchase(start: str | None = None) -> dict:
             log.error(f"repurchase@{s}-{e}: {ex}")
     log.info(f"repurchase: {len(windows)} windows, {total} rows")
     return {"rows": total, "windows": len(windows)}
+
+
+def backfill_holdertrade_window(start_date: str, end_date: str) -> int:
+    client = get_client()
+    df = client.call("stk_holdertrade", start_date=start_date, end_date=end_date)
+    if df is None or df.empty:
+        return 0
+    rows = transform_holdertrade_rows(df)
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO cn_holdertrade "
+                "(ts_code, ann_date, holder_name, holder_type, in_de, change_vol, change_ratio, "
+                " after_share, after_ratio, avg_price, total_share, begin_date, close_date) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+                "ON DUPLICATE KEY UPDATE "
+                "  holder_type=VALUES(holder_type), change_vol=VALUES(change_vol), "
+                "  change_ratio=VALUES(change_ratio), after_share=VALUES(after_share), "
+                "  after_ratio=VALUES(after_ratio), avg_price=VALUES(avg_price), "
+                "  total_share=VALUES(total_share), begin_date=VALUES(begin_date), "
+                "  close_date=VALUES(close_date)",
+                rows,
+            )
+        conn.commit()
+    log.info(f"stk_holdertrade@{start_date}-{end_date}: {len(rows)} rows")
+    return len(rows)
+
+
+def backfill_holdertrade(start: str | None = None) -> dict:
+    if start is None:
+        last = _last_synced_ann_date("cn_holdertrade")
+        if last is None:
+            start = TUSHARE_BACKFILL_START
+        else:
+            start = (datetime.strptime(last, "%Y%m%d") + timedelta(days=1)).strftime("%Y%m%d")
+    end = date.today().strftime("%Y%m%d")
+    windows = _date_windows(start, end, window_days=90) if start <= end else []
+    total = 0
+    for s, e in windows:
+        try:
+            total += backfill_holdertrade_window(s, e)
+        except Exception as ex:
+            log.error(f"stk_holdertrade@{s}-{e}: {ex}")
+    log.info(f"stk_holdertrade: {len(windows)} windows, {total} rows")
+    return {"rows": total, "windows": len(windows)}
+
+
+def backfill_all(start: str | None = None) -> dict:
+    return {
+        "dividend": backfill_dividend(),
+        "repurchase": backfill_repurchase(start=start),
+        "holdertrade": backfill_holdertrade(start=start),
+    }
