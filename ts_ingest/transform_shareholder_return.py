@@ -42,7 +42,7 @@ def transform_repurchase_rows(df: pd.DataFrame) -> list[tuple]:
         rows.append((
             r["ts_code"],
             to_date(r.get("ann_date")),
-            to_date(r.get("end_date")),
+            to_date(r.get("end_date")) or "9999-12-31",  # null end_date = open-ended buyback, no fixed deadline; sentinel keeps PK/data intact
             _to_str(r.get("proc")),
             to_date(r.get("exp_date")),
             to_float(r.get("vol")),

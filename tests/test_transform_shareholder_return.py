@@ -86,6 +86,17 @@ def test_transform_repurchase_rows_handles_nan_fields():
     assert row[5] is None   # vol
 
 
+def test_transform_repurchase_rows_null_end_date_uses_sentinel():
+    df = pd.DataFrame({
+        "ts_code": ["000001.SZ"], "ann_date": ["20240115"], "end_date": [None],
+        "proc": ["实施中"], "exp_date": [None], "vol": [1000.0],
+        "amount": [2000.0], "high_limit": [None], "low_limit": [None],
+    })
+    rows = transform_repurchase_rows(df)
+    row = rows[0]
+    assert row[2] == "9999-12-31"   # end_date: open-ended buyback sentinel
+
+
 def test_transform_holdertrade_rows_converts_dates_and_floats():
     df = pd.DataFrame({
         "ts_code": ["600519.SH"], "ann_date": ["20240115"], "holder_name": ["某某股东"],
