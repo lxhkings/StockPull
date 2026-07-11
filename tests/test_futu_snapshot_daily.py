@@ -1,4 +1,3 @@
-import json
 import pandas as pd
 from datetime import date
 from unittest.mock import MagicMock, patch
@@ -69,7 +68,7 @@ def test_run_daily_aggregates_via_streams(monkeypatch):
 
 def test_sync_shares_skips_when_sentinel_fresh():
     from unittest.mock import MagicMock, patch
-    from futu_ingest.snapshot_daily import sync_shares, run_daily as daily_run
+    from futu_ingest.snapshot_daily import sync_shares
     client = MagicMock()
     with patch("futu_ingest.snapshot_daily.fresh_tickers", return_value={"__ALL__"}), \
          patch("futu_ingest.snapshot_daily.snapshot_shares") as ss:

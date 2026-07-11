@@ -9,7 +9,6 @@ import logging
 from datetime import date
 from typing import Optional
 
-from core.db_client import get_conn
 
 log = logging.getLogger(__name__)
 

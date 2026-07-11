@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """验证 Futu 18 个未实现接口的返回结构。分组测试，每组限 3 个。"""
-import json
 import sys
 import time
-from pprint import pprint
 
 from futu import OpenQuoteContext
 

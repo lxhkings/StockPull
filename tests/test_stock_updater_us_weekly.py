@@ -1,7 +1,6 @@
 # tests/test_stock_updater_us_weekly.py
-import pytest
 from datetime import date
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 import pandas as pd
 
 
@@ -122,7 +121,6 @@ def test_normalize_weekly_frame_happy_path():
 
 def test_normalize_weekly_frame_drops_null_close():
     from data.stock_updater_us_weekly import _normalize_weekly_frame
-    import numpy as np
     sub = pd.DataFrame({
         "Date": pd.to_datetime(["2026-05-04", "2026-05-11"]),
         "Open": [180.0, 185.0],

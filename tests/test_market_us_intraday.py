@@ -1,5 +1,5 @@
 """Tests for market_us.intraday()"""
-from unittest.mock import patch, call
+from unittest.mock import patch
 
 
 def test_intraday_default_calls_1h():

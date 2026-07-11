@@ -1,6 +1,5 @@
 from unittest.mock import patch, MagicMock
 import pandas as pd
-import pytest
 
 from ts_ingest.backfill_prices import backfill_one, backfill_market
 

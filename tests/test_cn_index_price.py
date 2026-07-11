@@ -1,5 +1,4 @@
 """Tests for CN market index price fetching via tushare."""
-import pytest
 from unittest.mock import patch, MagicMock
 import pandas as pd
 from datetime import date

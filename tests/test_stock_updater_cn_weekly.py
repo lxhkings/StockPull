@@ -1,5 +1,4 @@
 # tests/test_stock_updater_cn_weekly.py
-import pytest
 from datetime import date
 from unittest.mock import patch, MagicMock
 import pandas as pd

@@ -233,7 +233,7 @@ def test_flush_parallel_clears_all_disjoint_batches(tmp_path, monkeypatch):
     from core import local_buffer
     path = str(tmp_path / "buf.sqlite")
     _seed(path, [
-        (f"INSERT INTO cn_valuation_snapshot VALUES (%s)", [[f"row{i}"]], 1)
+        ("INSERT INTO cn_valuation_snapshot VALUES (%s)", [[f"row{i}"]], 1)
         for i in range(9)
     ])
     executed = []

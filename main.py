@@ -147,7 +147,7 @@ def cmd_weekly(market: str, codes: list[str] | None) -> int:
 def cmd_rebase(market: str, codes: list[str] | None, years: int | None, index: str | None, etf_only: bool = False) -> int:
     if etf_only:
         if market != "cn":
-            print(f"--etf-only currently only supports --market cn", file=sys.stderr)
+            print("--etf-only currently only supports --market cn", file=sys.stderr)
             return 1
         from data.etf_updater_cn import update_etf_prices
         n = update_etf_prices(full_rebase=True)

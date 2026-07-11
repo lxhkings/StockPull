@@ -9,7 +9,6 @@ from datetime import date
 from typing import Optional, Set, Tuple
 import pandas as pd
 
-from core.db_client import get_conn
 
 
 def get_last_snapshot_date(conn, index_id: str) -> Optional[date]:

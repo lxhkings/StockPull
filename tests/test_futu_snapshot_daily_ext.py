@@ -1,10 +1,7 @@
-import json
 from unittest.mock import MagicMock, patch
-from datetime import date
 
 from futu_ingest.snapshot_daily_ext import (
-    snapshot_capital_flow, snapshot_capital_dist,
-    snapshot_short_interest, snapshot_short_volume
+    snapshot_capital_flow, snapshot_short_interest
 )
 
 

@@ -10,7 +10,7 @@ http_utils.py — HTTP 请求 + 速率限制 + 数据类型转换（纯组件，
 import time
 import logging
 import threading
-from typing import Optional, Callable, TypeVar
+from typing import Optional, TypeVar
 
 import pandas as pd
 import requests

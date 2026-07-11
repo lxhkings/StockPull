@@ -1,8 +1,4 @@
 """Tests for US market index/ETF price fetching."""
-import pytest
-from unittest.mock import patch, MagicMock
-import pandas as pd
-from datetime import date
 
 
 def test_update_index_price_includes_sector_etfs():

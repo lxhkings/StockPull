@@ -4,14 +4,11 @@ from __future__ import annotations
 
 import logging
 from typing import Optional
-import yfinance as yf
-import pandas as pd
 
-from core.db_client import get_conn, query, execute
+from core.db_client import get_conn, query
 from modules.db_admin import get_index_tickers
 from data import index_updater_hk
 from data import stock_updater_hk
-from core.http_utils import to_float
 
 log = logging.getLogger(__name__)
 

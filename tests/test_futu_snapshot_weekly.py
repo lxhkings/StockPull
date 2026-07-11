@@ -1,6 +1,4 @@
-import json
 from unittest.mock import MagicMock, patch
-from datetime import date
 
 from futu_ingest.snapshot_weekly import (
     snapshot_valuation, snapshot_rating, snapshot_morningstar

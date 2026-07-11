@@ -12,10 +12,10 @@ into the Pipeline contract.
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
+from datetime import timedelta
 from typing import Optional
 
-from core.db_client import get_conn, query, execute
+from core.db_client import query, execute
 from modules.db_admin import get_index_tickers
 from data import index_updater_us
 from data import index_updater_russell1000

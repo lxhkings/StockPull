@@ -1,5 +1,5 @@
 """modules.db_admin 管理查询测试。"""
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 def test_get_index_tickers_returns_ticker_list():

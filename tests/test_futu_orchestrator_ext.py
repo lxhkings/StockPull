@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from futu_ingest.orchestrator import run_sync, list_us_tickers
+from futu_ingest.orchestrator import run_sync
 
 
 def test_run_backfill_includes_profile_phase():

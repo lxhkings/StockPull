@@ -1,6 +1,4 @@
-import json
 from unittest.mock import MagicMock, patch
-from datetime import date
 
 from futu_ingest.backfill_revenue import (
     backfill_revenue, backfill_earnings_move, RECENT_PERIODS

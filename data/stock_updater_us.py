@@ -52,8 +52,6 @@ def _last_us_trading_date() -> date:
     Returns:
         美股最近已收盘的交易日日期
     """
-    from datetime import datetime
-    import time
 
     now = datetime.now()
     weekday = now.weekday()  # 0=周一, 5=周六, 6=周日
@@ -181,7 +179,7 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
         log.warning(f"[AAPL] yfinance 暂无 {last_trading} 数据（市场未开或未更新），跳过本次增量更新")
         return {t: "error: no_data" for t in tickers}
     elif status == "error":
-        log.warning(f"[AAPL] 测试请求失败，跳过本次增量更新")
+        log.warning("[AAPL] 测试请求失败，跳过本次增量更新")
         return {t: "error: test_failed" for t in tickers}
 
     log.info(f"[AAPL] yfinance 已有 {last_trading} 数据，开始批量下载")

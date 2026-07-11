@@ -1,5 +1,5 @@
 """core.db_client 纯连接组件测试。"""
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 import pymysql
@@ -62,7 +62,6 @@ def test_execute_runs_insert_and_returns_rowcount():
 
 def test_get_conn_retries_with_linear_backoff():
     """连接失败时线性退避重试，耗尽后抛出。"""
-    from core.db_client import get_conn
     import core.db_client as db
 
     # 重置连接池

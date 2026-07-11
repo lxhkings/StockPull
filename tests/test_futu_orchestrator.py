@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 import futu_ingest.orchestrator as orch
-from futu_ingest.orchestrator import run_sync, list_us_tickers
+from futu_ingest.orchestrator import run_sync
 
 
 def test_run_backfill_financial_scope_calls_only_financial():

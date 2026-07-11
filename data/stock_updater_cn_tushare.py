@@ -14,7 +14,7 @@ from typing import Dict, List, Tuple, Optional
 
 import pandas as pd
 
-from config import HISTORY_YEARS_CN, START_DATE_CN, TUSHARE_BACKFILL_START
+from config import HISTORY_YEARS_CN, TUSHARE_BACKFILL_START
 from core.db_client import get_conn
 from modules.sync_log import get_last_sync
 from core.http_utils import to_float, to_int

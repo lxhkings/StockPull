@@ -12,7 +12,7 @@ from ts_ingest import budget
 from ts_ingest.client import get_client
 from ts_ingest.backfill_lists import (
     backfill_stocks_a, backfill_stocks_hk, backfill_stocks_us,
-    backfill_etf_basic, backfill_hk_connect, backfill_index_weight,
+    backfill_etf_basic, backfill_hk_connect,
 )
 from ts_ingest.backfill_stock_dates import backfill_stock_dates
 from ts_ingest.backfill_prices import backfill_market

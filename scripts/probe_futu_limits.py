@@ -173,13 +173,13 @@ def probe_multi_iface(ctx) -> list[dict]:
         results = [f.result() for f in as_completed(futs)]
 
     total = sum(r["ok"] for r in results)
-    print(f"\n=== multi-iface (同连接并发) ===")
+    print("\n=== multi-iface (同连接并发) ===")
     print(f"{'interface':<38} {'ok':>6} msg")
     print("-" * 90)
     for r in sorted(results, key=lambda x: x["interface"]):
         print(f"{r['interface']:<38} {r['ok']:>6} {r['msg'][:40]!r}")
     print(f"{'TOTAL':<38} {total:>6}")
-    print(f"\n结论: 若 total ≈ 30 → 限频为全局共享;若 total ≈ sum(各自串行值) → 限频为每接口独立")
+    print("\n结论: 若 total ≈ 30 → 限频为全局共享;若 total ≈ sum(各自串行值) → 限频为每接口独立")
     return results
 
 

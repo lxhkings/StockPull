@@ -1,5 +1,4 @@
 import os
-from unittest.mock import patch
 
 def test_db_dict_is_assembled_from_env():
     """config.DB reads from environment via dotenv."""

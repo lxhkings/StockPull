@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import date
 
 from config import TUSHARE_BACKFILL_START
 from core.db_client import get_conn

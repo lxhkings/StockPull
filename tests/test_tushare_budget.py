@@ -1,6 +1,5 @@
 """Budget: 进程级调用计数与权限预检。"""
-from unittest.mock import patch, MagicMock
-import pytest
+from unittest.mock import MagicMock
 
 
 def setup_function():

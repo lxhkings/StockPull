@@ -28,7 +28,6 @@ from config import (
     YF_TIMEOUT,
 )
 from core.http_utils import to_float, to_int
-from data.stock_updater_us import _last_us_trading_date
 from data.yf_client import download_with_retry
 from core.db_client import get_conn
 from modules.sync_log import get_last_sync, set_sync_error, set_sync_ok
@@ -342,7 +341,7 @@ def _download_and_save(
             log.error(f"[{t}] 写库失败: {e}")
             # 检查是否是连接错误（应该立即停止，不应继续尝试写入）
             if isinstance(e, (pymysql.err.OperationalError, pymysql.err.InterfaceError)):
-                log.error(f"DB 连接断开，停止处理剩余 ticker")
+                log.error("DB 连接断开，停止处理剩余 ticker")
                 result[t] = f"error: {e}"
                 raise  # 连接错误应该向上抛出，停止整个批次
             # 非连接错误：尝试记录到 sync_log（可能成功）
