@@ -1,11 +1,12 @@
-"""StockPull CLI entry. Subcommands: init / daily / rebase / weekly / status / migrate-intraday / intraday / tushare-backfill / tushare-full / tushare-sync / tushare-flush / futu-full / futu-sync / futu-flush."""
+"""StockPull CLI: prices | tushare | futu | init | status | db"""
 
 from __future__ import annotations
 
-import argparse
 import logging
 import os
 import sys
+
+from cli.parser import build_parser
 
 # akshare/efinance (eastmoney.com) must bypass proxy — direct connect only.
 # yfinance (Yahoo Finance) should still go through proxy to avoid rate limits.
@@ -21,90 +22,6 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 MARKETS = ("us", "cn", "hk", "all")
-
-
-def _build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="main.py", description="Unified ingest for US/CN/HK")
-    sub = p.add_subparsers(dest="cmd", required=True)
-
-    sub.add_parser("init", help="Insert CSI800/HSI rows into indices table (idempotent)")
-
-    p_daily = sub.add_parser("daily", help="Run incremental daily ingest")
-    p_daily.add_argument("--market", choices=MARKETS, default="all")
-    p_daily.add_argument("--code", action="append", default=None,
-                         help="Only this ticker (repeatable, debug aid)")
-    p_daily.add_argument("--index", default=None,
-                         help="指数成分股（仅 US 市场：SP500）")
-
-    p_rebase = sub.add_parser("rebase", help="Full re-pull (qfq drift fix)")
-    p_rebase.add_argument("--market", choices=("cn", "hk", "us"), required=True)
-    p_rebase.add_argument("--code", action="append", default=None)
-    p_rebase.add_argument("--years", type=int, default=None, help="历史年数（默认：US=5, CN/HK=15）")
-    p_rebase.add_argument("--index", default=None,
-                          help="指数成分股（仅 US 市场：SP500）")
-    p_rebase.add_argument("--etf-only", action="store_true",
-                          help="仅重灌 ETF index_prices（仅 CN 市场）")
-
-    p_weekly = sub.add_parser("weekly", help="Run weekly ingest (US/CN market)")
-    p_weekly.add_argument("--market", choices=("us", "cn"), default="us")
-    p_weekly.add_argument("--code", action="append", default=None,
-                          help="Only this ticker (repeatable, debug aid)")
-
-    sub.add_parser("status", help="Print ingest status summary")
-
-    sub.add_parser("migrate-intraday", help="Create prices_intraday table (idempotent)")
-
-    p_intraday = sub.add_parser("intraday", help="拉取美股分钟级行情（15m / 1h）并写入 prices_intraday")
-    p_intraday.add_argument(
-        "--interval",
-        choices=["15m", "1h"],
-        default=None,
-        help="仅拉取指定 interval（默认：15m 和 1h 均拉）",
-    )
-    p_intraday.add_argument(
-        "--rebase",
-        action="store_true",
-        default=False,
-        help="全量回补，忽略 sync_log，拉满最大可得历史（1h=730天，15m=60天）",
-    )
-
-    _TS_SCOPES = ("all", "lists", "prices", "derive", "financial", "valuation", "shareholder_return")
-
-    p_ts = sub.add_parser("tushare-backfill", help="Tushare 回填（--start 自定义起点，需要精细控制时用）")
-    p_ts.add_argument("--scope", choices=_TS_SCOPES, default="all")
-    p_ts.add_argument("--market", choices=("all", "cn", "hk", "us"), default="all")
-    p_ts.add_argument("--dry-run", action="store_true")
-    p_ts.add_argument("--start", default=None,
-                      help="YYYYMMDD，强制指定起点重新回填历史（valuation 默认从上次同步点增量续拉，"
-                           "需要这个才会往回填；financial 默认已是 TUSHARE_BACKFILL_START 全量，"
-                           "传了就换成这个起点）")
-
-    p_tfull = sub.add_parser("tushare-full", help="Tushare 全量强制回填（=tushare-backfill --start 2010起；"
-                                                   "financial/dividend 接口本来就每次全量，无实际差异）")
-    p_tfull.add_argument("--scope", choices=_TS_SCOPES, default="all")
-    p_tfull.add_argument("--market", choices=("all", "cn", "hk", "us"), default="all")
-    p_tfull.add_argument("--dry-run", action="store_true")
-
-    p_tsync = sub.add_parser("tushare-sync", help="Tushare 增量拉取（=tushare-backfill 不带 --start；"
-                                                    "valuation/repurchase/holdertrade 从上次同步点续拉，"
-                                                    "financial/dividend 接口限制仍是全量）")
-    p_tsync.add_argument("--scope", choices=_TS_SCOPES, default="all")
-    p_tsync.add_argument("--market", choices=("all", "cn", "hk", "us"), default="all")
-    p_tsync.add_argument("--dry-run", action="store_true")
-
-    SCOPES = ("all", "other", "daily", "weekly", "financial", "earnings", "actions",
-              "profile", "revenue", "shareholders", "efficiency")
-    p_ff = sub.add_parser("futu-full", help="Futu 全量采集（忽略节流，强制重拉）")
-    p_ff.add_argument("--scope", choices=SCOPES, default="all")
-    p_fs = sub.add_parser("futu-sync", help="Futu 增量采集（按接口频率节流，cron 每日跑）")
-    p_fs.add_argument("--scope", choices=SCOPES, default="all")
-    sub.add_parser("futu-flush", help="把本地缓冲重放到 NAS（futu-full/sync flush 失败后兜底）")
-    p_tf = sub.add_parser("tushare-flush", help="把本地缓冲重放到 NAS（tushare-backfill flush 失败后兜底）")
-    p_tf.add_argument("--workers", type=int, default=1,
-                       help="并发连接数，默认1(顺序，安全)。>1 时不保证跨行执行顺序，"
-                            "只适合同表无依赖写入（如估值快照按日 upsert）")
-
-    return p
 
 
 def cmd_init() -> int:
@@ -229,7 +146,7 @@ def cmd_tushare_backfill(scope: str, market: str, dry_run: bool, start: str | No
     except Exception as e:  # noqa: BLE001
         n = pending_count(TUSHARE_BUFFER_PATH)
         print(f"BACKFILL 完成并已存本地。FLUSH 失败: {e}\n"
-              f"缓冲 {n} 条待传保留。NAS 恢复后跑: uv run main.py tushare-flush")
+              f"缓冲 {n} 条待传保留。NAS 恢复后跑: uv run main.py tushare flush")
         return 1
     return 0
 
@@ -243,7 +160,6 @@ def cmd_tushare_full(scope: str, market: str, dry_run: bool) -> int:
 def cmd_tushare_sync(scope: str, market: str, dry_run: bool) -> int:
     """增量拉取：不传 start，各 domain 走自己的默认行为（能增量的增量，financial/dividend 接口限制仍全量）。"""
     return cmd_tushare_backfill(scope, market, dry_run, start=None)
-    return 0
 
 
 def cmd_tushare_flush(workers: int = 1) -> int:
@@ -319,12 +235,64 @@ def _import_market(market: str):
     return m
 
 
+def _dispatch_prices(args) -> int:
+    c = args.prices_cmd
+    if c == "daily":
+        return cmd_daily(args.market, args.code, args.index)
+    if c == "weekly":
+        return cmd_weekly(args.market, args.code)
+    if c == "intraday":
+        return cmd_intraday(args.interval, args.rebase)
+    if c == "rebase":
+        return cmd_rebase(args.market, args.code, args.years, args.index, args.etf_only)
+    return 1
+
+
+def _dispatch_tushare(args) -> int:
+    c = args.tushare_cmd
+    if c == "sync":
+        return cmd_tushare_backfill(
+            args.scope, args.market, args.dry_run, getattr(args, "start", None),
+        )
+    if c == "full":
+        return cmd_tushare_full(args.scope, args.market, args.dry_run)
+    if c == "flush":
+        return cmd_tushare_flush(args.workers)
+    return 1
+
+
+def _dispatch_futu(args) -> int:
+    c = args.futu_cmd
+    if c == "sync":
+        return cmd_futu_sync(args.scope)
+    if c == "full":
+        return cmd_futu_full(args.scope)
+    if c == "flush":
+        return cmd_futu_flush()
+    return 1
+
+
+def _dispatch_db(args) -> int:
+    if args.db_cmd == "migrate-intraday":
+        return cmd_migrate_intraday()
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
-    args = _build_parser().parse_args(argv)
+    args = build_parser().parse_args(argv)
+    if args.cmd == "prices":
+        return _dispatch_prices(args)
+    if args.cmd == "tushare":
+        return _dispatch_tushare(args)
+    if args.cmd == "futu":
+        return _dispatch_futu(args)
+    if args.cmd == "db":
+        return _dispatch_db(args)
     if args.cmd == "init":
         return cmd_init()
     if args.cmd == "status":
         return cmd_status()
+    # Legacy top-level (Task 2 will wrap with deprecation warnings)
     if args.cmd == "daily":
         return cmd_daily(args.market, args.code, args.index)
     if args.cmd == "weekly":
