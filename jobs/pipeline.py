@@ -1,8 +1,8 @@
 """Generic per-market pipeline orchestrator.
 
 A market module must expose MarketModule (see Protocol below).
-CN/HK: list_active_tickers ignores index; intraday is no-op.
-US: index filters SP500/RUSSELL1000; intraday pulls 15m/1h.
+CN/HK: list_active_tickers ignores index; intraday/weekly may no-op.
+US: index filters SP500/RUSSELL1000; intraday is CLI-only (not in daily).
 
 Price path: single incremental() — new tickers have empty sync_log so
 updaters already full-history pull; no separate backfill_new step.
@@ -63,8 +63,5 @@ class Pipeline:
         log.info(f"[{mid}] === Step 3: update index / ETF price ===")
         rows = self.m.update_index_price()
         log.info(f"[{mid}] index price: +{rows} rows")
-
-        log.info(f"[{mid}] === Step 4: intraday update ===")
-        self.m.intraday()
 
         log.info(f"[{mid}] === pipeline complete ===")

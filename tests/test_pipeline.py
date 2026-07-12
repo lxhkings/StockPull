@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 
 def test_pipeline_runs_steps_in_order():
-    """Pipeline: update_index → incremental → update_index_price → intraday."""
+    """Pipeline: update_index → incremental → update_index_price (no intraday)."""
     from jobs.pipeline import Pipeline
 
     market_module = MagicMock()
@@ -21,7 +21,7 @@ def test_pipeline_runs_steps_in_order():
     market_module.update_index.assert_called_once()
     market_module.incremental.assert_called_once_with(["AAPL", "MSFT", "NEW1", "NEW2"])
     market_module.update_index_price.assert_called_once()
-    market_module.intraday.assert_called_once_with()
+    market_module.intraday.assert_not_called()
 
 
 def test_pipeline_incremental_includes_all_even_when_new():
@@ -39,6 +39,7 @@ def test_pipeline_incremental_includes_all_even_when_new():
     Pipeline(market_module).daily()
 
     market_module.incremental.assert_called_once_with(["AAPL", "NEW1"])
+    market_module.intraday.assert_not_called()
 
 
 def test_pipeline_when_no_new_tickers():
@@ -55,3 +56,4 @@ def test_pipeline_when_no_new_tickers():
     Pipeline(market_module).daily()
 
     market_module.incremental.assert_called_once()
+    market_module.intraday.assert_not_called()

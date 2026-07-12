@@ -63,8 +63,8 @@ Three-market daily-K ingest (US/CN/HK) into shared MariaDB on Synology NAS (192.
 1. `update_index()` — snapshot index constituents, detect added/removed
 2. `incremental()` — day prices (new tickers full-history via empty sync_log)
 3. `update_index_price()` — index/ETF daily close
-4. `intraday()` — always called (US real; CN/HK no-op)
-5. `weekly()` / `rebase()` — separate CLI, not in daily
+4. `weekly()` / `rebase()` / `intraday()` — **separate CLI**, not in daily
+   - `prices weekly` / `prices rebase` / `prices intraday`
 
 **Market modules** follow `MarketModule` protocol (defined in `jobs/pipeline.py`):
 - `jobs/market_us.py` — 编排 `apis.static`（SP500/R1000）+ `apis.yfinance`（日线/周线/分钟线/prices_index）
