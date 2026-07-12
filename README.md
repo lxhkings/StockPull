@@ -79,7 +79,7 @@ uv run main.py prices intraday --interval 1h --rebase  # 全量回补，忽略 s
 uv run main.py status
 ```
 
-**A 股说明：** 股票宇宙为**全 A**（`stock_basic`，非某一指数成分）。`prices daily --market cn` 的 Step 4 只写**行业 ETF** 到 `index_prices`（`index_id` = ts_code），不再采集宽基指数价（如已废弃的 CSI800）。
+**A 股说明：** 股票宇宙为**全 A**（`stock_basic`，非某一指数成分）。`prices daily --market cn` 的 Step 3 只写**行业 ETF** 到 `index_prices`（`index_id` = ts_code），不再采集宽基指数价（如已废弃的 CSI800）。
 
 **A股中报/年报出来后（8月底、次年4月前后），补最新一期财务数据：**
 

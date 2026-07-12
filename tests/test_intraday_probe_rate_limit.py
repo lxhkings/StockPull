@@ -1,9 +1,7 @@
 """Intraday AAPL probe rate_limit alignment with daily/weekly probes."""
-from datetime import date
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
-import pytest
 
 
 @patch("apis.yfinance.prices_intraday.download_with_retry")
