@@ -32,8 +32,7 @@ def test_intraday_is_noop():
     assert intraday() == {}
 
 
-def test_weekly_not_implemented():
-    import pytest
+def test_weekly_is_noop():
     from jobs.market_hk import weekly
-    with pytest.raises(NotImplementedError):
-        weekly()
+    assert weekly() == {}
+    assert weekly(["00700.HK"]) == {}

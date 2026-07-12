@@ -52,8 +52,8 @@ def rebase(
 
 
 def weekly(tickers: list[str] | None = None) -> dict[str, str]:
-    """港股周线未实现；CLI 未开放 --market hk。"""
-    raise NotImplementedError("HK weekly not supported")
+    """港股周线未实现；Protocol 统一入口，no-op。CLI 未开放 --market hk。"""
+    return {}
 
 
 def intraday(

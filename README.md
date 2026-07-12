@@ -349,7 +349,7 @@ core/                            # 纯组件（无表语义）
 - `incremental(tickers)` — 日线（新票无 sync_log → updater 全量；无单独 backfill 步）
 - `update_index_price()` — 指数/ETF 日线（US→`apis.yfinance.prices_index`；CN→行业 ETF；HK no-op）
 - `rebase(tickers)` — 全量重拉（修复 qfq 漂移）
-- `weekly(tickers)` — 周线（US/CN；HK `NotImplementedError`）
+- `weekly(tickers)` — 周线（US/CN；HK no-op）
 - `intraday()` — 分钟线（US 默认 15m+1h；CN/HK no-op；**CLI-only**，不在 `prices daily` 内）
 
 ---
