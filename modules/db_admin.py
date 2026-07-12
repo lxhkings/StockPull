@@ -110,10 +110,22 @@ def purge_index(index_id: str, *, dry_run: bool = True) -> dict[str, int]:
         return count_index_rows(index_id)
 
     deleted: dict[str, int] = {}
-    for table in _INDEX_PURGE_TABLES:
-        n = execute(f"DELETE FROM {table} WHERE index_id=%s", (index_id,))
-        deleted[table] = int(n or 0)
-    return deleted
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            for table in _INDEX_PURGE_TABLES:
+                cur.execute(
+                    f"DELETE FROM {table} WHERE index_id=%s",
+                    (index_id,),
+                )
+                deleted[table] = int(cur.rowcount or 0)
+        conn.commit()
+        return deleted
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 _FUNDAMENTAL_TABLES = (

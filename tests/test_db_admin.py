@@ -1,5 +1,5 @@
 """modules.db_admin 管理查询测试。"""
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 
 def test_get_index_tickers_returns_ticker_list():
@@ -87,18 +87,55 @@ def test_purge_index_dry_run_counts_without_delete():
     assert set(counts) == set(_INDEX_PURGE_TABLES)
 
 
-def test_purge_index_deletes_all_index_tables():
+def test_purge_index_deletes_all_index_tables_in_one_transaction():
     from modules.db_admin import purge_index, _INDEX_PURGE_TABLES
 
-    with patch("modules.db_admin.execute", return_value=2) as mock_ex:
+    conn = MagicMock()
+    cur = MagicMock()
+    cur.rowcount = 2
+    # support "with conn.cursor() as cur"
+    conn.cursor.return_value.__enter__.return_value = cur
+    conn.cursor.return_value.__exit__.return_value = None
+
+    with patch("modules.db_admin.get_conn", return_value=conn) as mock_gc:
         deleted = purge_index("CSI800", dry_run=False)
 
-    assert mock_ex.call_count == len(_INDEX_PURGE_TABLES)
-    assert all(v == 2 for v in deleted.values())
-    for call, table in zip(mock_ex.call_args_list, _INDEX_PURGE_TABLES):
+    mock_gc.assert_called_once()
+    assert cur.execute.call_count == len(_INDEX_PURGE_TABLES)
+    for call, table in zip(cur.execute.call_args_list, _INDEX_PURGE_TABLES):
         sql, params = call[0][0], call[0][1]
         assert f"DELETE FROM {table}" in sql
         assert params == ("CSI800",)
+    conn.commit.assert_called_once()
+    conn.rollback.assert_not_called()
+    conn.close.assert_called_once()
+    assert all(v == 2 for v in deleted.values())
+    assert set(deleted) == set(_INDEX_PURGE_TABLES)
+
+
+def test_purge_index_rollback_on_mid_failure():
+    from modules.db_admin import purge_index, _INDEX_PURGE_TABLES
+
+    conn = MagicMock()
+    cur = MagicMock()
+    # fail on second DELETE
+    def _exec(sql, params=None):
+        if cur.execute.call_count == 2:
+            raise RuntimeError("disk full")
+        cur.rowcount = 1
+
+    cur.execute.side_effect = _exec
+    conn.cursor.return_value.__enter__.return_value = cur
+    conn.cursor.return_value.__exit__.return_value = None
+
+    with patch("modules.db_admin.get_conn", return_value=conn):
+        import pytest
+        with pytest.raises(RuntimeError, match="disk full"):
+            purge_index("CSI800", dry_run=False)
+
+    conn.rollback.assert_called_once()
+    conn.commit.assert_not_called()
+    conn.close.assert_called_once()
 
 
 def test_purge_index_rejects_empty_id():
