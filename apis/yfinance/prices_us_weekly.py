@@ -53,7 +53,15 @@ def _last_us_weekly_date() -> date:
 
 
 def _test_aapl_weekly(target_monday: date) -> tuple[Optional[pd.DataFrame], str]:
-    """Test if yfinance has weekly data for the week starting target_monday."""
+    """Test if yfinance has weekly data for the week starting target_monday.
+
+    Returns:
+        (DataFrame, status) 其中 status 为:
+        - "ok": 有目标周一数据
+        - "rate_limit": 被限速
+        - "error": 其他错误
+        - "no_data": 空/无目标周
+    """
     start = target_monday - timedelta(days=14)
     end = target_monday + timedelta(days=7)
     try:

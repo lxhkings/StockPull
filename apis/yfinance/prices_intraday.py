@@ -83,6 +83,7 @@ def _test_aapl_intraday(interval: str) -> tuple[Optional[date], str]:
         (latest_date, status) 其中 status 为:
         - "ok": 有数据，返回最新日期
         - "no_data": 无数据（周末/假期或未更新）
+        - "rate_limit": 被限速
         - "error": 其他错误
     """
     try:
@@ -109,6 +110,10 @@ def _test_aapl_intraday(interval: str) -> tuple[Optional[date], str]:
         return latest, "ok"
 
     except Exception as e:
+        err_msg = str(e)
+        if "RateLimit" in err_msg or "Too Many Requests" in err_msg:
+            log.warning(f"[AAPL {interval}] yfinance 被限速: {e}")
+            return None, "rate_limit"
         log.error(f"[AAPL {interval}] 测试失败: {e}")
         return None, "error"
 
@@ -189,7 +194,10 @@ def update_intraday(interval: str, full_rebase: bool = False) -> dict[str, str]:
     if status == "no_data":
         log.warning(f"[intraday {interval}] AAPL 无数据（周末/假期或未更新），跳过本次更新")
         return {}
-    elif status == "error":
+    if status == "rate_limit":
+        log.warning(f"[intraday {interval}] yfinance 被限速，跳过本次更新")
+        return {}
+    if status == "error":
         log.error(f"[intraday {interval}] AAPL 测试失败，跳过本次更新")
         return {}
 
