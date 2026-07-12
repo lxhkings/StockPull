@@ -36,7 +36,7 @@ uv run main.py db migrate-intraday          # create prices_intraday table
 # Futu 美股基本面
 uv run main.py futu full             # 全量采集（首次/重建）
 uv run main.py futu full --scope financial
-uv run main.py futu sync             # 增量（cron 每日；按接口频率节流）
+uv run main.py futu sync             # 增量（按接口频率节流；手动按需）
 uv run main.py futu sync --scope daily
 uv run main.py futu flush            # 兜底：把本地缓冲重放到 NAS（futu full/sync flush 失败后）
 
@@ -48,10 +48,7 @@ uv run main.py tushare sync --scope lists --market cn  # 增量/日常用
 uv run main.py tushare full --scope valuation          # 全量强制回填（--start 2010起）
 uv run main.py tushare sync --scope valuation --start 20200101  # 自定义起点
 uv run main.py tushare flush                           # 本地缓冲重放到 NAS
-# tushare *：手动一次性回填工具，不在 daily cron 里；本地缓冲同 futu
-
-# Cron
-./scripts/daily_update.sh [us|cn|hk|all]   # → prices daily --market …
+# tushare * / futu * / prices daily：均手动按需；仓库内无 cron 包装脚本
 ```
 
 ## Architecture
