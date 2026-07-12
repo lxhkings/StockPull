@@ -1,14 +1,14 @@
 # Code-review 残留债收口 — 设计文档
 
 **日期:** 2026-07-12  
-**状态:** 已确认可写 plan  
+**状态:** 已确认；plan 已写  
 **范围:** 单 spec；修上一轮 `/code-review` 六项残留，**不**引入新数据源 / 新表 / 新市场  
 **来源:** 分支相对 `origin/main` 的 4 commits 审查 + brainstorming 决策  
 **前置:** `docs/SPEC_code_review_followup.md`（Phase 0–4 已落地；本文件为其 closure）
 
 **工作流（superpowers）:**  
 1. 本文件 = design spec  
-2. Plan：`docs/superpowers/plans/2026-07-12-code-review-closure.md`（待写）  
+2. Plan：`docs/superpowers/plans/2026-07-12-code-review-closure.md`  
 3. 再实现  
 
 **用户锁定（全部 A / 方案 1）:**
