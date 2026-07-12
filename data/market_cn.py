@@ -8,7 +8,7 @@ from typing import Optional
 import pandas as pd
 
 from core.db_client import get_conn, query, execute
-from data import stock_updater_cn_tushare as stock_updater_cn
+from ts_ingest import prices_cn as stock_updater_cn
 from core.http_utils import to_float
 from ts_ingest.backfill_lists import backfill_stocks_a
 from ts_ingest.client import get_client
@@ -76,7 +76,7 @@ def incremental(tickers: list[str]) -> dict[str, str]:
 def update_index_price() -> int:
     """中证800 指数 close via tushare index_daily + 行业 ETF hfq close via fund_daily × fund_adj。"""
     csi800_count = _update_csi800()
-    from data.etf_updater_cn import update_etf_prices
+    from ts_ingest.etf_cn import update_etf_prices
     etf_count = update_etf_prices()
     return csi800_count + etf_count
 
@@ -136,6 +136,6 @@ def rebase(
 
 def weekly(tickers: list[str] | None = None) -> dict[str, str]:
     """Pull weekly prices for CN universe into prices_weekly."""
-    from data import stock_updater_cn_weekly
+    from ts_ingest import prices_cn_weekly
     targets = tickers or list_active_tickers()
-    return stock_updater_cn_weekly.update_weekly_batch(targets)
+    return prices_cn_weekly.update_weekly_batch(targets)

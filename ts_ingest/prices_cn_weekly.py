@@ -1,7 +1,7 @@
-# data/stock_updater_cn_weekly.py
+# ts_ingest/prices_cn_weekly.py
 """A-share weekly-K updater via Tushare (pre-adjusted, qfq).
 
-与 stock_updater_cn_tushare.py 完全对称，差异：
+与 prices_cn.py 完全对称，差异：
 - pro_bar(freq="W") 拉取周线
 - 写入 prices_weekly 表
 - sync_log data_type = "price_weekly"

@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import date
 
 
-@patch("data.etf_updater_cn.update_etf_prices")
+@patch("ts_ingest.etf_cn.update_etf_prices")
 @patch("data.market_cn.query")
 @patch("data.market_cn.execute")
 @patch("data.market_cn.get_client")

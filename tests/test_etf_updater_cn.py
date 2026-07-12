@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import date
 
 
-@patch("data.etf_updater_cn.get_client")
+@patch("ts_ingest.etf_cn.get_client")
 def test_fetch_etf_daily_hfq_merges_close_and_adj(mock_get_client):
     """hfq_close = raw close × adj_factor, merged on trade_date."""
     mock_client = MagicMock()
@@ -31,7 +31,7 @@ def test_fetch_etf_daily_hfq_merges_close_and_adj(mock_get_client):
 
     mock_client.call.side_effect = fake_call
 
-    from data.etf_updater_cn import fetch_etf_daily_hfq
+    from ts_ingest.etf_cn import fetch_etf_daily_hfq
     df = fetch_etf_daily_hfq("512800.SH", start_date=None)
 
     assert list(df.columns) == ["date", "hfq_close"]
@@ -43,14 +43,14 @@ def test_fetch_etf_daily_hfq_merges_close_and_adj(mock_get_client):
     assert df.iloc[1]["hfq_close"] == pytest.approx(1.500 * 1.20)
 
 
-@patch("data.etf_updater_cn.get_client")
+@patch("ts_ingest.etf_cn.get_client")
 def test_fetch_etf_daily_hfq_empty_when_no_daily(mock_get_client):
     """Empty fund_daily → empty DataFrame, fund_adj not called."""
     mock_client = MagicMock()
     mock_get_client.return_value = mock_client
     mock_client.call.return_value = pd.DataFrame()
 
-    from data.etf_updater_cn import fetch_etf_daily_hfq
+    from ts_ingest.etf_cn import fetch_etf_daily_hfq
     df = fetch_etf_daily_hfq("512800.SH", start_date=None)
 
     assert df.empty
@@ -59,7 +59,7 @@ def test_fetch_etf_daily_hfq_empty_when_no_daily(mock_get_client):
     assert mock_client.call.call_args[0][0] == "fund_daily"
 
 
-@patch("data.etf_updater_cn.get_client")
+@patch("ts_ingest.etf_cn.get_client")
 def test_fetch_etf_daily_hfq_handles_missing_adj(mock_get_client):
     """Empty fund_adj → fallback to raw close."""
     mock_client = MagicMock()
@@ -80,14 +80,14 @@ def test_fetch_etf_daily_hfq_handles_missing_adj(mock_get_client):
 
     mock_client.call.side_effect = fake_call
 
-    from data.etf_updater_cn import fetch_etf_daily_hfq
+    from ts_ingest.etf_cn import fetch_etf_daily_hfq
     df = fetch_etf_daily_hfq("512800.SH", start_date=None)
 
     assert len(df) == 1
     assert df.iloc[0]["hfq_close"] == pytest.approx(1.500)
 
 
-@patch("data.etf_updater_cn.get_client")
+@patch("ts_ingest.etf_cn.get_client")
 def test_fetch_etf_daily_hfq_ffill_adj_gaps(mock_get_client):
     """Missing adj_factor rows are forward-filled."""
     mock_client = MagicMock()
@@ -114,7 +114,7 @@ def test_fetch_etf_daily_hfq_ffill_adj_gaps(mock_get_client):
 
     mock_client.call.side_effect = fake_call
 
-    from data.etf_updater_cn import fetch_etf_daily_hfq
+    from ts_ingest.etf_cn import fetch_etf_daily_hfq
     df = fetch_etf_daily_hfq("512800.SH", start_date=None)
 
     assert len(df) == 3
@@ -123,10 +123,10 @@ def test_fetch_etf_daily_hfq_ffill_adj_gaps(mock_get_client):
     assert row_0512["hfq_close"] == pytest.approx(1.1 * 2.0)
 
 
-@patch("data.etf_updater_cn.CN_SECTOR_ETFS", {"512800.SH": {"name": "银行ETF", "gics": "Financials"}})
-@patch("data.etf_updater_cn.query")
-@patch("data.etf_updater_cn.execute")
-@patch("data.etf_updater_cn.fetch_etf_daily_hfq")
+@patch("ts_ingest.etf_cn.CN_SECTOR_ETFS", {"512800.SH": {"name": "银行ETF", "gics": "Financials"}})
+@patch("ts_ingest.etf_cn.query")
+@patch("ts_ingest.etf_cn.execute")
+@patch("ts_ingest.etf_cn.fetch_etf_daily_hfq")
 def test_update_etf_prices_writes_to_index_prices(mock_fetch, mock_execute, mock_query):
     """update_etf_prices writes (date, ts_code, hfq_close) rows to index_prices."""
     mock_query.return_value = [{"d": None}]  # no last_date
@@ -136,7 +136,7 @@ def test_update_etf_prices_writes_to_index_prices(mock_fetch, mock_execute, mock
     })
     mock_execute.return_value = 2
 
-    from data.etf_updater_cn import update_etf_prices
+    from ts_ingest.etf_cn import update_etf_prices
     total = update_etf_prices()
 
     assert total == 2
@@ -152,10 +152,10 @@ def test_update_etf_prices_writes_to_index_prices(mock_fetch, mock_execute, mock
     ]
 
 
-@patch("data.etf_updater_cn.CN_SECTOR_ETFS", {"512800.SH": {"name": "银行ETF", "gics": "Financials"}})
-@patch("data.etf_updater_cn.query")
-@patch("data.etf_updater_cn.execute")
-@patch("data.etf_updater_cn.fetch_etf_daily_hfq")
+@patch("ts_ingest.etf_cn.CN_SECTOR_ETFS", {"512800.SH": {"name": "银行ETF", "gics": "Financials"}})
+@patch("ts_ingest.etf_cn.query")
+@patch("ts_ingest.etf_cn.execute")
+@patch("ts_ingest.etf_cn.fetch_etf_daily_hfq")
 def test_update_etf_prices_incremental_skips_existing(mock_fetch, mock_execute, mock_query):
     """last_date in DB → start_date passed as YYYYMMDD, rows ≤ last_date filtered."""
     mock_query.return_value = [{"d": date(2026, 5, 12)}]
@@ -165,7 +165,7 @@ def test_update_etf_prices_incremental_skips_existing(mock_fetch, mock_execute, 
     })
     mock_execute.return_value = 1
 
-    from data.etf_updater_cn import update_etf_prices
+    from ts_ingest.etf_cn import update_etf_prices
     total = update_etf_prices()
 
     mock_fetch.assert_called_once_with("512800.SH", start_date="20260512")
@@ -175,13 +175,13 @@ def test_update_etf_prices_incremental_skips_existing(mock_fetch, mock_execute, 
     assert rows[0][0] == date(2026, 5, 13)
 
 
-@patch("data.etf_updater_cn.CN_SECTOR_ETFS", {
+@patch("ts_ingest.etf_cn.CN_SECTOR_ETFS", {
     "512800.SH": {"name": "银行ETF", "gics": "Financials"},
     "512000.SH": {"name": "券商ETF", "gics": "Financials"},
 })
-@patch("data.etf_updater_cn.query")
-@patch("data.etf_updater_cn.execute")
-@patch("data.etf_updater_cn.fetch_etf_daily_hfq")
+@patch("ts_ingest.etf_cn.query")
+@patch("ts_ingest.etf_cn.execute")
+@patch("ts_ingest.etf_cn.fetch_etf_daily_hfq")
 def test_update_etf_prices_continues_on_single_failure(mock_fetch, mock_execute, mock_query):
     """If one ETF fetch raises, others still process."""
     mock_query.return_value = [{"d": None}]
@@ -197,7 +197,7 @@ def test_update_etf_prices_continues_on_single_failure(mock_fetch, mock_execute,
     mock_fetch.side_effect = fake_fetch
     mock_execute.return_value = 1
 
-    from data.etf_updater_cn import update_etf_prices
+    from ts_ingest.etf_cn import update_etf_prices
     total = update_etf_prices()
 
     # 512000.SH succeeded
@@ -207,10 +207,10 @@ def test_update_etf_prices_continues_on_single_failure(mock_fetch, mock_execute,
     assert written_rows[0][1] == "512000.SH"
 
 
-@patch("data.etf_updater_cn.CN_SECTOR_ETFS", {"512800.SH": {"name": "银行ETF", "gics": "Financials"}})
-@patch("data.etf_updater_cn.query")
-@patch("data.etf_updater_cn.execute")
-@patch("data.etf_updater_cn.fetch_etf_daily_hfq")
+@patch("ts_ingest.etf_cn.CN_SECTOR_ETFS", {"512800.SH": {"name": "银行ETF", "gics": "Financials"}})
+@patch("ts_ingest.etf_cn.query")
+@patch("ts_ingest.etf_cn.execute")
+@patch("ts_ingest.etf_cn.fetch_etf_daily_hfq")
 def test_update_etf_prices_full_rebase_ignores_last_date(mock_fetch, mock_execute, mock_query):
     """full_rebase=True → start from 20100101 even if last_date exists."""
     mock_query.return_value = [{"d": date(2026, 5, 12)}]
@@ -220,7 +220,7 @@ def test_update_etf_prices_full_rebase_ignores_last_date(mock_fetch, mock_execut
     })
     mock_execute.return_value = 2
 
-    from data.etf_updater_cn import update_etf_prices
+    from ts_ingest.etf_cn import update_etf_prices
     total = update_etf_prices(full_rebase=True)
 
     mock_fetch.assert_called_once_with("512800.SH", start_date="20100101")

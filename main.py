@@ -163,7 +163,7 @@ def cmd_rebase(market: str, codes: list[str] | None, years: int | None, index: s
         if market != "cn":
             print("--etf-only currently only supports --market cn", file=sys.stderr)
             return 1
-        from data.etf_updater_cn import update_etf_prices
+        from ts_ingest.etf_cn import update_etf_prices
         n = update_etf_prices(full_rebase=True)
         print(f"[cn] ETF rebase wrote {n} rows to index_prices")
         return 0
