@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Dict, List, Tuple, Optional
 
 import pandas as pd
@@ -18,41 +18,13 @@ from config import HISTORY_YEARS_CN, TUSHARE_BACKFILL_START
 from core.db_client import get_conn
 from modules.sync_log import get_last_sync
 from core.http_utils import to_float, to_int
+from core.trading_calendar import last_cn_trading_date
 from ts_ingest.client import get_client
 
 log = logging.getLogger(__name__)
 
 SYNC_DATA_TYPE = "price"
 BATCH_COMMIT_SIZE = 50  # 每50个ticker commit一次，减少网络往返
-
-
-def _last_cn_trading_date() -> date:
-    """北京时间视角下A股最近已收盘交易日。
-
-    A股15:00收盘，tushare数据16:00入库完成。
-    """
-    now = datetime.now()
-    weekday = now.weekday()  # 0=周一, 5=周六, 6=周日
-    hour = now.hour
-
-    # 周六：周五（周五数据周六早上入库）
-    if weekday == 5:
-        return (now - timedelta(days=1)).date()
-
-    # 周日：周五
-    if weekday == 6:
-        return (now - timedelta(days=2)).date()
-
-    # 周一16点前：周五
-    if weekday == 0 and hour < 16:
-        return (now - timedelta(days=3)).date()
-
-    # 其他交易日：
-    # 16点后 → 当天数据已入库，取当天
-    # 16点前 → 等待当天入库，取前一天
-    if hour >= 16:
-        return now.date()
-    return (now - timedelta(days=1)).date()
 
 
 def _normalize_pro_bar(df: pd.DataFrame) -> pd.DataFrame:
@@ -200,7 +172,7 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
     if not tickers:
         return {}
 
-    last_trading = _last_cn_trading_date()
+    last_trading = last_cn_trading_date()
     result: Dict[str, str] = {}
 
     conn = get_conn()

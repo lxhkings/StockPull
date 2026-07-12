@@ -74,7 +74,7 @@ def test_update_weekly_batch_empty():
 def test_update_weekly_batch_all_already_synced():
     """All tickers already at last_trading: skips without fetching."""
     from data.stock_updater_cn_weekly import update_weekly_batch
-    with patch("data.stock_updater_cn_weekly._last_cn_trading_date",
+    with patch("data.stock_updater_cn_weekly.last_cn_trading_date",
                return_value=date(2026, 5, 16)), \
          patch("data.stock_updater_cn_weekly.get_conn") as mock_conn_fn, \
          patch("data.stock_updater_cn_weekly.get_last_sync",
@@ -90,7 +90,7 @@ def test_update_weekly_batch_new_tickers_trigger_full_backfill():
     from data.stock_updater_cn_weekly import update_weekly_batch
     from config import TUSHARE_BACKFILL_START
 
-    with patch("data.stock_updater_cn_weekly._last_cn_trading_date",
+    with patch("data.stock_updater_cn_weekly.last_cn_trading_date",
                return_value=date(2026, 5, 16)), \
          patch("data.stock_updater_cn_weekly.get_conn") as mock_conn_fn, \
          patch("data.stock_updater_cn_weekly.get_last_sync", return_value=None), \

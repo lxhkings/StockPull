@@ -21,6 +21,7 @@ from data import index_updater_us
 from data import index_updater_russell1000
 from data import stock_updater_us
 from core.http_utils import to_float
+from core.trading_calendar import last_us_trading_date
 from data.yf_client import download_with_retry
 
 log = logging.getLogger(__name__)
@@ -109,7 +110,7 @@ def update_index_price() -> int:
         ("XLU", "XLU"),
         ("XLC", "XLC"),
     ]
-    last_trading = stock_updater_us._last_us_trading_date()
+    last_trading = last_us_trading_date()
     total = 0
     for symbol, index_id in indices:
         last = query(

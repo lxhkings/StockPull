@@ -19,7 +19,7 @@ from config import TUSHARE_BACKFILL_START
 from core.db_client import get_conn
 from modules.sync_log import get_last_sync
 from core.http_utils import to_float, to_int
-from data.stock_updater_cn_tushare import _last_cn_trading_date
+from core.trading_calendar import last_cn_trading_date
 from ts_ingest.client import get_client
 
 log = logging.getLogger(__name__)
@@ -170,7 +170,7 @@ def update_weekly_batch(
     if not tickers:
         return {}
 
-    last_trading = _last_cn_trading_date()
+    last_trading = last_cn_trading_date()
     result: Dict[str, str] = {}
 
     conn = get_conn()

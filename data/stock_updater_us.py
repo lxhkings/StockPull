@@ -15,7 +15,7 @@ import random
 import logging
 import pandas as pd
 import yfinance as yf
-from datetime import datetime, timedelta, date
+from datetime import timedelta, date
 from typing import Optional, List, Dict
 
 from core.batch_utils import chunked
@@ -30,51 +30,10 @@ from config import (
 from core.db_client import get_conn
 from modules.sync_log import get_last_sync, set_sync_ok, set_sync_error
 from core.http_utils import to_float, to_int
+from core.trading_calendar import last_us_trading_date
 from data.yf_client import download_with_retry
 
 log = logging.getLogger(__name__)
-
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 美股收盘日计算（北京时间视角）
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-def _last_us_trading_date() -> date:
-    """
-    计算美股最近已收盘的交易日（北京时间视角）。
-
-    北京时间凌晨 5:00 是美股收盘转换点：
-    - 周六/周日 → 周五数据
-    - 周一凌晨 5点前 → 周五数据
-    - 周一凌晨 5点后 → 等待周一收盘（回补周五）
-    - 周二凌晨 5点前 → 周一数据
-    - 周二凌晨 5点后 → 等待周二收盘（回补周一）
-
-    Returns:
-        美股最近已收盘的交易日日期
-    """
-
-    now = datetime.now()
-    weekday = now.weekday()  # 0=周一, 5=周六, 6=周日
-    hour = now.hour
-
-    # 周六、周日：回补周五
-    if weekday == 5 or weekday == 6:
-        # 往回找周五
-        days_back = weekday - 4 if weekday == 5 else 2
-        return (now - timedelta(days=days_back)).date()
-
-    # 周一凌晨5点前：回补周五
-    if weekday == 0 and hour < 5:
-        return (now - timedelta(days=3)).date()
-
-    # 周一凌晨5点后及周二至周五：
-    # 凌晨5点前 → 前一天数据
-    # 凌晨5点后 → 等待当天收盘，回补前一天
-    if hour < 5:
-        return (now - timedelta(days=1)).date()
-    else:
-        # 当前交易日尚未收盘，回补前一天
-        return (now - timedelta(days=1)).date()
 
 
 def _test_aapl_data(target_date: date) -> tuple[Optional[pd.DataFrame], str]:
@@ -169,7 +128,7 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
         return {}
 
     # 先用 AAPL 测试 yfinance 是否已更新最近数据
-    last_trading = _last_us_trading_date()
+    last_trading = last_us_trading_date()
     test_df, status = _test_aapl_data(last_trading)
 
     if status == "rate_limit":
@@ -255,7 +214,7 @@ def _download_and_save(conn, tickers: List[str], start_date: Optional[date], res
 
     # start_date 为 None 表示新 ticker，从历史起点到最近收盘日
     if start_date is None:
-        last_trading = _last_us_trading_date()
+        last_trading = last_us_trading_date()
         if years:
             # 指定年数，从 last_trading 往回推算
             start_date = last_trading - timedelta(days=365 * years)
@@ -264,7 +223,7 @@ def _download_and_save(conn, tickers: List[str], start_date: Optional[date], res
             start_date = date.fromisoformat(START_DATE_US)
 
     # end_dt 设为最近收盘日 + 1 天（yfinance end 参数不包含该日期）
-    last_trading = _last_us_trading_date()
+    last_trading = last_us_trading_date()
     end_dt = last_trading + timedelta(days=1)
     yf_symbols = [_yf_symbol(t) for t in tickers]
 
