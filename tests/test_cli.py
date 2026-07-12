@@ -1,5 +1,8 @@
 import subprocess
 import sys
+from unittest.mock import patch
+
+from main import main
 
 
 def _run(*args):
@@ -29,3 +32,46 @@ def test_daily_market_choice_validated():
     out = _run("daily", "--market", "europe")
     assert out.returncode != 0
     assert "europe" in out.stderr or "europe" in out.stdout
+
+
+def test_old_daily_help_still_works():
+    out = _run("daily", "--help")
+    assert out.returncode == 0
+
+
+def test_old_daily_emits_deprecation_on_run(capsys):
+    with patch("main.cmd_daily", return_value=0) as daily:
+        rc = main(["daily", "--market", "us"])
+    assert rc == 0
+    daily.assert_called_once()
+    err = capsys.readouterr().err
+    assert "[deprecated]" in err
+    assert "`daily`" in err
+    assert "`prices daily`" in err
+
+
+def test_old_tushare_sync_emits_deprecation_on_run(capsys):
+    with patch("main.cmd_tushare_sync", return_value=0) as sync:
+        rc = main(["tushare-sync", "--scope", "lists"])
+    assert rc == 0
+    sync.assert_called_once()
+    err = capsys.readouterr().err
+    assert "[deprecated]" in err
+    assert "`tushare-sync`" in err
+    assert "`tushare sync`" in err
+
+
+def test_new_prices_daily_no_deprecation(capsys):
+    with patch("main.cmd_daily", return_value=0):
+        rc = main(["prices", "daily", "--market", "us"])
+    assert rc == 0
+    err = capsys.readouterr().err
+    assert "[deprecated]" not in err
+
+
+def test_new_tushare_sync_no_deprecation(capsys):
+    with patch("main.cmd_tushare_backfill", return_value=0):
+        rc = main(["tushare", "sync", "--scope", "lists"])
+    assert rc == 0
+    err = capsys.readouterr().err
+    assert "[deprecated]" not in err

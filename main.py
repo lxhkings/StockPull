@@ -6,6 +6,7 @@ import logging
 import os
 import sys
 
+from cli.deprecate import warn_deprecated
 from cli.parser import build_parser
 
 # akshare/efinance (eastmoney.com) must bypass proxy — direct connect only.
@@ -198,7 +199,7 @@ def _run_futu(scope: str, force: bool) -> int:
     except Exception as e:  # noqa: BLE001
         n = pending_count(FUTU_BUFFER_PATH)
         print(f"FETCH 完成并已存本地。FLUSH 失败: {e}\n"
-              f"缓冲 {n} 条待传保留。NAS 恢复后跑: uv run main.py futu-flush")
+              f"缓冲 {n} 条待传保留。NAS 恢复后跑: uv run main.py futu flush")
         return 1
     return 0
 
@@ -292,31 +293,43 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_init()
     if args.cmd == "status":
         return cmd_status()
-    # Legacy top-level (Task 2 will wrap with deprecation warnings)
+    # Legacy top-level — warn then forward to existing cmd_*
     if args.cmd == "daily":
+        warn_deprecated("daily", "prices daily")
         return cmd_daily(args.market, args.code, args.index)
     if args.cmd == "weekly":
+        warn_deprecated("weekly", "prices weekly")
         return cmd_weekly(args.market, args.code)
+    if args.cmd == "intraday":
+        warn_deprecated("intraday", "prices intraday")
+        return cmd_intraday(args.interval, args.rebase)
     if args.cmd == "rebase":
+        warn_deprecated("rebase", "prices rebase")
         return cmd_rebase(args.market, args.code, args.years, args.index, args.etf_only)
-    if args.cmd == "tushare-backfill":
-        return cmd_tushare_backfill(args.scope, args.market, args.dry_run, args.start)
-    if args.cmd == "tushare-full":
-        return cmd_tushare_full(args.scope, args.market, args.dry_run)
     if args.cmd == "tushare-sync":
+        warn_deprecated("tushare-sync", "tushare sync")
         return cmd_tushare_sync(args.scope, args.market, args.dry_run)
+    if args.cmd == "tushare-full":
+        warn_deprecated("tushare-full", "tushare full")
+        return cmd_tushare_full(args.scope, args.market, args.dry_run)
+    if args.cmd == "tushare-backfill":
+        warn_deprecated("tushare-backfill", "tushare sync")
+        return cmd_tushare_backfill(args.scope, args.market, args.dry_run, args.start)
     if args.cmd == "tushare-flush":
+        warn_deprecated("tushare-flush", "tushare flush")
         return cmd_tushare_flush(args.workers)
-    if args.cmd == "futu-full":
-        return cmd_futu_full(args.scope)
     if args.cmd == "futu-sync":
+        warn_deprecated("futu-sync", "futu sync")
         return cmd_futu_sync(args.scope)
+    if args.cmd == "futu-full":
+        warn_deprecated("futu-full", "futu full")
+        return cmd_futu_full(args.scope)
     if args.cmd == "futu-flush":
+        warn_deprecated("futu-flush", "futu flush")
         return cmd_futu_flush()
     if args.cmd == "migrate-intraday":
+        warn_deprecated("migrate-intraday", "db migrate-intraday")
         return cmd_migrate_intraday()
-    if args.cmd == "intraday":
-        return cmd_intraday(args.interval, args.rebase)
     return 1
 
 
