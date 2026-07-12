@@ -1,4 +1,4 @@
-"""Project_B CLI entry. Subcommands: init / daily / rebase / status."""
+"""StockPull CLI entry. Subcommands: init / daily / rebase / weekly / status / migrate-intraday / intraday / tushare-backfill / tushare-full / tushare-sync / tushare-flush / futu-full / futu-sync / futu-flush."""
 
 from __future__ import annotations
 

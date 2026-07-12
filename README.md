@@ -352,7 +352,7 @@ ORDER BY date;
 **数据库查询示例（Python）：**
 
 ```python
-from db import query, execute
+from core.db_client import query, execute
 
 # SELECT（返回 list[dict]）
 rows = query("SELECT ticker, name, gics_sector FROM stocks WHERE exchange = 'SH' LIMIT 10")
@@ -377,15 +377,15 @@ rows_affected = execute(
 )
 
 # 常用查询函数
-from db import get_index_tickers, get_latest_snapshot_tickers
+from modules.db_admin import get_index_tickers
 sp500_tickers = get_index_tickers('SP500')
-latest_tickers = get_latest_snapshot_tickers('CSI800')
+latest_tickers = get_index_tickers('CSI800')
 ```
 
 命令行快速查询：
 
 ```bash
-python3 -c "from db import query; print(query('SELECT COUNT(*) as count FROM prices')[0]['count'])"
+python3 -c "from core.db_client import query; print(query('SELECT COUNT(*) as count FROM prices')[0]['count'])"
 mysql -h 192.168.8.9 -u root -p stocks
 ```
 
