@@ -82,15 +82,16 @@ def test_tushare_sync_passes_no_start():
 
 def test_tushare_full_cli_dispatch():
     with patch("main.cmd_tushare_full", return_value=0) as full:
-        rc = main_cli(["tushare-full", "--scope", "valuation", "--market", "cn"])
+        rc = main_cli(["tushare", "full", "--scope", "valuation", "--market", "cn"])
 
     assert rc == 0
     full.assert_called_once_with("valuation", "cn", False)
 
 
 def test_tushare_sync_cli_dispatch():
-    with patch("main.cmd_tushare_sync", return_value=0) as sync:
-        rc = main_cli(["tushare-sync", "--scope", "shareholder_return"])
+    # 新路径 tushare sync → cmd_tushare_backfill(..., start=None)
+    with patch("main.cmd_tushare_backfill", return_value=0) as backfill:
+        rc = main_cli(["tushare", "sync", "--scope", "shareholder_return"])
 
     assert rc == 0
-    sync.assert_called_once_with("shareholder_return", "all", False)
+    backfill.assert_called_once_with("shareholder_return", "all", False, None)

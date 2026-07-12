@@ -22,6 +22,23 @@ def test_help_shows_subcommands():
     assert "migrate-intraday" not in out.stdout
 
 
+def test_prices_daily_help():
+    out = _run("prices", "daily", "--help")
+    assert out.returncode == 0
+    assert "--market" in out.stdout
+
+
+def test_tushare_sync_help_has_scope():
+    out = _run("tushare", "sync", "--help")
+    assert out.returncode == 0
+    assert "--scope" in out.stdout
+
+
+def test_prices_without_subcommand_errors():
+    out = _run("prices")
+    assert out.returncode != 0
+
+
 def test_unknown_subcommand_errors():
     out = _run("nonexistent")
     assert out.returncode != 0
