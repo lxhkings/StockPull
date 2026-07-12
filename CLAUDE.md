@@ -32,6 +32,8 @@ uv run main.py prices weekly --market us
 uv run main.py prices intraday              # US 分钟线
 uv run main.py status                       # DB sync summary
 uv run main.py db migrate-intraday          # create prices_intraday table
+uv run main.py db purge-index --index-id CSI800          # dry-run 统计
+uv run main.py db purge-index --index-id CSI800 --yes    # 确认删除
 
 # Futu 美股基本面
 uv run main.py futu full             # 全量采集（首次/重建）

@@ -124,6 +124,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_db = sub.add_parser("db", help="数据库维护")
     dbs = p_db.add_subparsers(dest="db_cmd", required=True)
     dbs.add_parser("migrate-intraday", help="Create prices_intraday table (idempotent)")
+    p_purge = dbs.add_parser(
+        "purge-index",
+        help="按 index_id 清理指数相关表（默认 dry-run，加 --yes 才删除）",
+    )
+    p_purge.add_argument(
+        "--index-id", required=True,
+        help="要清理的 index_id（如 CSI800、废弃的自定义 id）",
+    )
+    p_purge.add_argument(
+        "--yes", action="store_true",
+        help="确认删除；不加则只打印各表行数（dry-run）",
+    )
 
     # --- legacy top-level (hidden from -h, still callable) ---
     p_daily_old = sub.add_parser("daily", help=argparse.SUPPRESS)

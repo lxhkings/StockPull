@@ -78,6 +78,27 @@ def test_old_tushare_sync_emits_deprecation_on_run(capsys):
     assert "`tushare sync`" in err
 
 
+def test_db_purge_index_help():
+    out = _run("db", "purge-index", "--help")
+    assert out.returncode == 0
+    assert "--index-id" in out.stdout
+    assert "--yes" in out.stdout
+
+
+def test_db_purge_index_dry_run_dispatches(capsys):
+    with patch("main.cmd_purge_index", return_value=0) as purge:
+        rc = main(["db", "purge-index", "--index-id", "CSI800"])
+    assert rc == 0
+    purge.assert_called_once_with("CSI800", yes=False)
+
+
+def test_db_purge_index_yes_dispatches(capsys):
+    with patch("main.cmd_purge_index", return_value=0) as purge:
+        rc = main(["db", "purge-index", "--index-id", "CSI800", "--yes"])
+    assert rc == 0
+    purge.assert_called_once_with("CSI800", yes=True)
+
+
 def test_new_prices_daily_no_deprecation(capsys):
     with patch("main.cmd_daily", return_value=0):
         rc = main(["prices", "daily", "--market", "us"])

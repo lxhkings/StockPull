@@ -7,6 +7,7 @@
 - [快速开始](#快速开始)（新机器/首次搭建）
 - [日常使用](#日常使用)（每天/每周该跑什么）
 - [首次配置 / 补历史数据](#首次配置--补历史数据)（一次性操作）
+- [DB 维护](#db-维护)（DDL / 按 index_id 清理）
 - [美股基本面数据 Futu OpenAPI](#美股基本面数据-futu-openapi)
 - [旧命令映射](#旧命令映射)
 - [数据库表](#数据库表)
@@ -77,6 +78,8 @@ uv run main.py prices intraday --interval 1h --rebase  # 全量回补，忽略 s
 ```bash
 uv run main.py status
 ```
+
+**A 股说明：** 股票宇宙为**全 A**（`stock_basic`，非某一指数成分）。`prices daily --market cn` 的 Step 4 只写**行业 ETF** 到 `index_prices`（`index_id` = ts_code），不再采集宽基指数价（如已废弃的 CSI800）。
 
 **A股中报/年报出来后（8月底、次年4月前后），补最新一期财务数据：**
 
@@ -234,6 +237,34 @@ LIMIT 1;
 
 ---
 
+## DB 维护
+
+`db` 子命令：DDL 与按 `index_id` 清理，逻辑在 `modules/db_admin`。
+
+```bash
+# 创建 prices_intraday 表（幂等）
+uv run main.py db migrate-intraday
+
+# 按 index_id 清理指数相关数据（默认 dry-run，只统计行数）
+uv run main.py db purge-index --index-id <INDEX_ID>
+# 确认删除
+uv run main.py db purge-index --index-id <INDEX_ID> --yes
+```
+
+`purge-index` 删除范围（均 `WHERE index_id=...`）：
+
+| 表 | 内容 |
+|---|---|
+| `index_prices` | 指数/ETF 日线 |
+| `index_constituents` | 成分股快照 |
+| `constituent_changes` | ADDED/REMOVED |
+| `index_sync_log` | 指数同步日志 |
+| `indices` | 指数元数据行 |
+
+默认 **dry-run**；必须显式 `--yes` 才 `DELETE`。幂等：无数据时各表 0 行。用于下线某个指数（如历史 CSI800）或误灌数据，避免再写一次性 SQL。
+
+---
+
 ## 数据库表
 
 MariaDB 时区设置：`+08:00`（每连接设置）。
@@ -316,7 +347,7 @@ core/                            # 纯组件（无表语义）
 - `list_active_tickers(index=None)` — 当前股票池（US 可筛 SP500/RUSSELL1000；**CN/HK 忽略 index**）
 - `backfill_new(tickers)` — 新股全量历史
 - `incremental(tickers)` — 存量股票增量（从 sync_log 恢复）
-- `update_index_price()` — 指数日线
+- `update_index_price()` — 指数/ETF 日线（US：宽基+行业 ETF；CN：仅行业 ETF；HK：暂空）
 - `rebase(tickers)` — 全量重拉（修复 qfq 漂移）
 - `weekly(tickers)` — 周线增量采集（US/CN，写 prices_weekly）
 - `intraday()` — 分钟线增量采集（仅 US，写 prices_intraday）

@@ -73,6 +73,49 @@ def create_prices_intraday_table() -> None:
     """)
 
 
+# 指数维度相关表（有数据的才删；顺序：子表 → indices 元数据）
+_INDEX_PURGE_TABLES = (
+    "index_prices",
+    "index_constituents",
+    "constituent_changes",
+    "index_sync_log",
+    "indices",
+)
+
+
+def count_index_rows(index_id: str) -> dict[str, int]:
+    """统计某 index_id 在各指数相关表中的行数。"""
+    out: dict[str, int] = {}
+    for table in _INDEX_PURGE_TABLES:
+        rows = query(
+            f"SELECT COUNT(*) AS n FROM {table} WHERE index_id=%s",
+            (index_id,),
+        )
+        out[table] = int(rows[0]["n"]) if rows else 0
+    return out
+
+
+def purge_index(index_id: str, *, dry_run: bool = True) -> dict[str, int]:
+    """按 index_id 清理指数相关行。
+
+    dry_run=True（默认）：只返回各表行数，不写库。
+    dry_run=False：DELETE 并返回各表删除行数。
+    幂等：无数据时返回全 0。
+    """
+    if not index_id or not str(index_id).strip():
+        raise ValueError("index_id is required")
+    index_id = str(index_id).strip()
+
+    if dry_run:
+        return count_index_rows(index_id)
+
+    deleted: dict[str, int] = {}
+    for table in _INDEX_PURGE_TABLES:
+        n = execute(f"DELETE FROM {table} WHERE index_id=%s", (index_id,))
+        deleted[table] = int(n or 0)
+    return deleted
+
+
 _FUNDAMENTAL_TABLES = (
     "fin_income", "fin_balancesheet", "fin_cashflow", "fin_indicator",
     "cn_valuation_snapshot", "cn_dividend", "cn_repurchase", "cn_holdertrade",

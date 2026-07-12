@@ -69,3 +69,40 @@ def test_show_status_includes_fundamental_table_row_estimates(capsys):
     assert "dividend=42" in captured.out
     assert "repurchase=42" in captured.out
     assert "holdertrade=42" in captured.out
+
+
+def test_purge_index_dry_run_counts_without_delete():
+    from modules.db_admin import purge_index, _INDEX_PURGE_TABLES
+
+    def fake_query(sql, params=None):
+        return [{"n": 3}]
+
+    with patch("modules.db_admin.query", side_effect=fake_query) as mock_q, \
+         patch("modules.db_admin.execute") as mock_ex:
+        counts = purge_index("CSI800", dry_run=True)
+
+    assert mock_ex.call_count == 0
+    assert mock_q.call_count == len(_INDEX_PURGE_TABLES)
+    assert all(v == 3 for v in counts.values())
+    assert set(counts) == set(_INDEX_PURGE_TABLES)
+
+
+def test_purge_index_deletes_all_index_tables():
+    from modules.db_admin import purge_index, _INDEX_PURGE_TABLES
+
+    with patch("modules.db_admin.execute", return_value=2) as mock_ex:
+        deleted = purge_index("CSI800", dry_run=False)
+
+    assert mock_ex.call_count == len(_INDEX_PURGE_TABLES)
+    assert all(v == 2 for v in deleted.values())
+    for call, table in zip(mock_ex.call_args_list, _INDEX_PURGE_TABLES):
+        sql, params = call[0][0], call[0][1]
+        assert f"DELETE FROM {table}" in sql
+        assert params == ("CSI800",)
+
+
+def test_purge_index_rejects_empty_id():
+    from modules.db_admin import purge_index
+    import pytest
+    with pytest.raises(ValueError):
+        purge_index("  ", dry_run=True)
