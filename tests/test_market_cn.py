@@ -2,11 +2,11 @@
 from unittest.mock import patch, MagicMock
 
 
-@patch("data.market_cn.backfill_stocks_a")
-@patch("data.market_cn.get_conn")
+@patch("jobs.market_cn.backfill_stocks_a")
+@patch("jobs.market_cn.get_conn")
 def test_update_index_delegates_to_backfill_stocks_a(mock_conn, mock_backfill):
     """update_index should call backfill_stocks_a and return stats."""
-    from data.market_cn import update_index
+    from jobs.market_cn import update_index
 
     # Mock connection for count queries - fetchone returns tuples
     mock_cursor = MagicMock()
@@ -27,10 +27,10 @@ def test_update_index_delegates_to_backfill_stocks_a(mock_conn, mock_backfill):
     assert new_tickers == []  # Returns empty since list_active_tickers reads from DB
 
 
-@patch("data.market_cn.query")
+@patch("jobs.market_cn.query")
 def test_list_active_tickers(mock_query):
     """list_active_tickers should return tickers from stocks table."""
-    from data.market_cn import list_active_tickers
+    from jobs.market_cn import list_active_tickers
 
     mock_query.return_value = [
         {"ticker": "600519.SH"},

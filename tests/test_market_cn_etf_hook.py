@@ -5,9 +5,9 @@ from datetime import date
 
 
 @patch("apis.tushare.etf_cn.update_etf_prices")
-@patch("data.market_cn.query")
-@patch("data.market_cn.execute")
-@patch("data.market_cn.get_client")
+@patch("jobs.market_cn.query")
+@patch("jobs.market_cn.execute")
+@patch("jobs.market_cn.get_client")
 def test_update_index_price_calls_etf_updater(mock_get_client, mock_execute, mock_query, mock_etf_update):
     """CSI800 count + ETF count are summed."""
     mock_query.return_value = [{"d": date(2026, 5, 10)}]
@@ -23,7 +23,7 @@ def test_update_index_price_calls_etf_updater(mock_get_client, mock_execute, moc
 
     mock_etf_update.return_value = 42  # ETF rows
 
-    from data.market_cn import update_index_price
+    from jobs.market_cn import update_index_price
     total = update_index_price()
 
     assert total == 1 + 42

@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 def test_pipeline_runs_steps_in_order():
     """Pipeline calls update_index → backfill_new → incremental → update_index_price."""
-    from data.pipeline import Pipeline
+    from jobs.pipeline import Pipeline
 
     market_module = MagicMock()
     market_module.market_id = "us"
@@ -23,7 +23,7 @@ def test_pipeline_runs_steps_in_order():
 
 
 def test_pipeline_skips_backfill_when_no_new():
-    from data.pipeline import Pipeline
+    from jobs.pipeline import Pipeline
 
     market_module = MagicMock()
     market_module.market_id = "cn"

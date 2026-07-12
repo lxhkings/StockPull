@@ -3,7 +3,7 @@
 
 def test_update_index_price_includes_sector_etfs():
     """update_index_price should include all 11 sector ETFs in indices list."""
-    from data.market_us import update_index_price
+    from jobs.market_us import update_index_price
     import inspect
 
     # Extract indices list from function source
@@ -21,7 +21,7 @@ def test_update_index_price_includes_sector_etfs():
 
 def test_indices_list_format():
     """Indices list should use (symbol, index_id) tuple format."""
-    from data.market_us import update_index_price
+    from jobs.market_us import update_index_price
     import inspect
 
     source = inspect.getsource(update_index_price)

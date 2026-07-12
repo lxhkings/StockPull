@@ -130,7 +130,7 @@ def cmd_status() -> int:
 
 
 def cmd_daily(market: str, codes: list[str] | None, index: str | None) -> int:
-    from data.pipeline import Pipeline
+    from jobs.pipeline import Pipeline
     targets = ["us", "cn", "hk"] if market == "all" else [market]
     for m in targets:
         try:
@@ -309,11 +309,11 @@ def cmd_futu_flush() -> int:
 
 def _import_market(market: str):
     if market == "us":
-        from data import market_us as m
+        from jobs import market_us as m
     elif market == "cn":
-        from data import market_cn as m
+        from jobs import market_cn as m
     elif market == "hk":
-        from data import market_hk as m
+        from jobs import market_hk as m
     else:
         raise ValueError(market)
     return m

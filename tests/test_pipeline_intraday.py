@@ -1,5 +1,5 @@
 """Tests for Pipeline.daily() Step 5 intraday integration."""
-from data.pipeline import Pipeline
+from jobs.pipeline import Pipeline
 
 
 class _USModule:

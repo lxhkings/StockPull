@@ -207,7 +207,7 @@ def update_intraday(interval: str, full_rebase: bool = False) -> dict[str, str]:
 
     log.info(f"[intraday {interval}] AAPL 验证通过，范围：{floor_date} ~ {last_trading}")
 
-    from data.market_us import list_active_tickers
+    from jobs.market_us import list_active_tickers
     tickers = list_active_tickers()
 
     result: dict[str, str] = {}

@@ -5,9 +5,9 @@ from datetime import date
 
 
 @patch("apis.tushare.etf_cn.update_etf_prices", return_value=0)
-@patch("data.market_cn.query")
-@patch("data.market_cn.execute")
-@patch("data.market_cn.get_client")
+@patch("jobs.market_cn.query")
+@patch("jobs.market_cn.execute")
+@patch("jobs.market_cn.get_client")
 def test_update_index_price_uses_tushare_index_daily(mock_get_client, mock_execute, mock_query, mock_etf_update):
     """update_index_price should call tushare index_daily API, not akshare."""
     # Setup: last date in DB is 2026-05-10
@@ -29,7 +29,7 @@ def test_update_index_price_uses_tushare_index_daily(mock_get_client, mock_execu
     mock_client.call.return_value = raw_df
 
     # Execute
-    from data.market_cn import update_index_price
+    from jobs.market_cn import update_index_price
     count = update_index_price()
 
     # Verify tushare client was called with correct parameters
@@ -56,9 +56,9 @@ def test_update_index_price_uses_tushare_index_daily(mock_get_client, mock_execu
 
 
 @patch("apis.tushare.etf_cn.update_etf_prices", return_value=0)
-@patch("data.market_cn.query")
-@patch("data.market_cn.execute")
-@patch("data.market_cn.get_client")
+@patch("jobs.market_cn.query")
+@patch("jobs.market_cn.execute")
+@patch("jobs.market_cn.get_client")
 def test_update_index_price_empty_response(mock_get_client, mock_execute, mock_query, mock_etf_update):
     """Should return 0 when tushare returns empty data."""
     mock_query.return_value = [{"d": date(2026, 5, 10)}]
@@ -67,7 +67,7 @@ def test_update_index_price_empty_response(mock_get_client, mock_execute, mock_q
     mock_get_client.return_value = mock_client
     mock_client.call.return_value = pd.DataFrame()  # Empty response
 
-    from data.market_cn import update_index_price
+    from jobs.market_cn import update_index_price
     count = update_index_price()
 
     assert count == 0
@@ -75,9 +75,9 @@ def test_update_index_price_empty_response(mock_get_client, mock_execute, mock_q
 
 
 @patch("apis.tushare.etf_cn.update_etf_prices", return_value=0)
-@patch("data.market_cn.query")
-@patch("data.market_cn.execute")
-@patch("data.market_cn.get_client")
+@patch("jobs.market_cn.query")
+@patch("jobs.market_cn.execute")
+@patch("jobs.market_cn.get_client")
 def test_update_index_price_no_last_date(mock_get_client, mock_execute, mock_query, mock_etf_update):
     """Should fetch all data when no last_date exists."""
     mock_query.return_value = [{"d": None}]  # No last date
@@ -92,7 +92,7 @@ def test_update_index_price_no_last_date(mock_get_client, mock_execute, mock_que
     })
     mock_client.call.return_value = raw_df
 
-    from data.market_cn import update_index_price
+    from jobs.market_cn import update_index_price
     count = update_index_price()
 
     # When no last_date, start_date should be None
@@ -106,9 +106,9 @@ def test_update_index_price_no_last_date(mock_get_client, mock_execute, mock_que
 
 
 @patch("apis.tushare.etf_cn.update_etf_prices", return_value=0)
-@patch("data.market_cn.query")
-@patch("data.market_cn.execute")
-@patch("data.market_cn.get_client")
+@patch("jobs.market_cn.query")
+@patch("jobs.market_cn.execute")
+@patch("jobs.market_cn.get_client")
 def test_update_index_price_handles_exception(mock_get_client, mock_execute, mock_query, mock_etf_update):
     """Should return 0 and log error on tushare API failure."""
     mock_query.return_value = [{"d": date(2026, 5, 10)}]
@@ -117,7 +117,7 @@ def test_update_index_price_handles_exception(mock_get_client, mock_execute, moc
     mock_get_client.return_value = mock_client
     mock_client.call.side_effect = Exception("API error")
 
-    from data.market_cn import update_index_price
+    from jobs.market_cn import update_index_price
     count = update_index_price()
 
     assert count == 0
@@ -125,8 +125,8 @@ def test_update_index_price_handles_exception(mock_get_client, mock_execute, moc
 
 
 @patch("apis.tushare.etf_cn.update_etf_prices", return_value=0)
-@patch("data.market_cn.query")
-@patch("data.market_cn.get_client")
+@patch("jobs.market_cn.query")
+@patch("jobs.market_cn.get_client")
 def test_update_index_price_missing_columns(mock_get_client, mock_query, mock_etf_update):
     """Should return 0 when response is missing required columns."""
     mock_query.return_value = []
@@ -136,15 +136,15 @@ def test_update_index_price_missing_columns(mock_get_client, mock_query, mock_et
     # Missing trade_date and close columns
     mock_client.call.return_value = pd.DataFrame({"ts_code": ["000906.SH"]})
 
-    from data.market_cn import update_index_price
+    from jobs.market_cn import update_index_price
     count = update_index_price()
 
     assert count == 0
 
 
 @patch("apis.tushare.etf_cn.update_etf_prices", return_value=0)
-@patch("data.market_cn.query")
-@patch("data.market_cn.get_client")
+@patch("jobs.market_cn.query")
+@patch("jobs.market_cn.get_client")
 def test_update_index_price_none_response(mock_get_client, mock_query, mock_etf_update):
     """Should return 0 when tushare client returns None."""
     mock_query.return_value = []
@@ -153,7 +153,7 @@ def test_update_index_price_none_response(mock_get_client, mock_query, mock_etf_
     mock_get_client.return_value = mock_client
     mock_client.call.return_value = None
 
-    from data.market_cn import update_index_price
+    from jobs.market_cn import update_index_price
     count = update_index_price()
 
     assert count == 0
