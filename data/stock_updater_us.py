@@ -28,7 +28,8 @@ from config import (
     YF_BATCH_DELAY_BASE, YF_BATCH_DELAY_JITTER,
 )
 from core.db_client import get_conn
-from modules.sync_log import get_last_sync_map, set_sync_ok, set_sync_error
+from modules.sync_log import get_last_sync_map, set_sync_error
+from modules.price_write import flush_prices_and_sync
 from core.http_utils import to_float, to_int
 from core.trading_calendar import last_us_trading_date
 from data.yf_client import download_with_retry
@@ -254,6 +255,10 @@ def _download_and_save(conn, tickers: List[str], start_date: Optional[date], res
     if df is not None and not df.empty and isinstance(df.columns, pd.MultiIndex):
         top_level = set(df.columns.get_level_values(0))
 
+    price_rows: list = []
+    sync_rows: list = []
+    ok_tickers: list = []
+
     for t in tickers:
         yf_t = _yf_symbol(t)
         if yf_t not in top_level:
@@ -268,16 +273,22 @@ def _download_and_save(conn, tickers: List[str], start_date: Optional[date], res
             set_sync_error(conn, t, "price", "yfinance: empty frame")
             result[t] = "no_data"
             continue
+        rows = _price_rows_from_df(normalized)
+        new_last = normalized["date"].max()
+        price_rows.extend(rows)
+        sync_rows.append((t, "price", new_last, len(rows), "ok", ""))
+        ok_tickers.append(t)
+        result[t] = "ok"
+        log.info(f"[{t}] 写入 {len(rows)} 条，最新={new_last}")
+
+    if price_rows or sync_rows:
         try:
-            rows_inserted = _save_prices(conn, t, normalized)
-            new_last = normalized["date"].max()
-            set_sync_ok(conn, t, "price", new_last, rows_inserted)
-            result[t] = "ok"
-            log.info(f"[{t}] 写入 {rows_inserted} 条，最新={new_last}")
+            flush_prices_and_sync(conn, price_rows, sync_rows, on_duplicate=False)
         except Exception as e:
-            log.error(f"[{t}] 写库失败: {e}")
-            set_sync_error(conn, t, "price", str(e))
-            result[t] = f"error: {e}"
+            log.error(f"[batch] 写库失败: {e}")
+            for t in ok_tickers:
+                set_sync_error(conn, t, "price", str(e))
+                result[t] = f"error: {e}"
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -312,13 +323,9 @@ def _normalize_yf_frame(ticker: str, sub: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _save_prices(conn, ticker: str, df: pd.DataFrame) -> int:
-    """INSERT IGNORE 写 prices 表，UNIQUE KEY (ticker, date) 自动去重"""
-    sql = """
-        INSERT IGNORE INTO prices (ticker, date, open, high, low, close, volume)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-    """
-    rows = [
+def _price_rows_from_df(df: pd.DataFrame) -> list:
+    """DataFrame → price row tuples for flush_prices_and_sync."""
+    return [
         (
             r.ticker,
             r.date,
@@ -330,7 +337,3 @@ def _save_prices(conn, ticker: str, df: pd.DataFrame) -> int:
         )
         for r in df.itertuples(index=False)
     ]
-    with conn.cursor() as cur:
-        cur.executemany(sql, rows)
-    conn.commit()
-    return len(rows)

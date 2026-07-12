@@ -17,6 +17,7 @@ from tqdm import tqdm
 from config import HISTORY_YEARS_CN, TUSHARE_BACKFILL_START
 from core.db_client import get_conn
 from modules.sync_log import get_last_sync, get_last_sync_map
+from modules.price_write import flush_prices_and_sync
 from core.http_utils import to_float, to_int
 from core.trading_calendar import last_cn_trading_date
 from ts_ingest.client import get_client
@@ -48,39 +49,9 @@ def _fetch_one(ticker: str, start: str, end: str) -> pd.DataFrame:
     return _normalize_pro_bar(df_raw)
 
 
-def _save_prices_batch(conn, rows: List[Tuple]) -> int:
-    """批量写入prices表，不commit（由调用者控制）。"""
-    sql = """
-        INSERT INTO prices (ticker, date, open, high, low, close, volume)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE
-            open=VALUES(open), high=VALUES(high), low=VALUES(low),
-            close=VALUES(close), volume=VALUES(volume)
-    """
-    with conn.cursor() as cur:
-        cur.executemany(sql, rows)
-    return len(rows)
-
-
 def _flush_batch(conn, prices_buf: List[Tuple], sync_buf: List[Tuple]):
     """批量commit prices + sync_log。"""
-    if prices_buf:
-        _save_prices_batch(conn, prices_buf)
-    if sync_buf:
-        sql = """
-            INSERT INTO sync_log
-              (ticker, data_type, last_date, rows_added, status, message)
-            VALUES (%s,%s,%s,%s,%s,%s)
-            ON DUPLICATE KEY UPDATE
-              last_date  = IF(VALUES(status)='ok', VALUES(last_date), last_date),
-              rows_added = VALUES(rows_added),
-              last_run   = CURRENT_TIMESTAMP,
-              status     = VALUES(status),
-              message    = VALUES(message)
-        """
-        with conn.cursor() as cur:
-            cur.executemany(sql, sync_buf)
-    conn.commit()
+    flush_prices_and_sync(conn, prices_buf, sync_buf, on_duplicate=True)
 
 
 def _process_tickers_batched(

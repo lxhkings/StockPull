@@ -13,7 +13,8 @@ from config import (
     START_DATE_HK, YF_LOOKBACK_DAYS,
 )
 from core.db_client import get_conn
-from modules.sync_log import get_last_sync_map, set_sync_ok, set_sync_error
+from modules.sync_log import get_last_sync_map, set_sync_error
+from modules.price_write import flush_prices_and_sync
 from core.http_utils import to_float, to_int
 from data.yf_client import history_with_retry
 
@@ -51,10 +52,17 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
                     result[t] = "no_data"
                     continue
 
-                rows = _save_prices(conn, df)
-                set_sync_ok(conn, t, "price", df["date"].max(), rows)
+                price_rows = [
+                    (r.ticker, r.date,
+                     to_float(r.open), to_float(r.high), to_float(r.low),
+                     to_float(r.close), to_int(r.volume))
+                    for r in df.itertuples(index=False)
+                ]
+                new_last = df["date"].max()
+                sync_rows = [(t, "price", new_last, len(price_rows), "ok", "")]
+                flush_prices_and_sync(conn, price_rows, sync_rows, on_duplicate=True)
                 result[t] = "ok"
-                log.info(f"[{t}] 写入 {rows} 行，{df['date'].min()} → {df['date'].max()}")
+                log.info(f"[{t}] 写入 {len(price_rows)} 行，{df['date'].min()} → {df['date'].max()}")
                 time.sleep(1)  # yfinance rate limit
             except Exception as e:
                 log.error(f"[{t}] 失败: {e}")
@@ -82,23 +90,3 @@ def _fetch_one_yfinance(ticker: str, start: date, end: date) -> pd.DataFrame:
     df["ticker"] = ticker
     return df[["ticker", "date", "open", "high", "low", "close", "volume"]]
 
-
-def _save_prices(conn, df: pd.DataFrame) -> int:
-    """INSERT ... ON DUPLICATE KEY UPDATE so rebases overwrite cleanly."""
-    sql = """
-        INSERT INTO prices (ticker, date, open, high, low, close, volume)
-        VALUES (%s,%s,%s,%s,%s,%s,%s)
-        ON DUPLICATE KEY UPDATE
-            open=VALUES(open), high=VALUES(high), low=VALUES(low),
-            close=VALUES(close), volume=VALUES(volume)
-    """
-    rows = [
-        (r.ticker, r.date,
-         to_float(r.open), to_float(r.high), to_float(r.low),
-         to_float(r.close), to_int(r.volume))
-        for r in df.itertuples(index=False)
-    ]
-    with conn.cursor() as cur:
-        cur.executemany(sql, rows)
-    conn.commit()
-    return len(rows)
