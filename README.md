@@ -128,7 +128,7 @@ uv run main.py tushare-backfill --dry-run                   # 预检（不执行
 
 - `stocks.list_date`/`delist_date`（全A股 universe 前置）已并入 `--scope lists`（跑在 stocks_a/hk/us 之后，脚本已保证顺序）。只想单独补这两列：
   ```bash
-  uv run python3 -c "from ts_ingest.backfill_stock_dates import backfill_stock_dates; print(backfill_stock_dates())"
+  uv run python3 -c "from apis.tushare.backfill_stock_dates import backfill_stock_dates; print(backfill_stock_dates())"
   ```
 - `financial`/`valuation` 均可安全重复运行（幂等）：
   - `financial` 按季度全量重算（低频，全市场单期批量，~66期×4接口，约3小时）
@@ -250,34 +250,50 @@ MariaDB 时区设置：`+08:00`（每连接设置）。
 
 ## 架构设计
 
+主轴：**按上游 API 分包（`apis/*`）+ 编排（`jobs/*`）+ 共享组件（`core/` / `modules/`）**。
+
 ```
-main.py
-  └── data/pipeline.py        # Pipeline 流程编排
-        ├── data/market_us.py  # 美股适配器（yfinance，SP500+R1000组合）
-        ├── data/market_cn.py  # A股适配器（tushare）
-        └── data/market_hk.py  # 港股适配器（本地 CSV + yfinance）
+main.py / config.py
+  └── jobs/pipeline.py           # MarketModule + Pipeline 流程编排
+        ├── jobs/market_us.py    # 美股：apis.static + apis.yfinance
+        ├── jobs/market_cn.py    # A股：apis.tushare
+        └── jobs/market_hk.py    # 港股：apis.static + apis.yfinance
 
-data/yf_client.py                # yfinance 请求封装（限速+重试，对齐 ts_ingest/futu_ingest 的 client.py）
-data/stock_updater_us_weekly.py  # 美股周线（yfinance 1wk → prices_weekly）
-data/stock_updater_cn_weekly.py  # A股周线（tushare freq=W → prices_weekly）
-data/intraday_updater_us.py      # 美股分钟线（yfinance 15m/60m → prices_intraday）
+apis/yfinance/                   # 全部 yfinance SDK 调用
+  client.py                      # 限速+重试（download_with_retry）
+  prices_us.py / prices_hk.py    # 美/港日线
+  prices_us_weekly.py            # 美股周线（1wk → prices_weekly）
+  prices_intraday.py             # 美股分钟线（15m/60m → prices_intraday）
+  ticker_utils.py
 
-data/index_updater_*.py        # 各市场成分股快照
-  ├── index_updater_us.py      # SP500（GitHub CSV）
-  ├── index_updater_russell1000.py # Russell 1000（iShares CSV）
-  ├── index_updater_cn.py      # CSI800（tushare）
-  └── index_updater_hk.py      # HSI（本地 CSV）
+apis/tushare/                    # 全部 tushare SDK 调用
+  client.py / budget.py / orchestrator.py
+  prices_cn.py / prices_cn_weekly.py
+  index_cn.py / etf_cn.py
+  backfill_* / transform_* / derive_periodic.py
 
-ts_ingest/backfill_lists.py    # Tushare 股票列表回填（CN/HK）
-ts_ingest/client.py            # Tushare API 客户端（限速+重试）
-ts_ingest/backfill_prices.py   # Tushare 日线回填
-db.py                          # 数据库连接池
-config.py                      # 配置管理
+apis/futu/                       # 全部 Futu OpenAPI 调用
+  client.py / concurrency.py / orchestrator.py
+  backfill_* / snapshot_*
+
+apis/static/                     # 成分股「源适配」only（写表走 modules.index_base）
+  sp500_github.py
+  russell_ishares.py
+  hsi_csv.py + hsi_constituents.csv
+
+modules/                         # 有表/业务语义
+  sync_log.py / price_write.py / index_base.py / db_admin.py
+
+core/                            # 纯组件（无表语义）
+  db_client.py / http_utils.py / retry_utils.py
+  batch_utils.py / local_buffer.py / trading_calendar.py
 ```
 
-每个市场模块遵循 `MarketModule` 协议：
+**依赖方向：** `jobs → apis → core/modules`；`apis` 禁止 import `jobs`；`jobs` 禁止直接 import 上游 SDK；禁止跨 `apis` 子包互引。
+
+每个市场模块遵循 `MarketModule` 协议（`jobs/pipeline.py`）：
 - `update_index()` — 成分股快照，检测新增/剔除
-- `list_active_tickers()` — 当前股票池
+- `list_active_tickers(index=None)` — 当前股票池（US 可筛 SP500/RUSSELL1000；**CN/HK 忽略 index**）
 - `backfill_new(tickers)` — 新股全量历史
 - `incremental(tickers)` — 存量股票增量（从 sync_log 恢复）
 - `update_index_price()` — 指数日线
@@ -301,7 +317,7 @@ config.py                      # 配置管理
 - 数据源：SP500 使用 GitHub CSV，R1000 使用 iShares holdings CSV
 
 **HSI 成分股维护：**
-- 文件：`data/hsi_constituents.csv`
+- 文件：`apis/static/hsi_constituents.csv`
 - 手动更新：参考 https://en.wikipedia.org/wiki/Hang_Seng_Index
 
 **美股行业 ETF（`index_prices` 表，`daily --market us` 自动采集）：**
@@ -434,7 +450,7 @@ uv run pytest tests/test_cn_index_price.py -v
 
 **`tushare-backfill --scope valuation --start` 卡很久 / 没反应？**
 
-大概率不是卡死，是真的在跑但很慢。`_trading_dates()`（`ts_ingest/backfill_valuation.py`）用 `ticker LIKE '%.SH'` 这类前导通配符查 `prices` 表取全部A股交易日，这种写法走不了索引，在百万级行的表上是全表扫描+排序，群辉NAS性能有限，可能要跑几分钟到十几分钟。用 `SHOW PROCESSLIST` 连 NAS 能看到真实活跃查询（状态 `Sending data`/`Creating sort index` 说明还在跑，不是挂起）。这是既有实现的效率问题，不是bug，只是耗时长，等它跑完即可。
+大概率不是卡死，是真的在跑但很慢。`_trading_dates()`（`apis/tushare/backfill_valuation.py`）用 `ticker LIKE '%.SH'` 这类前导通配符查 `prices` 表取全部A股交易日，这种写法走不了索引，在百万级行的表上是全表扫描+排序，群辉NAS性能有限，可能要跑几分钟到十几分钟。用 `SHOW PROCESSLIST` 连 NAS 能看到真实活跃查询（状态 `Sending data`/`Creating sort index` 说明还在跑，不是挂起）。这是既有实现的效率问题，不是bug，只是耗时长，等它跑完即可。
 
 **为什么 `fund_pe_ttm` 类估值因子多年回测跑不出结果？**
 
