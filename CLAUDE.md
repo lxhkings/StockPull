@@ -21,33 +21,37 @@ uv run pytest tests/ -v                    # all tests
 uv run pytest tests/test_index_updater_cn.py -v  # single file
 uv run pytest tests/test_cn_index_price.py::test_update_index_price_uses_tushare_index_daily  # single test
 
-# CLI
-uv run main.py init                 # one-time: seed index metadata
-uv run main.py daily                # all markets
-uv run main.py daily --market us
-uv run main.py daily --market cn    # single market
-uv run main.py daily --market cn --code 600519.SH  # single ticker (debug)
-uv run main.py rebase --market cn   # full hfq re-pull
-uv run main.py status               # DB sync summary
+# CLI（二级命令：prices | tushare | futu | init | status | db）
+uv run main.py init                         # one-time: seed index metadata
+uv run main.py prices daily                 # all markets
+uv run main.py prices daily --market us
+uv run main.py prices daily --market cn     # single market
+uv run main.py prices daily --market cn --code 600519.SH  # single ticker (debug)
+uv run main.py prices rebase --market cn    # full hfq re-pull
+uv run main.py prices weekly --market us
+uv run main.py prices intraday              # US 分钟线
+uv run main.py status                       # DB sync summary
+uv run main.py db migrate-intraday          # create prices_intraday table
 
 # Futu 美股基本面
-uv run main.py futu-full             # 全量采集（首次/重建）
-uv run main.py futu-full --scope financial
-uv run main.py futu-sync            # 增量（cron 每日；按接口频率节流）
-uv run main.py futu-sync --scope daily
-uv run main.py futu-flush           # 兜底：把本地缓冲重放到 NAS（futu-full/sync flush 失败后）
+uv run main.py futu full             # 全量采集（首次/重建）
+uv run main.py futu full --scope financial
+uv run main.py futu sync             # 增量（cron 每日；按接口频率节流）
+uv run main.py futu sync --scope daily
+uv run main.py futu flush            # 兜底：把本地缓冲重放到 NAS（futu full/sync flush 失败后）
 
-# futu-full/futu-sync 先写本地缓冲（.futu_buffer/pending.sqlite），收尾自动 flush 到 NAS。
-# NAS 中途宕机不丢数据；flush 失败时跑 futu-flush 兜底。
+# futu full/sync 先写本地缓冲（.futu_buffer/pending.sqlite），收尾自动 flush 到 NAS。
+# NAS 中途宕机不丢数据；flush 失败时跑 futu flush 兜底。
 
 # Tushare 回填（股票基础信息、行业分类、财务、估值、股东回报）
-uv run main.py tushare-sync --scope lists --market cn  # 增量/日常用（=tushare-backfill 不带--start）
-uv run main.py tushare-full --scope valuation           # 全量强制回填（=tushare-backfill --start 2010起）
-uv run main.py tushare-backfill --scope valuation --start 20200101  # 自定义起点才用这个
-# tushare-*: 手动一次性回填工具，不在 daily cron 里；本地缓冲同 futu，flush 失败跑 tushare-flush 兜底
+uv run main.py tushare sync --scope lists --market cn  # 增量/日常用
+uv run main.py tushare full --scope valuation          # 全量强制回填（--start 2010起）
+uv run main.py tushare sync --scope valuation --start 20200101  # 自定义起点
+uv run main.py tushare flush                           # 本地缓冲重放到 NAS
+# tushare *：手动一次性回填工具，不在 daily cron 里；本地缓冲同 futu
 
 # Cron
-./scripts/daily_update.sh [us|cn|hk|all]
+./scripts/daily_update.sh [us|cn|hk|all]   # → prices daily --market …
 ```
 
 ## Architecture

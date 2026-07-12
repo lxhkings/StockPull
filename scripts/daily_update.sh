@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# daily_update.sh — cron wrapper for the daily data pipeline
+# daily_update.sh — cron wrapper for the daily prices pipeline
 #
 # Usage:
-#   ./scripts/daily_update.sh              # all markets
+#   ./scripts/daily_update.sh              # all markets (prices daily --market all)
 #   ./scripts/daily_update.sh cn           # CN only
-#   ./scripts/daily_update.sh us hk        # US + HK
+#   ./scripts/daily_update.sh us hk        # US then HK (sequential)
+#   ./scripts/daily_update.sh all          # same as no args
 #
+# Invokes: python -m main prices daily --market <m>
 # Logs to logs/daily_YYYY-MM-DD.log
 
 set -euo pipefail
@@ -21,13 +23,36 @@ LOG_FILE="$LOG_DIR/daily_${DATE_TAG}.log"
 # Activate venv
 source "$PROJECT_DIR/.venv/bin/activate"
 
-MARKETS="${@:-all}"
+cd "$PROJECT_DIR"
+
+run_one() {
+  local m="$1"
+  python -m main prices daily --market "$m" >> "$LOG_FILE" 2>&1
+}
+
+if [ "$#" -eq 0 ] || [ "${1:-}" = "all" ]; then
+  MARKETS="all"
+else
+  MARKETS="$*"
+fi
 
 echo "==== daily_update $(date) markets=$MARKETS ====" >> "$LOG_FILE"
 
-cd "$PROJECT_DIR"
-python -m main daily $MARKETS >> "$LOG_FILE" 2>&1
-EXIT_CODE=$?
+# Temporarily disable set -e so we can capture non-zero exits without aborting
+# mid-loop (multi-market) or before logging the FAILED footer.
+EXIT_CODE=0
+set +e
+if [ "$#" -eq 0 ] || [ "${1:-}" = "all" ]; then
+  run_one all
+  EXIT_CODE=$?
+else
+  for m in "$@"; do
+    run_one "$m"
+    ec=$?
+    if [ $ec -ne 0 ]; then EXIT_CODE=$ec; fi
+  done
+fi
+set -e
 
 if [ $EXIT_CODE -ne 0 ]; then
     echo "==== FAILED (exit $EXIT_CODE) $(date) ====" >> "$LOG_FILE"

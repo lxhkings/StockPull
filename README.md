@@ -8,6 +8,7 @@
 - [日常使用](#日常使用)（每天/每周该跑什么）
 - [首次配置 / 补历史数据](#首次配置--补历史数据)（一次性操作）
 - [美股基本面数据 Futu OpenAPI](#美股基本面数据-futu-openapi)
+- [旧命令映射](#旧命令映射)
 - [数据库表](#数据库表)
 - [架构设计](#架构设计)（给开发者看）
 - [数据源明细](#数据源明细)
@@ -29,9 +30,11 @@ uv venv --python 3.12
 source .venv/bin/activate
 cp .env.example .env  # 填入 DB_PASSWORD 和 TUSHARE_TOKEN
 
-uv run main.py init      # 初始化：插入指数元数据
-uv run main.py daily     # 全市场增量同步
+uv run main.py init              # 初始化：插入指数元数据
+uv run main.py prices daily      # 全市场增量同步
 ```
+
+CLI 顶层：`prices` | `tushare` | `futu` | `init` | `status` | `db`。旧顶层命令仍可用但会 deprecation 警告，见下方[旧命令映射](#旧命令映射)。
 
 ---
 
@@ -40,18 +43,20 @@ uv run main.py daily     # 全市场增量同步
 **每天该跑的（美股收盘后 / cron）：**
 
 ```bash
-uv run main.py daily --market us   # 美股默认组合（SP500 + R1000，约1016支）
-uv run main.py daily --market us --index SP500      # 仅 SP500 成分股（503支）
-uv run main.py daily --market us --index RUSSELL1000 # 仅 Russell 1000（1008支）
-uv run main.py daily --market cn   # A股（CSI800），自动包含 CN 行业 ETF
-uv run main.py daily --market hk   # 港股（HSI）
-uv run main.py daily               # 全市场（默认）
+uv run main.py prices daily --market us   # 美股默认组合（SP500 + R1000，约1016支）
+uv run main.py prices daily --market us --index SP500      # 仅 SP500 成分股（503支）
+uv run main.py prices daily --market us --index RUSSELL1000 # 仅 Russell 1000（1008支）
+uv run main.py prices daily --market cn   # A股（CSI800），自动包含 CN 行业 ETF
+uv run main.py prices daily --market hk   # 港股（HSI）
+uv run main.py prices daily               # 全市场（默认 --market all）
 ```
 
 Cron 示例（北京时间每日 18:00，美股收盘后）：
 
 ```bash
 0 18 * * 1-5 /path/to/project/scripts/daily_update.sh >> /var/log/stocks.log 2>&1
+# 脚本内部：python -m main prices daily --market <us|cn|hk|all>
+# 多市场：./scripts/daily_update.sh us cn  → 依次跑 --market us / --market cn
 ```
 
 美股交易日计算：程序自动算最近已收盘的交易日（北京时间凌晨5:00收盘；周一凌晨5点前用上周五数据；周末用周五数据）。日志写入 `logs/daily_YYYY-MM-DD.log`。
@@ -59,19 +64,19 @@ Cron 示例（北京时间每日 18:00，美股收盘后）：
 **每周该跑的（周线，`prices_weekly` 表）：**
 
 ```bash
-uv run main.py weekly --market us   # 美股周线（SP500 + R1000，yfinance interval=1wk）
-uv run main.py weekly --market cn   # A股周线（全量 A 股，tushare pro_bar freq=W）
-uv run main.py weekly --market us --code AAPL      # 单票调试（美股）
-uv run main.py weekly --market cn --code 600519.SH # 单票调试（A股）
+uv run main.py prices weekly --market us   # 美股周线（SP500 + R1000，yfinance interval=1wk）
+uv run main.py prices weekly --market cn   # A股周线（全量 A 股，tushare pro_bar freq=W）
+uv run main.py prices weekly --market us --code AAPL      # 单票调试（美股）
+uv run main.py prices weekly --market cn --code 600519.SH # 单票调试（A股）
 ```
 
 **分钟线（`prices_intraday` 表，仅美股）：**
 
 ```bash
-uv run main.py intraday                  # 默认：15m + 1h
-uv run main.py intraday --interval 1h    # 仅 1h（730天最大历史）
-uv run main.py intraday --interval 15m   # 仅 15m（60天最大历史）
-uv run main.py intraday --interval 1h --rebase  # 全量回补，忽略 sync_log
+uv run main.py prices intraday                  # 默认：15m + 1h
+uv run main.py prices intraday --interval 1h    # 仅 1h（730天最大历史）
+uv run main.py prices intraday --interval 15m   # 仅 15m（60天最大历史）
+uv run main.py prices intraday --interval 1h --rebase  # 全量回补，忽略 sync_log
 ```
 
 **查看同步状态：**
@@ -83,7 +88,7 @@ uv run main.py status
 **A股中报/年报出来后（8月底、次年4月前后），补最新一期财务数据：**
 
 ```bash
-uv run main.py tushare-backfill --scope financial
+uv run main.py tushare sync --scope financial
 uv run trendspec ingest fundamentals --market cn   # (在 TrendSpec 仓库里跑，把数据摄入下游 data_lake)
 ```
 
@@ -96,35 +101,36 @@ uv run trendspec ingest fundamentals --market cn   # (在 TrendSpec 仓库里跑
 **全量回补（qfq 复权漂移修复，或首次拉历史）：**
 
 ```bash
-uv run main.py rebase --market cn  # A股全量重拉（tushare qfq，默认15年）
-uv run main.py rebase --market hk  # 港股全量重拉（yfinance auto_adjust，默认15年）
-uv run main.py rebase --market us  # 美股全量重拉（yfinance raw，2010年起，1016支）
-uv run main.py rebase --market us --index SP500  # 仅 SP500 成分股
-uv run main.py rebase --market us --years 10  # 指定10年历史
-uv run main.py rebase --market cn --code 600519.SH  # 单只股票全量重拉
-uv run main.py rebase --market cn --etf-only   # 仅 CN 行业 ETF 全量重灌（季度执行，修正分红drift）
+uv run main.py prices rebase --market cn  # A股全量重拉（tushare qfq，默认15年）
+uv run main.py prices rebase --market hk  # 港股全量重拉（yfinance auto_adjust，默认15年）
+uv run main.py prices rebase --market us  # 美股全量重拉（yfinance raw，2010年起，1016支）
+uv run main.py prices rebase --market us --index SP500  # 仅 SP500 成分股
+uv run main.py prices rebase --market us --years 10  # 指定10年历史
+uv run main.py prices rebase --market cn --code 600519.SH  # 单只股票全量重拉
+uv run main.py prices rebase --market cn --etf-only   # 仅 CN 行业 ETF 全量重灌（季度执行，修正分红drift）
 ```
 
 **Tushare 回填（股票基础信息 + 行业分类 + 财务数据 + 估值数据）：**
 
-`tushare-full`/`tushare-sync` 是 `tushare-backfill` 的两个预设封装（跟 `futu-full`/`futu-sync` 对齐，不用记哪个 scope 该不该加 `--start`）：
+`tushare full` / `tushare sync` 对齐 `futu full` / `futu sync`：日常用 sync，强制全史用 full；自定义起点在 `tushare sync` 上加 `--start`。
 
 ```bash
-uv run main.py tushare-sync --scope lists --market cn      # A股基础信息（含行业分类+list_date/delist_date）
-uv run main.py tushare-sync --scope lists --market hk      # 港股基础信息
-uv run main.py tushare-sync --scope derive                  # 周线/月线聚合（从日线计算）
-uv run main.py tushare-sync --scope financial                # 财务三表+指标（income/balancesheet/cashflow/indicator）
-uv run main.py tushare-sync --scope valuation                # 每日估值快照增量续拉（PE/PB/PS/dv_ratio，daily_basic）
-uv run main.py tushare-sync --scope shareholder_return        # 分红送股/股票回购/股东增减持增量续拉
-uv run main.py tushare-full --scope valuation                 # 强制重新回填估值全部历史（见下方⚠️）
-uv run main.py tushare-full --scope shareholder_return         # 强制重新回填股东回报全部历史
-uv run main.py tushare-backfill --scope valuation --start 20200101  # 需要自定义起点时才用 tushare-backfill
-uv run main.py tushare-backfill --dry-run                   # 预检（不执行）
+uv run main.py tushare sync --scope lists --market cn      # A股基础信息（含行业分类+list_date/delist_date）
+uv run main.py tushare sync --scope lists --market hk      # 港股基础信息
+uv run main.py tushare sync --scope derive                  # 周线/月线聚合（从日线计算）
+uv run main.py tushare sync --scope financial                # 财务三表+指标（income/balancesheet/cashflow/indicator）
+uv run main.py tushare sync --scope valuation                # 每日估值快照增量续拉（PE/PB/PS/dv_ratio，daily_basic）
+uv run main.py tushare sync --scope shareholder_return        # 分红送股/股票回购/股东增减持增量续拉
+uv run main.py tushare full --scope valuation                 # 强制重新回填估值全部历史（见下方⚠️）
+uv run main.py tushare full --scope shareholder_return         # 强制重新回填股东回报全部历史
+uv run main.py tushare sync --scope valuation --start 20200101  # 自定义起点回填
+uv run main.py tushare sync --dry-run                           # 预检（不执行）
+uv run main.py tushare flush                                    # 兜底：本地缓冲重放到 NAS
 ```
 
-- `tushare-sync` = 不带 `--start`：能增量的走增量（valuation/repurchase/holdertrade 从上次同步点续拉），不能增量的（financial/dividend，接口本身限制）照样全量，只是省心不用记。
-- `tushare-full` = 固定 `--start` 到 `TUSHARE_BACKFILL_START`（2010年）：强制从头回填历史。
-- `tushare-backfill` 保留给需要**自定义起点**（不是2010也不是增量续拉，比如只想补某个特定日期之后的数据）的场景，直接传 `--start`。
+- `tushare sync`（不带 `--start`）：能增量的走增量（valuation/repurchase/holdertrade 从上次同步点续拉），不能增量的（financial/dividend，接口本身限制）照样全量。
+- `tushare full`：固定 `--start` 到 `TUSHARE_BACKFILL_START`（2010年）：强制从头回填历史。
+- `tushare sync --start YYYYMMDD`：自定义起点（不是 2010、也不是增量续拉时用）。
 
 - `stocks.list_date`/`delist_date`（全A股 universe 前置）已并入 `--scope lists`（跑在 stocks_a/hk/us 之后，脚本已保证顺序）。只想单独补这两列：
   ```bash
@@ -137,7 +143,7 @@ uv run main.py tushare-backfill --dry-run                   # 预检（不执行
 
 ⚠️ **`--start` 强制回填历史很慢，且可能触发NAS慢查询**——见[常见问题](#常见问题)。
 
-日线数据不走这个命令，通过 `daily`/`rebase` 拉取（CN: tushare, HK/US: yfinance）。
+日线数据不走这个命令，通过 `prices daily` / `prices rebase` 拉取（CN: tushare, HK/US: yfinance）。
 
 ---
 
@@ -147,23 +153,23 @@ uv run main.py tushare-backfill --dry-run                   # 预检（不执行
 
 ```bash
 # 全量采集（首次/重建）
-uv run main.py futu-full                    # 全量采集（所有 scope，~10h）
-uv run main.py futu-full --scope financial  # 仅财务4表（~4.5h）
-uv run main.py futu-full --scope other      # 除财务表外的全部（~5.5h）
+uv run main.py futu full                    # 全量采集（所有 scope，~10h）
+uv run main.py futu full --scope financial  # 仅财务4表（~4.5h）
+uv run main.py futu full --scope other      # 除财务表外的全部（~5.5h）
 
 # 增量同步（cron 每日；按接口频率节流）
-uv run main.py futu-sync                    # 增量同步（所有 scope）
-uv run main.py futu-sync --scope daily      # 仅日频快照
+uv run main.py futu sync                    # 增量同步（所有 scope）
+uv run main.py futu sync --scope daily      # 仅日频快照
 
 # 恢复工具（NAS 宕机/网络中断后）
-uv run main.py futu-flush                   # 把本地缓冲重放到 NAS
+uv run main.py futu flush                   # 把本地缓冲重放到 NAS
 ```
 
 **工作流说明：**
-- futu-full/futu-sync 采集过程：先写本地缓冲 `.futu_buffer/pending.sqlite`
+- `futu full` / `futu sync` 采集过程：先写本地缓冲 `.futu_buffer/pending.sqlite`
 - 采集完成后自动 flush 到 NAS（MariaDB）
 - NAS 宕机或网络中断 → flush 失败，数据保留在本地缓冲
-- NAS 恢复后：运行 `futu-flush` 将本地缓冲重新同步到 NAS（无数据丢失）
+- NAS 恢复后：运行 `futu flush` 将本地缓冲重新同步到 NAS（无数据丢失）
 
 **Scope 选项：**
 
@@ -211,6 +217,27 @@ LIMIT 1;
 ### 财务科目字段对照
 
 `raw_payload.item_list` 里 `field_id` 的含义，查 Futu 字段表或调用接口的 `structure_list`（含 `field_id` → `display_name` 映射）。
+
+---
+
+## 旧命令映射
+
+旧顶层命令仍可解析执行，但会打印 deprecation 警告；新脚本与文档请统一用右侧新命令。
+
+| 旧命令 | 新命令 |
+|---|---|
+| `daily` | `prices daily` |
+| `weekly` | `prices weekly` |
+| `intraday` | `prices intraday` |
+| `rebase` | `prices rebase` |
+| `tushare-sync` | `tushare sync` |
+| `tushare-full` | `tushare full` |
+| `tushare-backfill` | `tushare sync`（自定义起点加 `--start`） |
+| `tushare-flush` | `tushare flush` |
+| `futu-sync` | `futu sync` |
+| `futu-full` | `futu full` |
+| `futu-flush` | `futu flush` |
+| `migrate-intraday` | `db migrate-intraday` |
 
 ---
 
@@ -320,7 +347,7 @@ core/                            # 纯组件（无表语义）
 - 文件：`apis/static/hsi_constituents.csv`
 - 手动更新：参考 https://en.wikipedia.org/wiki/Hang_Seng_Index
 
-**美股行业 ETF（`index_prices` 表，`daily --market us` 自动采集）：**
+**美股行业 ETF（`index_prices` 表，`prices daily --market us` 自动采集）：**
 
 QQQ (纳斯达克100) / XLK (科技) / XLY (可选消费) / XLF (金融) / XLV (医疗) / XLP (必选消费) / XLI (工业) / XLE (能源) / XLB (材料) / XLRE (房地产) / XLU (公用事业) / XLC (通信服务)
 
@@ -448,7 +475,7 @@ uv run pytest tests/test_cn_index_price.py -v
 
 ## 常见问题
 
-**`tushare-backfill --scope valuation --start` 卡很久 / 没反应？**
+**`tushare sync --scope valuation --start` 卡很久 / 没反应？**
 
 大概率不是卡死，是真的在跑但很慢。`_trading_dates()`（`apis/tushare/backfill_valuation.py`）用 `ticker LIKE '%.SH'` 这类前导通配符查 `prices` 表取全部A股交易日，这种写法走不了索引，在百万级行的表上是全表扫描+排序，群辉NAS性能有限，可能要跑几分钟到十几分钟。用 `SHOW PROCESSLIST` 连 NAS 能看到真实活跃查询（状态 `Sending data`/`Creating sort index` 说明还在跑，不是挂起）。这是既有实现的效率问题，不是bug，只是耗时长，等它跑完即可。
 
