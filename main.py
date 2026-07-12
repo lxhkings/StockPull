@@ -192,7 +192,7 @@ def cmd_migrate_intraday() -> int:
 
 
 def cmd_intraday(interval: str | None, rebase: bool = False) -> int:
-    from data.intraday_updater_us import update_intraday, SUPPORTED_INTERVALS
+    from apis.yfinance.prices_intraday import update_intraday, SUPPORTED_INTERVALS
     intervals = [interval] if interval else SUPPORTED_INTERVALS
     for ivl in intervals:
         log.info(f"[intraday] 开始拉取 {ivl}" + (" (rebase)" if rebase else ""))

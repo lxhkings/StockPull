@@ -1,6 +1,6 @@
 import pytest
 
-from data.ticker_utils import (
+from apis.yfinance.ticker_utils import (
     parse_ticker,
     to_akshare_a,
     to_akshare_hk,

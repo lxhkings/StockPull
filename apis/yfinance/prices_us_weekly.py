@@ -30,7 +30,7 @@ from config import (
 from core.db_client import get_conn
 from modules.sync_log import get_last_sync_map, set_sync_ok, set_sync_error
 from core.http_utils import to_float, to_int
-from data.yf_client import download_with_retry
+from apis.yfinance.client import download_with_retry
 
 log = logging.getLogger(__name__)
 

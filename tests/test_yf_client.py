@@ -5,9 +5,9 @@ import pytest
 
 
 def test_download_with_retry_success_first_attempt():
-    from data.yf_client import download_with_retry
+    from apis.yfinance.client import download_with_retry
     df = pd.DataFrame({"Close": [1.0]})
-    with patch("data.yf_client.yf.download", return_value=df) as mock_dl, \
+    with patch("apis.yfinance.client.yf.download", return_value=df) as mock_dl, \
          patch("core.retry_utils.time.sleep") as mock_sleep:
         result = download_with_retry(
             tickers=["AAPL"], start="2026-01-01", end="2026-01-02", interval="1d",
@@ -18,8 +18,8 @@ def test_download_with_retry_success_first_attempt():
 
 
 def test_download_with_retry_passes_kwargs_through():
-    from data.yf_client import download_with_retry
-    with patch("data.yf_client.yf.download", return_value=pd.DataFrame()) as mock_dl:
+    from apis.yfinance.client import download_with_retry
+    with patch("apis.yfinance.client.yf.download", return_value=pd.DataFrame()) as mock_dl:
         download_with_retry(
             tickers=["AAPL", "MSFT"], start="2026-01-01", end="2026-01-02",
             interval="1wk", group_by="ticker", threads=False, repair=False,
@@ -36,8 +36,8 @@ def test_download_with_retry_passes_kwargs_through():
 
 
 def test_download_with_retry_omits_repair_when_not_given():
-    from data.yf_client import download_with_retry
-    with patch("data.yf_client.yf.download", return_value=pd.DataFrame()) as mock_dl:
+    from apis.yfinance.client import download_with_retry
+    with patch("apis.yfinance.client.yf.download", return_value=pd.DataFrame()) as mock_dl:
         download_with_retry(
             tickers=["AAPL"], start="2026-01-01", end="2026-01-02", interval="15m",
         )
@@ -45,9 +45,9 @@ def test_download_with_retry_omits_repair_when_not_given():
 
 
 def test_download_with_retry_retries_then_succeeds():
-    from data.yf_client import download_with_retry
+    from apis.yfinance.client import download_with_retry
     df = pd.DataFrame({"Close": [1.0]})
-    with patch("data.yf_client.yf.download", side_effect=[ConnectionError("boom"), df]) as mock_dl, \
+    with patch("apis.yfinance.client.yf.download", side_effect=[ConnectionError("boom"), df]) as mock_dl, \
          patch("core.retry_utils.time.sleep") as mock_sleep:
         result = download_with_retry(
             tickers=["AAPL"], start="2026-01-01", end="2026-01-02", interval="1d",
@@ -59,10 +59,10 @@ def test_download_with_retry_retries_then_succeeds():
 
 
 def test_download_with_retry_exhausts_and_raises_last_exception():
-    from data.yf_client import download_with_retry
+    from apis.yfinance.client import download_with_retry
     err1 = ConnectionError("first")
     err2 = TimeoutError("second")
-    with patch("data.yf_client.yf.download", side_effect=[err1, err2]) as mock_dl, \
+    with patch("apis.yfinance.client.yf.download", side_effect=[err1, err2]) as mock_dl, \
          patch("core.retry_utils.time.sleep") as mock_sleep:
         with pytest.raises(TimeoutError) as exc_info:
             download_with_retry(
@@ -75,9 +75,9 @@ def test_download_with_retry_exhausts_and_raises_last_exception():
 
 
 def test_download_with_retry_uses_config_defaults():
-    from data.yf_client import download_with_retry
+    from apis.yfinance.client import download_with_retry
     import config
-    with patch("data.yf_client.yf.download", return_value=pd.DataFrame()) as mock_dl:
+    with patch("apis.yfinance.client.yf.download", return_value=pd.DataFrame()) as mock_dl:
         download_with_retry(
             tickers=["AAPL"], start="2026-01-01", end="2026-01-02", interval="1d",
         )
@@ -88,11 +88,11 @@ def test_download_with_retry_uses_config_defaults():
 # ── history_with_retry (yf.Ticker(...).history()) ──────────────────────────
 
 def test_history_with_retry_success_first_attempt():
-    from data.yf_client import history_with_retry
+    from apis.yfinance.client import history_with_retry
     df = pd.DataFrame({"Close": [1.0]})
     mock_ticker = MagicMock()
     mock_ticker.history.return_value = df
-    with patch("data.yf_client.yf.Ticker", return_value=mock_ticker) as mock_tk, \
+    with patch("apis.yfinance.client.yf.Ticker", return_value=mock_ticker) as mock_tk, \
          patch("core.retry_utils.time.sleep") as mock_sleep:
         result = history_with_retry("00700.HK", start="2026-01-01", end="2026-01-02")
     assert result is df
@@ -102,11 +102,11 @@ def test_history_with_retry_success_first_attempt():
 
 
 def test_history_with_retry_retries_then_succeeds():
-    from data.yf_client import history_with_retry
+    from apis.yfinance.client import history_with_retry
     df = pd.DataFrame({"Close": [1.0]})
     mock_ticker = MagicMock()
     mock_ticker.history.side_effect = [ConnectionError("boom"), df]
-    with patch("data.yf_client.yf.Ticker", return_value=mock_ticker), \
+    with patch("apis.yfinance.client.yf.Ticker", return_value=mock_ticker), \
          patch("core.retry_utils.time.sleep") as mock_sleep:
         result = history_with_retry("00700.HK", start="2026-01-01", end="2026-01-02", retry_count=3)
     assert result is df
@@ -115,12 +115,12 @@ def test_history_with_retry_retries_then_succeeds():
 
 
 def test_history_with_retry_exhausts_and_raises_last_exception():
-    from data.yf_client import history_with_retry
+    from apis.yfinance.client import history_with_retry
     err1 = ConnectionError("first")
     err2 = TimeoutError("second")
     mock_ticker = MagicMock()
     mock_ticker.history.side_effect = [err1, err2]
-    with patch("data.yf_client.yf.Ticker", return_value=mock_ticker), \
+    with patch("apis.yfinance.client.yf.Ticker", return_value=mock_ticker), \
          patch("core.retry_utils.time.sleep"):
         with pytest.raises(TimeoutError) as exc_info:
             history_with_retry("00700.HK", start="2026-01-01", end="2026-01-02", retry_count=2)

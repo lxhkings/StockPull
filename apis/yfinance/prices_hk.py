@@ -16,7 +16,7 @@ from core.db_client import get_conn
 from modules.sync_log import get_last_sync_map, set_sync_error
 from modules.price_write import flush_prices_and_sync
 from core.http_utils import to_float, to_int
-from data.yf_client import history_with_retry
+from apis.yfinance.client import history_with_retry
 
 log = logging.getLogger(__name__)
 

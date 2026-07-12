@@ -28,7 +28,7 @@ from config import (
     YF_TIMEOUT,
 )
 from core.http_utils import to_float, to_int
-from data.yf_client import download_with_retry
+from apis.yfinance.client import download_with_retry
 from core.db_client import get_conn
 from modules.sync_log import get_last_sync, set_sync_error, set_sync_ok
 

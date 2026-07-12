@@ -19,10 +19,10 @@ from core.db_client import query, execute
 from modules.db_admin import get_index_tickers
 from data import index_updater_us
 from data import index_updater_russell1000
-from data import stock_updater_us
+from apis.yfinance import prices_us as stock_updater_us
 from core.http_utils import to_float
 from core.trading_calendar import last_us_trading_date
-from data.yf_client import download_with_retry
+from apis.yfinance.client import download_with_retry
 
 log = logging.getLogger(__name__)
 
@@ -161,14 +161,14 @@ def rebase(tickers: Optional[list[str]] = None, years: Optional[int] = None, ind
 
 def weekly(tickers: list[str] | None = None) -> dict[str, str]:
     """Pull weekly prices for US universe into prices_weekly."""
-    from data import stock_updater_us_weekly
+    from apis.yfinance import prices_us_weekly as stock_updater_us_weekly
     targets = tickers or list_active_tickers()
     return stock_updater_us_weekly.update_weekly_batch(targets)
 
 
 def intraday(intervals: list[str] | None = None) -> dict[str, str]:
     """Pull intraday prices (15m / 1h) for US universe into prices_intraday."""
-    from data.intraday_updater_us import update_intraday
+    from apis.yfinance.prices_intraday import update_intraday
     result = {}
     for ivl in (intervals or ["1h"]):
         result.update(update_intraday(ivl))

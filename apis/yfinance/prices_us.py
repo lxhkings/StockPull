@@ -32,7 +32,7 @@ from modules.sync_log import get_last_sync_map, set_sync_error
 from modules.price_write import flush_prices_and_sync
 from core.http_utils import to_float, to_int
 from core.trading_calendar import last_us_trading_date
-from data.yf_client import download_with_retry
+from apis.yfinance.client import download_with_retry
 
 log = logging.getLogger(__name__)
 

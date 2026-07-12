@@ -8,7 +8,7 @@ from typing import Optional
 from core.db_client import get_conn, query
 from modules.db_admin import get_index_tickers
 from data import index_updater_hk
-from data import stock_updater_hk
+from apis.yfinance import prices_hk as stock_updater_hk
 
 log = logging.getLogger(__name__)
 
