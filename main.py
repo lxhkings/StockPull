@@ -142,6 +142,13 @@ def cmd_intraday(interval: str | None, rebase: bool = False) -> int:
     return 0
 
 
+def _format_run_result(result: Any) -> str:
+    render = getattr(result, "render", None)
+    if callable(render):
+        return render()
+    return str(result)
+
+
 def _run_buffered(
     buffer_path: str,
     run_fn: Callable[[], Any],
@@ -159,10 +166,7 @@ def _run_buffered(
     finally:
         set_local_first(False)
 
-    if hasattr(result, "render"):
-        print(result.render())
-    else:
-        print(result)
+    print(_format_run_result(result))
 
     try:
         fstat = flush(buffer_path)
@@ -199,11 +203,6 @@ def cmd_tushare_full(scope: str, market: str, dry_run: bool) -> int:
     """全量强制回填：起点固定为 TUSHARE_BACKFILL_START，等价 tushare sync --start 2010起。"""
     from config import TUSHARE_BACKFILL_START
     return cmd_tushare_backfill(scope, market, dry_run, start=TUSHARE_BACKFILL_START)
-
-
-def cmd_tushare_sync(scope: str, market: str, dry_run: bool) -> int:
-    """增量拉取：不传 start，各 domain 走自己的默认行为（能增量的增量，financial/dividend 接口限制仍全量）。"""
-    return cmd_tushare_backfill(scope, market, dry_run, start=None)
 
 
 def cmd_tushare_flush(workers: int = 1) -> int:

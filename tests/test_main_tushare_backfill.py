@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from main import cmd_tushare_backfill, cmd_tushare_flush, cmd_tushare_full, cmd_tushare_sync
+from main import cmd_tushare_backfill, cmd_tushare_flush, cmd_tushare_full
 from main import main as main_cli
 
 
@@ -72,12 +72,26 @@ def test_tushare_full_forces_start_from_backfill_start():
     backfill.assert_called_once_with("all", "cn", False, start="20100101")
 
 
-def test_tushare_sync_passes_no_start():
+def test_tushare_sync_cli_dispatches_backfill_without_start():
     with patch("main.cmd_tushare_backfill", return_value=0) as backfill:
-        rc = cmd_tushare_sync(scope="valuation", market="cn", dry_run=False)
+        rc = main_cli(["tushare", "sync", "--scope", "valuation", "--market", "cn"])
 
     assert rc == 0
-    backfill.assert_called_once_with("valuation", "cn", False, start=None)
+    backfill.assert_called_once_with("valuation", "cn", False, None)
+
+
+def test_format_run_result_uses_render():
+    from main import _format_run_result
+
+    rep = MagicMock()
+    rep.render.return_value = "hello"
+    assert _format_run_result(rep) == "hello"
+
+
+def test_format_run_result_falls_back_to_str():
+    from main import _format_run_result
+
+    assert _format_run_result(42) == "42"
 
 
 def test_tushare_full_cli_dispatch():
