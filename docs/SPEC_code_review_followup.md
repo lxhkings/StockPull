@@ -1,10 +1,14 @@
-# Spec: Code-review 未决项跟进
+# Spec: Code-review 未决项跟进（已完成 / 已归档）
 
+> **状态：已完成。** Phase 0–4 已落地。  
+> **Closure：** `docs/superpowers/specs/2026-07-12-code-review-closure-design.md`  
+> **Plan：** `docs/superpowers/plans/2026-07-12-code-review-closure.md`  
+> 本文仅保留历史执行记录，**不再作为待办**。
+>
 > 来源：`/code-review`（apis+jobs 落地后结构审查）  
-> 已完成：CSI800 下线（全 A + 行业 ETF）、`db purge-index` 组件化  
-> 状态：本文为剩余项执行规格
+> 已完成：CSI800 下线（全 A + 行业 ETF）、`db purge-index` 组件化；Phase 1–4 见下文历史记录。
 
-## 目标
+## 目标（历史）
 
 在**不改变对外数据语义**的前提下，消除审查中的结构债：
 
@@ -12,14 +16,13 @@
 2. `MarketModule` 协议与实现一致，去掉 `hasattr` 特判  
 3. Intraday 单一入口与默认 interval 一致  
 4. 删死代码与假抽象（能删概念就删）  
-5. （后续）CLI 双轨、buffer 编排重复、yfinance 探测绕 client
+5. CLI 双轨、buffer 编排重复、yfinance 探测绕 client（Phase 4，已落地）
 
-## 非目标
+## 非目标（历史）
 
 - 不改 NAS 表结构  
 - 不引入新数据源 / 新市场  
-- 本轮不做 CLI argv rewrite 大手术（列入 Phase 4，可另开 PR）
-
+- CLI argv rewrite 已在 Phase 4 / closure 落地
 ## 分层硬约束（复用 CLAUDE.md）
 
 ```
@@ -141,19 +144,20 @@ uv run pytest tests/test_market_cn.py tests/test_market_hk.py tests/test_pipelin
 - [x] 全量 `uv run pytest tests/ -q` 绿（407 passed，Phase 4 后）
 - [x] README/CLAUDE 与实现一致（CN 全 A；US 指数价在 apis）  
 
-### 本轮落地进度
+### 落地进度（历史）
 
 | Phase | 状态 |
 |---|---|
-| 0 CSI800 / purge-index | 已完成（先前 commit） |
-| 1 US prices_index | 本轮 |
-| 2 Protocol + intraday | 本轮 |
-| 3 小清理 | 本轮 |
-| 4 CLI rewrite / buffer / yf probe / backfill 合并 | 本轮 |
+| 0 CSI800 / purge-index | 已完成 |
+| 1 US prices_index | 已完成 |
+| 2 Protocol + intraday | 已完成 |
+| 3 小清理 | 已完成 |
+| 4 CLI rewrite / buffer / yf probe / backfill 合并 | 已完成 |
+| Closure（daily/intraday 拆分等） | 见 `2026-07-12-code-review-closure-design.md` |
 
-## 风险
+## 风险（历史）
 
 | 风险 | 缓解 |
 |---|---|
-| daily 流水线突然跑满 15m+1h 变慢 | 接受：与 CLI 一致；或后续加 config 开关（YAGNI 先不做） |
-| 迁 prices_index 测挂 | 保持函数语义与 SQL 不变，只搬家 |
+| daily 流水线突然跑满 15m+1h 变慢 | closure：daily 与 intraday 拆开 |
+| 迁 prices_index 测挂 | 保持函数语义与 SQL 不变；写路径 mock 测已补 |

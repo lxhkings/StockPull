@@ -1,7 +1,7 @@
 # Code-review 残留债收口 — 设计文档
 
 **日期:** 2026-07-12  
-**状态:** 已确认；plan 已写  
+**状态:** 已实现  
 **范围:** 单 spec；修上一轮 `/code-review` 六项残留，**不**引入新数据源 / 新表 / 新市场  
 **来源:** 分支相对 `origin/main` 的 4 commits 审查 + brainstorming 决策  
 **前置:** `docs/SPEC_code_review_followup.md`（Phase 0–4 已落地；本文件为其 closure）
@@ -274,15 +274,15 @@ finally:
 
 ## 7. 成功标准
 
-- [ ] `Pipeline.daily` 不调用 `intraday`  
-- [ ] `market_hk.weekly()` → `{}`  
-- [ ] 三处 probe：empty = `no_data`；限速仅 except 字符串 → `rate_limit`（含 **intraday 补齐**）  
-- [ ] `update_intraday` 对 `rate_limit` 整批 skip  
-- [ ] `purge_index(dry_run=False)` 单连接 commit/rollback  
-- [ ] 无 `cmd_tushare_sync`；`_run_buffered` 经 `_format_run_result`  
-- [ ] `prices_index` 写路径有测；旧 SPEC 不再标「剩余」  
-- [ ] `uv run pytest tests/ -q` 全绿  
-- [ ] CLAUDE/README Pipeline 描述与实现一致  
+- [x] `Pipeline.daily` 不调用 `intraday`  
+- [x] `market_hk.weekly()` → `{}`  
+- [x] 三处 probe：empty = `no_data`；限速仅 except 字符串 → `rate_limit`（含 **intraday 补齐**）  
+- [x] `update_intraday` 对 `rate_limit` 整批 skip  
+- [x] `purge_index(dry_run=False)` 单连接 commit/rollback  
+- [x] 无 `cmd_tushare_sync`；`_run_buffered` 经 `_format_run_result`  
+- [x] `prices_index` 写路径有测；旧 SPEC 不再标「剩余」  
+- [x] `uv run pytest tests/ -q` 全绿  
+- [x] CLAUDE/README Pipeline 描述与实现一致  
 
 ---
 
