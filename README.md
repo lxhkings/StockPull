@@ -315,6 +315,7 @@ apis/yfinance/                   # 全部 yfinance SDK 调用
   prices_us.py / prices_hk.py    # 美/港日线
   prices_us_weekly.py            # 美股周线（1wk → prices_weekly）
   prices_intraday.py             # 美股分钟线（15m/60m → prices_intraday）
+  prices_index.py                # 美股宽基+行业 ETF 日线 → index_prices
   ticker_utils.py
 
 apis/tushare/                    # 全部 tushare SDK 调用
@@ -347,10 +348,10 @@ core/                            # 纯组件（无表语义）
 - `list_active_tickers(index=None)` — 当前股票池（US 可筛 SP500/RUSSELL1000；**CN/HK 忽略 index**）
 - `backfill_new(tickers)` — 新股全量历史
 - `incremental(tickers)` — 存量股票增量（从 sync_log 恢复）
-- `update_index_price()` — 指数/ETF 日线（US：宽基+行业 ETF；CN：仅行业 ETF；HK：暂空）
+- `update_index_price()` — 指数/ETF 日线（US→`apis.yfinance.prices_index`；CN→行业 ETF；HK no-op）
 - `rebase(tickers)` — 全量重拉（修复 qfq 漂移）
-- `weekly(tickers)` — 周线增量采集（US/CN，写 prices_weekly）
-- `intraday()` — 分钟线增量采集（仅 US，写 prices_intraday）
+- `weekly(tickers)` — 周线（US/CN；HK `NotImplementedError`）
+- `intraday()` — 分钟线（US 默认 15m+1h；CN/HK no-op；Pipeline Step 5 始终调用）
 
 ---
 

@@ -25,3 +25,15 @@ def test_list_active_tickers(mock_get):
     from jobs.market_hk import list_active_tickers
     tickers = list_active_tickers()
     assert tickers == ["00700.HK", "09988.HK"]
+
+
+def test_intraday_is_noop():
+    from jobs.market_hk import intraday
+    assert intraday() == {}
+
+
+def test_weekly_not_implemented():
+    import pytest
+    from jobs.market_hk import weekly
+    with pytest.raises(NotImplementedError):
+        weekly()

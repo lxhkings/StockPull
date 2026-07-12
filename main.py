@@ -51,12 +51,7 @@ def cmd_daily(market: str, codes: list[str] | None, index: str | None) -> int:
     from jobs.pipeline import Pipeline
     targets = ["us", "cn", "hk"] if market == "all" else [market]
     for m in targets:
-        try:
-            mod = _import_market(m)
-        except ImportError as e:
-            print(f"[{m}] not yet implemented: {e}", file=sys.stderr)
-            continue
-
+        mod = _import_market(m)
         if codes:
             # Single-ticker debug path: skip Step 1/2, run incremental on the codes only
             print(f"[{m}] daily --code {codes}: running incremental only")
@@ -87,10 +82,6 @@ def cmd_rebase(market: str, codes: list[str] | None, years: int | None, index: s
         return 0
 
     mod = _import_market(market)
-    if not hasattr(mod, "rebase"):
-        print(f"[{market}] rebase not implemented", file=sys.stderr)
-        return 1
-
     targets = codes or mod.list_active_tickers(index=index)
 
     years_msg = f" ({years} 年)" if years else ""
@@ -134,14 +125,18 @@ def cmd_purge_index(index_id: str, yes: bool = False) -> int:
 
 
 def cmd_intraday(interval: str | None, rebase: bool = False) -> int:
-    from apis.yfinance.prices_intraday import update_intraday, SUPPORTED_INTERVALS
-    intervals = [interval] if interval else SUPPORTED_INTERVALS
-    for ivl in intervals:
-        log.info(f"[intraday] 开始拉取 {ivl}" + (" (rebase)" if rebase else ""))
-        result = update_intraday(ivl, full_rebase=rebase)
-        ok = sum(1 for v in result.values() if v == "ok")
-        err = sum(1 for v in result.values() if v.startswith("error"))
-        log.info(f"[intraday {ivl}] 完成: ok={ok}, error={err}")
+    from jobs import market_us
+    from apis.yfinance.prices_intraday import SUPPORTED_INTERVALS
+    intervals = [interval] if interval else None  # None → market_us 用 SUPPORTED_INTERVALS
+    log.info(
+        f"[intraday] 开始拉取 "
+        f"{intervals or SUPPORTED_INTERVALS}"
+        + (" (rebase)" if rebase else "")
+    )
+    result = market_us.intraday(intervals=intervals, full_rebase=rebase)
+    ok = sum(1 for v in result.values() if v == "ok")
+    err = sum(1 for v in result.values() if v.startswith("error"))
+    log.info(f"[intraday] 完成: ok={ok}, error={err}")
     return 0
 
 

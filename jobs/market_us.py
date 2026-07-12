@@ -12,17 +12,13 @@ into the Pipeline contract.
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
 from typing import Optional
 
-from core.db_client import query, execute
 from modules.db_admin import get_index_tickers
 from apis.static import sp500_github
 from apis.static import russell_ishares
 from apis.yfinance import prices_us as stock_updater_us
-from core.http_utils import to_float
-from core.trading_calendar import last_us_trading_date
-from apis.yfinance.client import download_with_retry
+from apis.yfinance.prices_index import update_index_prices
 
 log = logging.getLogger(__name__)
 
@@ -93,67 +89,15 @@ def incremental(tickers: list[str]) -> dict[str, str]:
 
 
 def update_index_price() -> int:
-    """Pull ^GSPC, ^RUT, QQQ, and 11 sector ETFs daily close from yfinance, write to index_prices."""
-    indices = [
-        ("^GSPC", "SP500"),
-        ("^RUT", "RUSSELL1000"),
-        ("QQQ", "QQQ"),
-        ("XLK", "XLK"),
-        ("XLY", "XLY"),
-        ("XLF", "XLF"),
-        ("XLV", "XLV"),
-        ("XLP", "XLP"),
-        ("XLI", "XLI"),
-        ("XLE", "XLE"),
-        ("XLB", "XLB"),
-        ("XLRE", "XLRE"),
-        ("XLU", "XLU"),
-        ("XLC", "XLC"),
-    ]
-    last_trading = last_us_trading_date()
-    total = 0
-    for symbol, index_id in indices:
-        last = query(
-            "SELECT MAX(date) AS d FROM index_prices WHERE index_id=%s", (index_id,)
-        )
-        last_date = last[0]["d"] if last and last[0]["d"] else None
-
-        if last_date and last_date >= last_trading:
-            continue
-
-        start = last_date.isoformat() if last_date else "2010-01-01"
-        end = (last_trading + timedelta(days=1)).isoformat()
-        try:
-            df = download_with_retry(
-                tickers=symbol, start=start, end=end, interval="1d",
-                group_by="column", context=f"[{symbol} index price] ",
-            )
-        except Exception as e:
-            log.warning(f"[{symbol}] index price yfinance 失败，跳过: {e}")
-            continue
-        if df.empty:
-            continue
-
-        df = df.reset_index()
-        df.columns = [str(c).lower() if not isinstance(c, tuple) else str(c[0]).lower() for c in df.columns]
-        rows = []
-        for _, r in df.iterrows():
-            d = r["date"].date() if hasattr(r["date"], "date") else r["date"]
-            if last_date and d <= last_date:
-                continue
-            rows.append((d, index_id, to_float(r.get("close"))))
-
-        if not rows:
-            continue
-
-        total += execute(
-            "INSERT IGNORE INTO index_prices (date, index_id, close) VALUES (%s,%s,%s)",
-            rows, many=True
-        )
-    return total
+    """US 宽基 + 行业 ETF 日线 → index_prices（apis.yfinance.prices_index）。"""
+    return update_index_prices()
 
 
-def rebase(tickers: Optional[list[str]] = None, years: Optional[int] = None, index: Optional[str] = None) -> dict[str, str]:
+def rebase(
+    tickers: Optional[list[str]] = None,
+    years: Optional[int] = None,
+    index: Optional[str] = None,
+) -> dict[str, str]:
     """US rebase: full re-pull from specified years (raw prices, no hfq)."""
     targets = tickers if tickers else list_active_tickers(index=index)
     return stock_updater_us.update_prices_batch(targets, full_rebase=True, years=years)
@@ -166,10 +110,16 @@ def weekly(tickers: list[str] | None = None) -> dict[str, str]:
     return stock_updater_us_weekly.update_weekly_batch(targets)
 
 
-def intraday(intervals: list[str] | None = None) -> dict[str, str]:
-    """Pull intraday prices (15m / 1h) for US universe into prices_intraday."""
-    from apis.yfinance.prices_intraday import update_intraday
-    result = {}
-    for ivl in (intervals or ["1h"]):
-        result.update(update_intraday(ivl))
+def intraday(
+    intervals: list[str] | None = None,
+    full_rebase: bool = False,
+) -> dict[str, str]:
+    """Pull intraday (15m / 1h) into prices_intraday.
+
+    Default intervals = SUPPORTED_INTERVALS（与 CLI prices intraday 一致）。
+    """
+    from apis.yfinance.prices_intraday import update_intraday, SUPPORTED_INTERVALS
+    result: dict[str, str] = {}
+    for ivl in (intervals or SUPPORTED_INTERVALS):
+        result.update(update_intraday(ivl, full_rebase=full_rebase))
     return result

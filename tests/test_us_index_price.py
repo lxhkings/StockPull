@@ -1,34 +1,32 @@
 """Tests for US market index/ETF price fetching."""
 
 
-def test_update_index_price_includes_sector_etfs():
-    """update_index_price should include all 11 sector ETFs in indices list."""
-    from jobs.market_us import update_index_price
-    import inspect
+def test_us_index_symbols_include_sector_etfs():
+    """US_INDEX_SYMBOLS covers QQQ + 11 GICS sector ETFs."""
+    from apis.yfinance.prices_index import US_INDEX_SYMBOLS
 
-    # Extract indices list from function source
-    source = inspect.getsource(update_index_price)
-    expected_etfs = [
-        "QQQ",
+    ids = {index_id for _, index_id in US_INDEX_SYMBOLS}
+    expected = {
+        "SP500", "RUSSELL1000", "QQQ",
         "XLK", "XLY", "XLF", "XLV", "XLP",
-        "XLI", "XLE", "XLB", "XLRE", "XLU", "XLC"
-    ]
-
-    # Each ETF should appear in source code
-    for etf in expected_etfs:
-        assert etf in source, f"ETF {etf} not found in update_index_price()"
+        "XLI", "XLE", "XLB", "XLRE", "XLU", "XLC",
+    }
+    assert expected <= ids
 
 
-def test_indices_list_format():
-    """Indices list should use (symbol, index_id) tuple format."""
-    from jobs.market_us import update_index_price
-    import inspect
+def test_us_index_symbols_tuple_format():
+    from apis.yfinance.prices_index import US_INDEX_SYMBOLS
+    for symbol, index_id in US_INDEX_SYMBOLS:
+        assert isinstance(symbol, str) and symbol
+        assert isinstance(index_id, str) and index_id
+    assert ("XLK", "XLK") in US_INDEX_SYMBOLS
+    assert ("^GSPC", "SP500") in US_INDEX_SYMBOLS
 
-    source = inspect.getsource(update_index_price)
 
-    # Find indices assignment line
-    for line in source.split('\n'):
-        if 'indices = [' in line:
-            # Verify format: ("XLK", "XLK")
-            assert '"XLK", "XLK"' in source or "('XLK', 'XLK')" in source
-            break
+def test_market_us_update_index_price_delegates():
+    from unittest.mock import patch
+    from jobs import market_us
+
+    with patch("jobs.market_us.update_index_prices", return_value=7) as mock_upd:
+        assert market_us.update_index_price() == 7
+    mock_upd.assert_called_once_with()

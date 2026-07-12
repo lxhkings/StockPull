@@ -67,7 +67,7 @@ Three-market daily-K ingest (US/CN/HK) into shared MariaDB on Synology NAS (192.
 5. `weekly()` / `intraday()` — optional when market module implements them
 
 **Market modules** follow `MarketModule` protocol (defined in `jobs/pipeline.py`):
-- `jobs/market_us.py` — 编排 `apis.static`（SP500/R1000）+ `apis.yfinance`（日线/周线/分钟线/指数价）
+- `jobs/market_us.py` — 编排 `apis.static`（SP500/R1000）+ `apis.yfinance`（日线/周线/分钟线/prices_index）
 - `jobs/market_cn.py` — 编排 `apis.tushare`（全 A 列表/日线/周线 + 行业 ETF 价）
 - `jobs/market_hk.py` — 编排 `apis.static`（HSI CSV）+ `apis.yfinance`（港股日线）
 

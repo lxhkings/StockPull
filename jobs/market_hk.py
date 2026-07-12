@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from core.db_client import get_conn, query
 from modules.db_admin import get_index_tickers
 from apis.static import hsi_csv
 from apis.yfinance import prices_hk as stock_updater_hk
@@ -43,7 +42,7 @@ def incremental(tickers: list[str]) -> dict[str, str]:
 
 
 def update_index_price() -> int:
-    # Skip due to yfinance rate limit. Run manually later.
+    """港股指数价暂不采集（yfinance 限速）；保留 Protocol 入口。"""
     return 0
 
 
@@ -55,3 +54,16 @@ def rebase(
     """Full re-pull. ``index`` is ignored (HK single-universe)."""
     targets = tickers if tickers else list_active_tickers()
     return stock_updater_hk.update_prices_batch(targets, full_rebase=True, years=years)
+
+
+def weekly(tickers: list[str] | None = None) -> dict[str, str]:
+    """港股周线未实现；CLI 未开放 --market hk。"""
+    raise NotImplementedError("HK weekly not supported")
+
+
+def intraday(
+    intervals: list[str] | None = None,
+    full_rebase: bool = False,
+) -> dict[str, str]:
+    """HK 无分钟线；Protocol 统一入口，no-op。"""
+    return {}
