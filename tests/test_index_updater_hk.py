@@ -1,5 +1,5 @@
 # tests/test_index_updater_hk.py
-from data.index_updater_hk import _fetch_hsi
+from apis.static.hsi_csv import _fetch_hsi
 
 
 def test_fetch_hsi_from_csv():

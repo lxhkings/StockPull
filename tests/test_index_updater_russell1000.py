@@ -1,4 +1,4 @@
-"""data/index_updater_russell1000.py 测试。
+"""apis/static/russell_ishares.py 测试。
 
 数据源：SEC EDGAR NPORT-P（IWB 持仓）+ company_tickers_exchange.json（名称→ticker）。
 """
@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 import json
 import pandas as pd
 
-from data.index_updater_russell1000 import (
+from apis.static.russell_ishares import (
     _normalize_name,
     _valid_us_ticker,
     _build_name_ticker_lookup,
@@ -57,7 +57,7 @@ def test_valid_us_ticker_rejects_empty_and_too_long():
 # _build_name_ticker_lookup
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-@patch("data.index_updater_russell1000.fetch_with_retry")
+@patch("apis.static.russell_ishares.fetch_with_retry")
 def test_build_name_ticker_lookup_prefers_higher_priority_exchange(mock_fetch):
     mock_resp = MagicMock()
     mock_resp.json.return_value = {
@@ -76,7 +76,7 @@ def test_build_name_ticker_lookup_prefers_higher_priority_exchange(mock_fetch):
     assert mock_fetch.call_args.kwargs["context"] == "russell1000.name_ticker_lookup"
 
 
-@patch("data.index_updater_russell1000.fetch_with_retry")
+@patch("apis.static.russell_ishares.fetch_with_retry")
 def test_build_name_ticker_lookup_skips_invalid_ticker(mock_fetch):
     mock_resp = MagicMock()
     mock_resp.json.return_value = {
@@ -94,7 +94,7 @@ def test_build_name_ticker_lookup_skips_invalid_ticker(mock_fetch):
     assert "BAD TICKER CO" not in lookup
 
 
-@patch("data.index_updater_russell1000.fetch_with_retry")
+@patch("apis.static.russell_ishares.fetch_with_retry")
 def test_build_name_ticker_lookup_applies_name_overrides(mock_fetch):
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"fields": ["ticker", "name", "exchange"], "data": []}
@@ -117,8 +117,8 @@ def test_find_iwb_accession_uses_valid_cache(tmp_path):
         "accession": "0001-cached",
         "cached_at": datetime.now().isoformat(),
     }))
-    with patch("data.index_updater_russell1000._CACHE_FILE", cache_file), \
-         patch("data.index_updater_russell1000.fetch_with_retry") as mock_fetch:
+    with patch("apis.static.russell_ishares._CACHE_FILE", cache_file), \
+         patch("apis.static.russell_ishares.fetch_with_retry") as mock_fetch:
         acc = _find_iwb_accession()
     assert acc == "0001-cached"
     mock_fetch.assert_not_called()
@@ -142,10 +142,10 @@ def test_find_iwb_accession_ignores_expired_cache(tmp_path):
     doc_resp.status_code = 200
     doc_resp.text = "<seriesName>iShares Russell 1000 ETF</seriesName>"
 
-    with patch("data.index_updater_russell1000._CACHE_FILE", cache_file), \
-         patch("data.index_updater_russell1000.fetch_with_retry", return_value=submissions_resp), \
-         patch("data.index_updater_russell1000.requests.get", return_value=doc_resp), \
-         patch("data.index_updater_russell1000.time.sleep"):
+    with patch("apis.static.russell_ishares._CACHE_FILE", cache_file), \
+         patch("apis.static.russell_ishares.fetch_with_retry", return_value=submissions_resp), \
+         patch("apis.static.russell_ishares.requests.get", return_value=doc_resp), \
+         patch("apis.static.russell_ishares.time.sleep"):
         acc = _find_iwb_accession()
 
     assert acc == "0001-fresh"
@@ -166,10 +166,10 @@ def test_find_iwb_accession_skips_non_matching_series(tmp_path):
     other_resp = MagicMock(status_code=200, text="<seriesName>iShares Some Other ETF</seriesName>")
     iwb_resp = MagicMock(status_code=200, text="<seriesName>iShares Russell 1000 ETF</seriesName>")
 
-    with patch("data.index_updater_russell1000._CACHE_FILE", cache_file), \
-         patch("data.index_updater_russell1000.fetch_with_retry", return_value=submissions_resp), \
-         patch("data.index_updater_russell1000.requests.get", side_effect=[other_resp, iwb_resp]), \
-         patch("data.index_updater_russell1000.time.sleep"):
+    with patch("apis.static.russell_ishares._CACHE_FILE", cache_file), \
+         patch("apis.static.russell_ishares.fetch_with_retry", return_value=submissions_resp), \
+         patch("apis.static.russell_ishares.requests.get", side_effect=[other_resp, iwb_resp]), \
+         patch("apis.static.russell_ishares.time.sleep"):
         acc = _find_iwb_accession()
 
     assert acc == "0002-iwb"
@@ -211,10 +211,10 @@ def test_parse_nport_holdings_skips_unmatched_names():
 # fetch_russell1000_data（编排）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-@patch("data.index_updater_russell1000.time.sleep")
-@patch("data.index_updater_russell1000.fetch_with_retry")
-@patch("data.index_updater_russell1000._find_iwb_accession", return_value="0001-acc")
-@patch("data.index_updater_russell1000._build_name_ticker_lookup", return_value={"APPLE": "AAPL"})
+@patch("apis.static.russell_ishares.time.sleep")
+@patch("apis.static.russell_ishares.fetch_with_retry")
+@patch("apis.static.russell_ishares._find_iwb_accession", return_value="0001-acc")
+@patch("apis.static.russell_ishares._build_name_ticker_lookup", return_value={"APPLE": "AAPL"})
 def test_fetch_russell1000_data_orchestrates_lookup_accession_and_parse(
     mock_lookup, mock_acc, mock_fetch, mock_sleep,
 ):
@@ -233,27 +233,27 @@ def test_fetch_russell1000_data_orchestrates_lookup_accession_and_parse(
 # update_russell1000
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-@patch("data.index_updater_russell1000.get_conn")
+@patch("apis.static.russell_ishares.get_conn")
 def test_update_russell1000_skips_when_already_updated_today(mock_get_conn):
-    with patch("data.index_updater_russell1000.get_last_snapshot_date", return_value=date.today()), \
-         patch("data.index_updater_russell1000.fetch_russell1000_data") as mock_fetch:
+    with patch("apis.static.russell_ishares.get_last_snapshot_date", return_value=date.today()), \
+         patch("apis.static.russell_ishares.fetch_russell1000_data") as mock_fetch:
         result = update_russell1000()
     assert result == (0, 0)
     mock_fetch.assert_not_called()
 
 
-@patch("data.index_updater_russell1000.get_conn")
+@patch("apis.static.russell_ishares.get_conn")
 def test_update_russell1000_skips_when_fetch_returns_empty(mock_get_conn):
     conn = MagicMock()
     mock_get_conn.return_value = conn
-    with patch("data.index_updater_russell1000.get_last_snapshot_date", return_value=None), \
-         patch("data.index_updater_russell1000.fetch_russell1000_data", return_value=pd.DataFrame(columns=["ticker", "name", "sector"])):
+    with patch("apis.static.russell_ishares.get_last_snapshot_date", return_value=None), \
+         patch("apis.static.russell_ishares.fetch_russell1000_data", return_value=pd.DataFrame(columns=["ticker", "name", "sector"])):
         result = update_russell1000()
     assert result == (0, 0)
 
 
-@patch("data.index_updater_russell1000.register_stocks")
-@patch("data.index_updater_russell1000.get_conn")
+@patch("apis.static.russell_ishares.register_stocks")
+@patch("apis.static.russell_ishares.get_conn")
 def test_update_russell1000_inserts_constituents_and_registers_stocks(mock_get_conn, mock_register):
     conn = MagicMock()
     cur = MagicMock()
@@ -266,8 +266,8 @@ def test_update_russell1000_inserts_constituents_and_registers_stocks(mock_get_c
         "name": ["Apple Inc.", "Charles Schwab Corp"],
         "sector": [None, None],
     })
-    with patch("data.index_updater_russell1000.get_last_snapshot_date", return_value=None), \
-         patch("data.index_updater_russell1000.fetch_russell1000_data", return_value=df):
+    with patch("apis.static.russell_ishares.get_last_snapshot_date", return_value=None), \
+         patch("apis.static.russell_ishares.fetch_russell1000_data", return_value=df):
         inserted, count = update_russell1000()
 
     assert (inserted, count) == (2, 2)

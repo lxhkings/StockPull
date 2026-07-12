@@ -1,5 +1,4 @@
-"""
-index_updater_us.py — SP500 指数成分股更新
+"""SP500 指数成分股更新（GitHub/datahub CSV 源适配）。
 
 数据源：
   SP500 → GitHub datasets (含 CIK，直接可用)

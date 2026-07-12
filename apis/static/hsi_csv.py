@@ -1,13 +1,13 @@
 """HSI (恒生指数) constituent updater via local CSV.
 
-Data source: data/hsi_constituents.csv (manually maintained)
+Data source: apis/static/hsi_constituents.csv (manually maintained)
 """
 
 from __future__ import annotations
 
 import logging
 from datetime import date
-import os
+from pathlib import Path
 
 import pandas as pd
 
@@ -56,7 +56,7 @@ def update_hsi() -> None:
 def _fetch_hsi() -> pd.DataFrame:
     """Fetch HSI constituents from local CSV."""
     try:
-        csv_path = os.path.join(os.path.dirname(__file__), "hsi_constituents.csv")
+        csv_path = Path(__file__).with_name("hsi_constituents.csv")
         raw = pd.read_csv(csv_path)
 
         # Pad code to 5 digits and add .HK suffix

@@ -1,6 +1,6 @@
 """US market module: thin adapter exposing the MarketModule protocol.
 
-Wraps existing index_updater_us.update_sp500() and stock_updater_us.update_prices_batch()
+Wraps apis.static SP500/Russell adapters and yfinance price updaters
 into the Pipeline contract.
 
 支持指数：
@@ -17,8 +17,8 @@ from typing import Optional
 
 from core.db_client import query, execute
 from modules.db_admin import get_index_tickers
-from data import index_updater_us
-from data import index_updater_russell1000
+from apis.static import sp500_github
+from apis.static import russell_ishares
 from apis.yfinance import prices_us as stock_updater_us
 from core.http_utils import to_float
 from core.trading_calendar import last_us_trading_date
@@ -37,14 +37,14 @@ def update_index() -> tuple[list[str], int, int]:
     """
     # SP500
     prev_sp500 = set(get_index_tickers("SP500"))
-    index_updater_us.update_sp500()
+    sp500_github.update_sp500()
     curr_sp500 = set(get_index_tickers("SP500"))
     sp500_new = sorted(curr_sp500 - prev_sp500)
     sp500_removed = len(prev_sp500 - curr_sp500)
 
     # Russell 1000
     prev_r1k = set(get_index_tickers("RUSSELL1000"))
-    index_updater_russell1000.update_russell1000()
+    russell_ishares.update_russell1000()
     curr_r1k = set(get_index_tickers("RUSSELL1000"))
     r1k_new = sorted(curr_r1k - prev_r1k)
     r1k_removed = len(prev_r1k - curr_r1k)

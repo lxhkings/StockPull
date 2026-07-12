@@ -2,7 +2,7 @@ from unittest.mock import patch, MagicMock
 
 
 @patch("data.market_hk.stock_updater_hk")
-@patch("data.market_hk.index_updater_hk")
+@patch("data.market_hk.hsi_csv")
 @patch("data.market_hk.get_conn")
 def test_update_index_delegates_to_hsi(mock_conn, mock_idx, mock_stock):
     from data.market_hk import update_index
