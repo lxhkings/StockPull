@@ -17,7 +17,7 @@
 |---|-----|------|
 | 1 | daily 默认拉满 15m+1h | **拆开**：`Pipeline.daily` 不调 intraday |
 | 2 | HK weekly raise vs Protocol | **no-op** `return {}` |
-| 3 | probe 限速静默路径 | **删假语义**：empty → `no_data`，不推断限速 |
+| 3 | probe 限速静默路径 | **删假语义** + **三处对齐**：empty → `no_data`；限速仅 except 字符串；**intraday 补齐** `rate_limit` 分支与批量 skip |
 | 4 | purge_index 非事务 | **单连接事务**包一组 DELETE |
 | 5 | hasattr(render) / 死 `cmd_tushare_sync` | **本轮收口** |
 | 6 | prices_index 测 + SPEC 归档 | **本轮收口** |
@@ -31,7 +31,7 @@
 
 1. **日线与分钟线焊在一起**：为消灭 `hasattr`，`Pipeline.daily` 固定调 `intraday()`，且 US 默认变成 `15m+1h`（改前 daily 内默认仅 `1h`）。协议整洁被兑换成更重的默认行为。  
 2. **能力模型不一致**：CN/HK `intraday` no-op，HK `weekly` 却 `raise NotImplementedError`，Protocol 签名撒谎。  
-3. **probe 语义收缩未写清**：改走 `download_with_retry` 后 empty 不再能从 yfinance 日志推断限速，文档仍像能区分。  
+3. **probe 语义不对称**：日线/周线 except 可返回 `rate_limit`；intraday probe 不能，且批量入口不处理该 status。empty 从不推断限速（正确），但三处契约未对齐。  
 4. **`purge_index` 多表非原子**：`execute()` 每次独立 commit。  
 5. **CLI 小残留**：`_run_buffered` 内联 `hasattr(render)`；`cmd_tushare_sync` 已无 dispatch 入口。  
 6. **测试/文档**：`prices_index` 仅测符号表+委托；旧 SPEC 头仍写「剩余项」。
@@ -123,9 +123,20 @@ modules/*   → core, config
 
 ---
 
-### 4.3 #3 Probe 语义：删假合同
+### 4.3 #3 Probe 语义：删假合同 + 三处真正对齐
 
-三处 probe（`prices_us._test_aapl_data`、`prices_us_weekly._test_aapl_weekly`、`prices_intraday._test_aapl_intraday`）统一：
+**现状（不对称，实现前必读）：**
+
+| Probe | empty → | except 限速字符串 → `rate_limit` |
+|-------|---------|----------------------------------|
+| `prices_us._test_aapl_data` | `no_data` | **有** |
+| `prices_us_weekly._test_aapl_weekly` | `no_data` | **有** |
+| `prices_intraday._test_aapl_intraday` | `no_data` | **无**（一律 `error`）；docstring 也未列 `rate_limit` |
+
+「删假合同」= 不从 empty/日志推断限速。  
+「三处统一」= 上表四态行为一致，**不是**「只改文档、假定限速分支已有」。
+
+**目标语义（三处相同）：**
 
 | 情况 | status |
 |------|--------|
@@ -134,19 +145,35 @@ modules/*   → core, config
 | 异常且文案含 `RateLimit` / `Too Many Requests` | `rate_limit` |
 | 其他异常 | `error` |
 
-**做：**
+**做（代码 + 文档）：**
 
-- Docstring / 注释与上表一致；去掉「empty 可推断限速」表述  
-- 保留 exception 字符串匹配限速（已有）  
+1. **`prices_us` / `prices_us_weekly`：** except 限速分支**保留**；docstring 与上表对齐；去掉任何「empty 可推断限速」表述（若有）。  
+2. **`prices_intraday._test_aapl_intraday`（代码必改）：**  
+   - except 补齐与日线/周线**相同**的字符串匹配 → `rate_limit`，其余 → `error`  
+   - docstring Returns 增加 `"rate_limit"`  
+3. **`update_intraday` 批量入口（代码必改）：** 今日只处理 `no_data` / `error`；`rate_limit` 会落到 `latest_date is None` 继续跑。补：
+
+   ```text
+   if status == "rate_limit":
+       log.warning(...限速，跳过...)
+       return {}
+   ```
+
+   与 `no_data` / `error` 一样整批 skip。
 
 **不做：**
 
 - 不恢复 yfinance logging Handler  
-- 不改 `download_with_retry`  
+- 不改 `download_with_retry`（限速分类仍在各 probe 的 except，不抽到 client）  
+- 不为 empty 发明限速  
 
-批量入口对 `rate_limit` / `no_data` / `error` 的 skip 逻辑保持；仅 `rate_limit` 触发变少（更诚实）。
+**测试：**
 
-**测试：** 若有 empty→rate_limit 断言则改为 empty→`no_data`；限速用 raise 带 RateLimit 文案的 mock。无则补最小单测（可选，优先改文档一致性）。
+- empty → `no_data`（三处一致；无 empty→rate_limit 断言）  
+- mock `download_with_retry` raise 含 `RateLimit` / `Too Many Requests` → probe 返回 `rate_limit`  
+- **intraday：** 上述 except 分支 + `update_intraday` 遇 `rate_limit` 返回 `{}` 不继续批量  
+
+**成功标准补充：** 三处 probe 对限速异常均返回 `rate_limit`；intraday 批量入口识别并 skip。
 
 ---
 
@@ -249,7 +276,8 @@ finally:
 
 - [ ] `Pipeline.daily` 不调用 `intraday`  
 - [ ] `market_hk.weekly()` → `{}`  
-- [ ] probe 文档/行为：empty = `no_data`；限速仅异常路径  
+- [ ] 三处 probe：empty = `no_data`；限速仅 except 字符串 → `rate_limit`（含 **intraday 补齐**）  
+- [ ] `update_intraday` 对 `rate_limit` 整批 skip  
 - [ ] `purge_index(dry_run=False)` 单连接 commit/rollback  
 - [ ] 无 `cmd_tushare_sync`；`_run_buffered` 经 `_format_run_result`  
 - [ ] `prices_index` 写路径有测；旧 SPEC 不再标「剩余」  
