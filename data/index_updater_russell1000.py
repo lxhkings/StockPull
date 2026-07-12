@@ -22,7 +22,7 @@ from pathlib import Path
 
 from core.db_client import get_conn
 from core.http_utils import fetch_with_retry
-from data.index_base import register_stocks, get_last_snapshot_date
+from modules.index_base import register_stocks, get_last_snapshot_date
 
 log = logging.getLogger(__name__)
 

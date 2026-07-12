@@ -99,7 +99,7 @@ Three-market daily-K ingest (US/CN/HK) into shared MariaDB on Synology NAS (192.
 | 层 | 定位 | 内容 |
 |---|---|---|
 | `core/` | 纯组件（无业务状态、无 DB 表语义） | `db_client.py`（连接池）、`http_utils.py`（HTTP 重试/限速/类型转换）、`retry_utils.py`（指数退避）、`batch_utils.py`（切片）、`local_buffer.py`（本地缓冲）。进度可视化统一用 `tqdm`，不再自建进度日志组件 |
-| `modules/` | 跨家族业务模块（有 DB 表/业务规则语义） | `sync_log.py`（同步状态追踪）、`db_admin.py`（管理查询/DDL） |
+| `modules/` | 跨家族业务模块（有 DB 表/业务规则语义） | `sync_log.py`（同步状态追踪）、`db_admin.py`（管理查询/DDL）、`index_base.py`（成分股快照/stocks 注册）、`price_write.py`（价格写入） |
 
 **判断标准：** 不依赖特定表结构/业务规则 → `core/`；依赖 sync_log 等业务表语义 → `modules/`。
 
@@ -107,7 +107,7 @@ Three-market daily-K ingest (US/CN/HK) into shared MariaDB on Synology NAS (192.
 
 | 家族 | 入口 | 扩展点模式 | 客户端/限速层 |
 |---|---|---|---|
-| `data/` 日线主流程 | `data/pipeline.py` | 新市场 MUST 实现 `MarketModule` protocol（见下），在 `data/market_*.py` 实现，`pipeline.py` 里注册 | 各 `market_*.py` 自带；跨市场共享逻辑放 `core/http_utils.py` / `data/index_base.py`；所有 yfinance 调用 MUST 走 `data/yf_client.py`（限速+重试），不得自建 retry 循环 |
+| `data/` 日线主流程 | `data/pipeline.py` | 新市场 MUST 实现 `MarketModule` protocol（见下），在 `data/market_*.py` 实现，`pipeline.py` 里注册 | 各 `market_*.py` 自带；跨市场共享逻辑放 `core/http_utils.py` / `modules/index_base.py`；所有 yfinance 调用 MUST 走 `data/yf_client.py`（限速+重试），不得自建 retry 循环 |
 | `ts_ingest/` Tushare 回填 | `ts_ingest/orchestrator.py`（phase: lists→prices→derive→financial→valuation） | 新回填域 MUST 新建 `ts_ingest/backfill_<domain>.py`，暴露 `backfill_all()`，在 orchestrator 里按 phase 顺序挂载 | `ts_ingest/client.py`（限速+重试）+ `ts_ingest/budget.py`（调用预算），MUST 复用，不得自建 API 调用逻辑 |
 | `futu_ingest/` Futu 回填 | `futu_ingest/orchestrator.py`（`run_sync(scope)` 分发表） | 新数据域 MUST 新建 `futu_ingest/backfill_<domain>.py` 或 `snapshot_<domain>.py`，暴露 `backfill_all()`/`run_daily()`，在 orchestrator 的 `want()` 分发表里挂 scope | `futu_ingest/client.py` + `futu_ingest/concurrency.py`；本地缓冲复用 `core/local_buffer.py`（断网本地优先，收尾 flush 到 NAS） |
 
@@ -116,7 +116,7 @@ Three-market daily-K ingest (US/CN/HK) into shared MariaDB on Synology NAS (192.
 
 **强制规则：**
 1. 新市场/新数据源 MUST 走对应家族的既有 protocol/orchestrator 接入点，不得在 `main.py` 里直接写一次性脚本逻辑。
-2. 跨市场/跨模块共享逻辑复用 `core/http_utils.py`（HTTP 重试/限速/类型转换）、`data/index_base.py`（成分股快照通用操作）；不得每个市场模块各写一份重复代码。
+2. 跨市场/跨模块共享逻辑复用 `core/http_utils.py`（HTTP 重试/限速/类型转换）、`modules/index_base.py`（成分股快照通用操作）；不得每个市场模块各写一份重复代码。
 3. 数据库访问统一走 `core/db_client.py`（`query`/`execute`/`get_conn` 连接池），不得散落裸 `pymysql` 连接。同步状态追踪用 `modules/sync_log.py`。
 4. 每个新增 backfill/updater/snapshot 模块 MUST 有对应 `tests/test_<module>.py`（现有 1:1 命名约定，见 `tests/` 目录）。
 5. 不确定该归入哪个家族、或是否需要新建第四套平行结构 → 先问用户，不要自行决定。

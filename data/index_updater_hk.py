@@ -12,7 +12,7 @@ import os
 import pandas as pd
 
 from core.db_client import get_conn
-from data.index_base import (
+from modules.index_base import (
     get_last_snapshot_date,
     save_snapshot,
     detect_and_record_changes,

@@ -12,7 +12,7 @@ from datetime import date
 
 from core.db_client import get_conn
 from core.http_utils import fetch_urls_sequentially, format_cik
-from data.index_base import (
+from modules.index_base import (
     get_last_snapshot_date,
     save_snapshot,
     detect_and_record_changes,

@@ -1,9 +1,9 @@
-"""data/index_base.py 成分股快照通用操作测试。"""
+"""modules/index_base.py 成分股快照通用操作测试。"""
 from unittest.mock import MagicMock
 from datetime import date
 import pandas as pd
 
-from data.index_base import (
+from modules.index_base import (
     get_last_snapshot_date,
     save_snapshot,
     detect_and_record_changes,

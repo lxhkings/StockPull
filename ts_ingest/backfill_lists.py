@@ -5,7 +5,7 @@ import logging
 import pandas as pd
 
 from core.db_client import get_conn
-from data.index_base import register_stocks
+from modules.index_base import register_stocks
 from ts_ingest.client import get_client
 from ts_ingest.ticker_map import index_id_to_ts_code
 from ts_ingest.transform_lists import (
@@ -23,7 +23,7 @@ def _to_str(v) -> str | None:
 
 
 def backfill_stocks_a() -> int:
-    """A 股全量股票列表 → stocks（复用 data/index_base.py:register_stocks，
+    """A 股全量股票列表 → stocks（复用 modules/index_base.py:register_stocks，
     COALESCE 保护已有 gics_sector 不被空 industry 覆盖）。"""
     client = get_client()
     total = 0
