@@ -30,6 +30,7 @@ from config import (
 from core.http_utils import to_float, to_int
 from apis.yfinance.client import download_with_retry
 from core.db_client import get_conn
+from modules.db_admin import get_index_tickers
 from modules.sync_log import get_last_sync, set_sync_error, set_sync_ok
 
 log = logging.getLogger(__name__)
@@ -207,8 +208,8 @@ def update_intraday(interval: str, full_rebase: bool = False) -> dict[str, str]:
 
     log.info(f"[intraday {interval}] AAPL 验证通过，范围：{floor_date} ~ {last_trading}")
 
-    from jobs.market_us import list_active_tickers
-    tickers = list_active_tickers()
+    # 与 jobs.market_us.list_active_tickers(None) 默认宇宙一致：SP500 ∪ RUSSELL1000
+    tickers = sorted(set(get_index_tickers("SP500")) | set(get_index_tickers("RUSSELL1000")))
 
     result: dict[str, str] = {}
     conn = get_conn()

@@ -1,4 +1,4 @@
-"""Tests for data/intraday_updater_us.py"""
+"""Tests for apis/yfinance/prices_intraday.py"""
 
 from datetime import date, datetime
 from unittest.mock import MagicMock, patch
@@ -128,14 +128,15 @@ def _make_yf_multiindex_df(symbol: str) -> pd.DataFrame:
 @patch("apis.yfinance.prices_intraday.set_sync_ok")
 @patch("apis.yfinance.prices_intraday.set_sync_error")
 @patch("apis.yfinance.client.yf.download")
-@patch("jobs.market_us.list_active_tickers")
+@patch("apis.yfinance.prices_intraday.get_index_tickers")
 @patch("apis.yfinance.prices_intraday._test_aapl_intraday")
 def test_update_intraday_calls_yf_download(
-    mock_test_aapl, mock_list, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
+    mock_test_aapl, mock_get_index, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
 ):
     # AAPL 测试返回成功
     mock_test_aapl.return_value = (date(2026, 5, 15), "ok")
-    mock_list.return_value = ["AAPL"]
+    # SP500 + RUSSELL1000 两次调用；并集后为 ["AAPL"]
+    mock_get_index.return_value = ["AAPL"]
     mock_get_last_sync.return_value = None  # 首次：全量拉取
     mock_get_conn.return_value = MagicMock()
     mock_yf_download.return_value = _make_yf_multiindex_df("AAPL")
@@ -155,15 +156,15 @@ def test_update_intraday_calls_yf_download(
 @patch("apis.yfinance.prices_intraday.set_sync_ok")
 @patch("apis.yfinance.prices_intraday.set_sync_error")
 @patch("apis.yfinance.client.yf.download")
-@patch("jobs.market_us.list_active_tickers")
+@patch("apis.yfinance.prices_intraday.get_index_tickers")
 @patch("apis.yfinance.prices_intraday._test_aapl_intraday")
 def test_update_intraday_full_rebase_ignores_sync_log(
-    mock_test_aapl, mock_list, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
+    mock_test_aapl, mock_get_index, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
 ):
     """full_rebase=True must not call get_last_sync — all tickers start from floor_date."""
     # AAPL 测试返回成功
     mock_test_aapl.return_value = (date(2026, 5, 15), "ok")
-    mock_list.return_value = ["AAPL"]
+    mock_get_index.return_value = ["AAPL"]
     mock_get_last_sync.return_value = date.today()  # would be "already up to date" in normal mode
     mock_get_conn.return_value = MagicMock()
     mock_yf_download.return_value = _make_yf_multiindex_df("AAPL")
@@ -181,12 +182,12 @@ def test_update_intraday_full_rebase_ignores_sync_log(
 
 @patch("apis.yfinance.prices_intraday.get_conn")
 @patch("apis.yfinance.prices_intraday.get_last_sync")
-@patch("jobs.market_us.list_active_tickers")
+@patch("apis.yfinance.prices_intraday.get_index_tickers")
 @patch("apis.yfinance.prices_intraday._test_aapl_intraday")
-def test_update_intraday_skips_up_to_date_ticker(mock_test_aapl, mock_list, mock_get_last_sync, mock_get_conn):
+def test_update_intraday_skips_up_to_date_ticker(mock_test_aapl, mock_get_index, mock_get_last_sync, mock_get_conn):
     # AAPL 测试返回成功，日期匹配
     mock_test_aapl.return_value = (date(2026, 5, 15), "ok")
-    mock_list.return_value = ["AAPL"]
+    mock_get_index.return_value = ["AAPL"]
     mock_get_last_sync.return_value = date(2026, 5, 15)  # 已同步到最新
     mock_get_conn.return_value = MagicMock()
 
@@ -204,10 +205,10 @@ def test_update_intraday_skips_up_to_date_ticker(mock_test_aapl, mock_list, mock
 @patch("apis.yfinance.prices_intraday.set_sync_ok")
 @patch("apis.yfinance.prices_intraday.set_sync_error")
 @patch("apis.yfinance.client.yf.download")
-@patch("jobs.market_us.list_active_tickers")
+@patch("apis.yfinance.prices_intraday.get_index_tickers")
 @patch("apis.yfinance.prices_intraday._test_aapl_intraday")
 def test_update_intraday_floor_within_yahoo_window(
-    mock_test_aapl, mock_list, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
+    mock_test_aapl, mock_get_index, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
 ):
     """floor_date 必须以 today 为基准，否则 latest_date<today 时 start 落在 730 天窗口外被拒。"""
     from datetime import timedelta
@@ -215,7 +216,7 @@ def test_update_intraday_floor_within_yahoo_window(
     # latest_date 比 today 早，模拟非交易日/未收盘
     latest = date.today() - timedelta(days=3)
     mock_test_aapl.return_value = (latest, "ok")
-    mock_list.return_value = ["AAPL"]
+    mock_get_index.return_value = ["AAPL"]
     mock_get_conn.return_value = MagicMock()
     mock_yf_download.return_value = _make_yf_multiindex_df("AAPL")
 
