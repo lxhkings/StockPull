@@ -13,7 +13,7 @@ from config import (
     START_DATE_HK, YF_LOOKBACK_DAYS,
 )
 from core.db_client import get_conn
-from modules.sync_log import get_last_sync, set_sync_ok, set_sync_error
+from modules.sync_log import get_last_sync_map, set_sync_ok, set_sync_error
 from core.http_utils import to_float, to_int
 from data.yf_client import history_with_retry
 
@@ -29,6 +29,7 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
 
     conn = get_conn()
     try:
+        last_map = {} if full_rebase else get_last_sync_map(conn, tickers, "price")
         for t in tickers:
             try:
                 if full_rebase:
@@ -38,7 +39,7 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
                     else:
                         start = date.fromisoformat(START_DATE_HK)
                 else:
-                    last = get_last_sync(conn, t, "price")
+                    last = last_map.get(t)
                     if last is None:
                         start = date.fromisoformat(START_DATE_HK)
                     else:

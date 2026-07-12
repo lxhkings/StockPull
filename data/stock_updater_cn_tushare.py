@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 from config import HISTORY_YEARS_CN, TUSHARE_BACKFILL_START
 from core.db_client import get_conn
-from modules.sync_log import get_last_sync
+from modules.sync_log import get_last_sync, get_last_sync_map
 from core.http_utils import to_float, to_int
 from core.trading_calendar import last_cn_trading_date
 from ts_ingest.client import get_client
@@ -180,11 +180,12 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
         new_tickers = []
         pending_tickers = []
 
+        last_map = {} if full_rebase else get_last_sync_map(conn, tickers, SYNC_DATA_TYPE)
         for t in tickers:
             if full_rebase:
                 pending_tickers.append(t)
                 continue
-            last = get_last_sync(conn, t, SYNC_DATA_TYPE)
+            last = last_map.get(t)
             if last is None:
                 new_tickers.append(t)
             elif last < last_trading:

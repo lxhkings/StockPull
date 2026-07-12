@@ -37,6 +37,35 @@ def get_last_sync(conn, ticker: str, data_type: str) -> Optional[date]:
     return None
 
 
+def get_last_sync_map(conn, tickers: list[str], data_type: str) -> dict[str, date | None]:
+    """批量 get_last_sync。返回 {ticker: last_date|None}，覆盖输入全部 ticker。"""
+    if not tickers:
+        return {}
+    out: dict[str, date | None] = {t: None for t in tickers}
+    ph = ",".join(["%s"] * len(tickers))
+    with conn.cursor() as cur:
+        cur.execute(
+            f"SELECT ticker, last_date FROM sync_log "
+            f"WHERE data_type=%s AND status='ok' AND ticker IN ({ph})",
+            (data_type, *tickers),
+        )
+        for ticker, last_date in cur.fetchall():
+            out[ticker] = last_date
+        if data_type == "price":
+            missing = [t for t, v in out.items() if v is None]
+            if missing:
+                ph2 = ",".join(["%s"] * len(missing))
+                cur.execute(
+                    f"SELECT ticker, MAX(date) FROM prices "
+                    f"WHERE ticker IN ({ph2}) GROUP BY ticker",
+                    tuple(missing),
+                )
+                for ticker, max_d in cur.fetchall():
+                    if max_d is not None:
+                        out[ticker] = max_d
+    return out
+
+
 def set_sync_ok(conn, ticker: str, data_type: str,
                 last_date: date, rows_added: int = 0):
     _upsert_sync_log(conn, ticker, data_type, last_date, rows_added, "ok", "")

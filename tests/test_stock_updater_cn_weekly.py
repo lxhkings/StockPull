@@ -77,8 +77,9 @@ def test_update_weekly_batch_all_already_synced():
     with patch("data.stock_updater_cn_weekly.last_cn_trading_date",
                return_value=date(2026, 5, 16)), \
          patch("data.stock_updater_cn_weekly.get_conn") as mock_conn_fn, \
-         patch("data.stock_updater_cn_weekly.get_last_sync",
-               return_value=date(2026, 5, 16)):
+         patch("data.stock_updater_cn_weekly.get_last_sync_map",
+               return_value={"600519.SH": date(2026, 5, 16),
+                             "000001.SZ": date(2026, 5, 16)}):
         mock_conn = MagicMock()
         mock_conn_fn.return_value = mock_conn
         result = update_weekly_batch(["600519.SH", "000001.SZ"])
@@ -93,7 +94,8 @@ def test_update_weekly_batch_new_tickers_trigger_full_backfill():
     with patch("data.stock_updater_cn_weekly.last_cn_trading_date",
                return_value=date(2026, 5, 16)), \
          patch("data.stock_updater_cn_weekly.get_conn") as mock_conn_fn, \
-         patch("data.stock_updater_cn_weekly.get_last_sync", return_value=None), \
+         patch("data.stock_updater_cn_weekly.get_last_sync_map",
+               return_value={"600519.SH": None}), \
          patch("data.stock_updater_cn_weekly._fetch_one", return_value=pd.DataFrame({
              "date": [date(2026, 5, 16)],
              "open": [100.0], "high": [105.0], "low": [99.0],

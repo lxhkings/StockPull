@@ -28,7 +28,7 @@ from config import (
     YF_BATCH_DELAY_BASE, YF_BATCH_DELAY_JITTER,
 )
 from core.db_client import get_conn
-from modules.sync_log import get_last_sync, set_sync_ok, set_sync_error
+from modules.sync_log import get_last_sync_map, set_sync_ok, set_sync_error
 from core.http_utils import to_float, to_int
 from core.trading_calendar import last_us_trading_date
 from data.yf_client import download_with_retry
@@ -166,8 +166,9 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
             # 增量窗口上限：不超过 YF_LOOKBACK_DAYS 天前
             lookback_floor = last_trading - timedelta(days=YF_LOOKBACK_DAYS)
 
+            last_map = get_last_sync_map(conn, tickers, "price")
             for t in tickers:
-                last = get_last_sync(conn, t, "price")
+                last = last_map.get(t)
                 if last is None:
                     new_tickers.append(t)
                 elif last < last_trading:
