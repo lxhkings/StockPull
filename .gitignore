@@ -15,6 +15,7 @@ cache/
 backups/
 data/.cache/
 docs/superpowers/
+.superpowers/
 .worktrees/
 .futu_buffer/
 .tushare_buffer/
