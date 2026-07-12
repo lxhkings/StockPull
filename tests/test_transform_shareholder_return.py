@@ -1,6 +1,6 @@
 import pandas as pd
 
-from ts_ingest.transform_shareholder_return import (
+from apis.tushare.transform_shareholder_return import (
     transform_dividend_rows,
     transform_holdertrade_rows,
     transform_repurchase_rows,

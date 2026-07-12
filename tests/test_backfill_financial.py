@@ -2,7 +2,7 @@ from unittest.mock import patch, MagicMock
 import json
 import pandas as pd
 
-from ts_ingest.backfill_financial import (
+from apis.tushare.backfill_financial import (
     quarterly_periods, backfill_period, backfill_all,
 )
 
@@ -26,8 +26,8 @@ def test_backfill_period_writes_with_raw_payload_json():
         "total_revenue": [150000000000.0],
         "n_income":      [74700000000.0],
     })
-    with patch("ts_ingest.backfill_financial.get_conn") as mock_conn, \
-         patch("ts_ingest.backfill_financial.get_client", return_value=fake_client):
+    with patch("apis.tushare.backfill_financial.get_conn") as mock_conn, \
+         patch("apis.tushare.backfill_financial.get_client", return_value=fake_client):
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -48,8 +48,8 @@ def test_backfill_all_calls_4_apis_per_period():
         "ts_code": ["x"], "ann_date": ["20240328"], "f_ann_date": ["20240328"],
         "end_date": ["20231231"], "report_type": ["1"], "comp_type": ["1"],
     })
-    with patch("ts_ingest.backfill_financial.get_conn") as mock_conn, \
-         patch("ts_ingest.backfill_financial.get_client", return_value=fake_client):
+    with patch("apis.tushare.backfill_financial.get_conn") as mock_conn, \
+         patch("apis.tushare.backfill_financial.get_client", return_value=fake_client):
         cur = MagicMock()
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
         backfill_all(periods=["20231231"])

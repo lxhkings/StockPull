@@ -8,7 +8,7 @@ import pymysql.cursors
 from tqdm import tqdm
 
 from core.db_client import get_conn
-from ts_ingest.transform_periodic import resample_ohlcv, periodic_rows
+from apis.tushare.transform_periodic import resample_ohlcv, periodic_rows
 
 log = logging.getLogger(__name__)
 

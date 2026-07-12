@@ -8,8 +8,8 @@ from typing import Callable
 from tqdm import tqdm
 
 from config import FUTU_REFRESH_DAYS, FUTU_DEFAULT_REFRESH_DAYS
-from futu_ingest.client import PERMANENT_ERRORS
-from futu_ingest.sync import fresh_tickers, mark_ok, mark_error, mark_skip
+from apis.futu.client import PERMANENT_ERRORS
+from apis.futu.sync import fresh_tickers, mark_ok, mark_error, mark_skip
 
 log = logging.getLogger(__name__)
 

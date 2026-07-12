@@ -1,6 +1,6 @@
 """yf_client.py — yfinance 请求封装（限速+重试层）。
 
-对齐 ts_ingest/client.py、futu_ingest/client.py 的模块结构：所有 yf.download
+对齐 apis.tushare/client.py、apis.futu/client.py 的模块结构：所有 yf.download
 调用统一走这里，指数退避重试通过 retry_utils.retry_with_backoff 实现。
 """
 from __future__ import annotations

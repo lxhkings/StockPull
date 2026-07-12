@@ -8,8 +8,8 @@ from tqdm import tqdm
 from config import TUSHARE_BACKFILL_START
 from core.db_client import get_conn
 from modules.sync_log import set_sync_error, set_sync_ok
-from ts_ingest.client import get_client
-from ts_ingest.transform_prices import pro_bar_rows
+from apis.tushare.client import get_client
+from apis.tushare.transform_prices import pro_bar_rows
 
 log = logging.getLogger(__name__)
 

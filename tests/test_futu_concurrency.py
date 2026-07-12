@@ -2,7 +2,7 @@ import time
 
 import pytest
 
-from futu_ingest.concurrency import batch_with_bisect, run_streams, ticker_stream
+from apis.futu.concurrency import batch_with_bisect, run_streams, ticker_stream
 
 
 def test_run_streams_aggregates_by_key():
@@ -29,8 +29,8 @@ def test_ticker_stream_sums_rows_and_ok():
     def fake_backfill(client, t):
         calls.append(t)
         return 3
-    with patch("futu_ingest.concurrency.fresh_tickers", return_value=set()), \
-         patch("futu_ingest.concurrency.mark_ok"):
+    with patch("apis.futu.concurrency.fresh_tickers", return_value=set()), \
+         patch("apis.futu.concurrency.mark_ok"):
         rows, ok, skipped = ticker_stream(fake_backfill, client=object(), tickers=["A", "B"], data_type="us_x")
     assert (rows, ok, skipped) == (6, 2, 0)
     assert calls == ["A", "B"]
@@ -42,9 +42,9 @@ def test_ticker_stream_swallows_per_ticker_error():
         if t == "B":
             raise ValueError("boom")
         return 1
-    with patch("futu_ingest.concurrency.fresh_tickers", return_value=set()), \
-         patch("futu_ingest.concurrency.mark_ok"), \
-         patch("futu_ingest.concurrency.mark_error"):
+    with patch("apis.futu.concurrency.fresh_tickers", return_value=set()), \
+         patch("apis.futu.concurrency.mark_ok"), \
+         patch("apis.futu.concurrency.mark_error"):
         rows, ok, skipped = ticker_stream(fake_backfill, client=object(), tickers=["A", "B", "C"], data_type="us_x")
     assert (rows, ok, skipped) == (2, 2, 0)   # B 异常被吞，A/C 仍计
 
@@ -54,9 +54,9 @@ def test_ticker_stream_skips_fresh_and_marks_pulled():
 
     client = MagicMock()
     fn = MagicMock(return_value=3)
-    with patch("futu_ingest.concurrency.fresh_tickers", return_value={"AAPL"}), \
-         patch("futu_ingest.concurrency.mark_ok") as mok, \
-         patch("futu_ingest.concurrency.FUTU_REFRESH_DAYS", {"us_x": 80}):
+    with patch("apis.futu.concurrency.fresh_tickers", return_value={"AAPL"}), \
+         patch("apis.futu.concurrency.mark_ok") as mok, \
+         patch("apis.futu.concurrency.FUTU_REFRESH_DAYS", {"us_x": 80}):
         rows, ok, skipped = ticker_stream(fn, client, ["AAPL", "MSFT"], "us_x")
     # AAPL fresh -> skipped, fn 只对 MSFT 调一次
     fn.assert_called_once_with(client, "MSFT")
@@ -69,9 +69,9 @@ def test_ticker_stream_force_ignores_freshness():
 
     client = MagicMock()
     fn = MagicMock(return_value=1)
-    with patch("futu_ingest.concurrency.fresh_tickers") as ft, \
-         patch("futu_ingest.concurrency.mark_ok"), \
-         patch("futu_ingest.concurrency.FUTU_REFRESH_DAYS", {"us_x": 80}):
+    with patch("apis.futu.concurrency.fresh_tickers") as ft, \
+         patch("apis.futu.concurrency.mark_ok"), \
+         patch("apis.futu.concurrency.FUTU_REFRESH_DAYS", {"us_x": 80}):
         rows, ok, skipped = ticker_stream(fn, client, ["AAPL", "MSFT"], "us_x", force=True)
     ft.assert_not_called()
     assert fn.call_count == 2
@@ -129,11 +129,11 @@ def test_ticker_stream_skips_permanent_error_not_retry():
             raise RuntimeError("futu.x ret=-1: 只支持港股、美股正股，其他市场或股票类型不支持")
         return 2
 
-    with patch("futu_ingest.concurrency.fresh_tickers", return_value=set()), \
-         patch("futu_ingest.concurrency.mark_ok"), \
-         patch("futu_ingest.concurrency.mark_skip") as mskip, \
-         patch("futu_ingest.concurrency.mark_error") as merr, \
-         patch("futu_ingest.concurrency.FUTU_REFRESH_DAYS", {"us_x": 80}):
+    with patch("apis.futu.concurrency.fresh_tickers", return_value=set()), \
+         patch("apis.futu.concurrency.mark_ok"), \
+         patch("apis.futu.concurrency.mark_skip") as mskip, \
+         patch("apis.futu.concurrency.mark_error") as merr, \
+         patch("apis.futu.concurrency.FUTU_REFRESH_DAYS", {"us_x": 80}):
         rows, ok, skipped = ticker_stream(fn, client, ["AAPL", "AMT", "MSFT"], "us_x")
     assert (rows, ok, skipped) == (4, 2, 1)   # AMT 标 skip
     mskip.assert_called_once_with("AMT", "us_x")
@@ -145,9 +145,9 @@ def test_ticker_stream_marks_error_on_exception():
 
     client = MagicMock()
     fn = MagicMock(side_effect=RuntimeError("boom"))
-    with patch("futu_ingest.concurrency.fresh_tickers", return_value=set()), \
-         patch("futu_ingest.concurrency.mark_error") as merr, \
-         patch("futu_ingest.concurrency.FUTU_REFRESH_DAYS", {"us_x": 80}):
+    with patch("apis.futu.concurrency.fresh_tickers", return_value=set()), \
+         patch("apis.futu.concurrency.mark_error") as merr, \
+         patch("apis.futu.concurrency.FUTU_REFRESH_DAYS", {"us_x": 80}):
         rows, ok, skipped = ticker_stream(fn, client, ["AAPL"], "us_x")
     assert (rows, ok, skipped) == (0, 0, 0)
     merr.assert_called_once_with("AAPL", "us_x", "boom")

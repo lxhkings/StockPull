@@ -163,7 +163,7 @@ def cmd_rebase(market: str, codes: list[str] | None, years: int | None, index: s
         if market != "cn":
             print("--etf-only currently only supports --market cn", file=sys.stderr)
             return 1
-        from ts_ingest.etf_cn import update_etf_prices
+        from apis.tushare.etf_cn import update_etf_prices
         n = update_etf_prices(full_rebase=True)
         print(f"[cn] ETF rebase wrote {n} rows to index_prices")
         return 0
@@ -206,7 +206,7 @@ def cmd_intraday(interval: str | None, rebase: bool = False) -> int:
 def cmd_tushare_backfill(scope: str, market: str, dry_run: bool, start: str | None = None) -> int:
     """两阶段：backfill 写本地缓冲 → 自动 flush 到 NAS。flush 失败则保留缓冲、提示兜底。"""
     from core.db_client import set_local_first
-    from ts_ingest.orchestrator import run_full_backfill
+    from apis.tushare.orchestrator import run_full_backfill
     from core.local_buffer import flush, pending_count
     from config import TUSHARE_BUFFER_PATH
 
@@ -265,7 +265,7 @@ def cmd_tushare_flush(workers: int = 1) -> int:
 def _run_futu(scope: str, force: bool) -> int:
     """两阶段：fetch 写本地缓冲 → 自动 flush 到 NAS。flush 失败则保留缓冲、提示兜底。"""
     from core.db_client import set_local_first
-    from futu_ingest.orchestrator import run_sync
+    from apis.futu.orchestrator import run_sync
     from core.local_buffer import flush, pending_count
     from config import FUTU_BUFFER_PATH
 

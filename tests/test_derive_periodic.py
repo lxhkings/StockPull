@@ -2,7 +2,7 @@ from unittest.mock import patch, MagicMock
 import pandas as pd
 from datetime import date
 
-from ts_ingest.derive_periodic import derive_for_ticker
+from apis.tushare.derive_periodic import derive_for_ticker
 
 
 def test_derive_for_ticker_writes_both_tables():
@@ -14,8 +14,8 @@ def test_derive_for_ticker_writes_both_tables():
         "close":  [10.5, 11.5],
         "volume": [100, 200],
     })
-    with patch("ts_ingest.derive_periodic._read_daily", return_value=daily), \
-         patch("ts_ingest.derive_periodic.get_conn") as mock_conn:
+    with patch("apis.tushare.derive_periodic._read_daily", return_value=daily), \
+         patch("apis.tushare.derive_periodic.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur

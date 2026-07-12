@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-from futu_ingest.backfill_shareholders import (
+from apis.futu.backfill_shareholders import (
     backfill_overview, backfill_holding_changes,
     backfill_institutional, backfill_insider_holders, backfill_insider_trades
 )
@@ -54,7 +54,7 @@ def _fake_insider_trades():
 def test_backfill_overview_merges_main_and_type():
     client = MagicMock()
     client.call.return_value = _fake_overview()
-    with patch("futu_ingest.backfill_shareholders.get_conn") as mock_conn:
+    with patch("apis.futu.backfill_shareholders.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -67,7 +67,7 @@ def test_backfill_overview_merges_main_and_type():
 def test_backfill_insider_trades_upserts():
     client = MagicMock()
     client.call.return_value = _fake_insider_trades()
-    with patch("futu_ingest.backfill_shareholders.get_conn") as mock_conn:
+    with patch("apis.futu.backfill_shareholders.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -80,7 +80,7 @@ def test_backfill_insider_trades_upserts():
 def test_backfill_holding_changes_upserts():
     client = MagicMock()
     client.call.return_value = _fake_holding_changes()
-    with patch("futu_ingest.backfill_shareholders.get_conn") as mock_conn:
+    with patch("apis.futu.backfill_shareholders.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -93,7 +93,7 @@ def test_backfill_holding_changes_upserts():
 def test_backfill_institutional_upserts():
     client = MagicMock()
     client.call.return_value = _fake_institutional()
-    with patch("futu_ingest.backfill_shareholders.get_conn") as mock_conn:
+    with patch("apis.futu.backfill_shareholders.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -106,7 +106,7 @@ def test_backfill_institutional_upserts():
 def test_backfill_insider_holders_upserts():
     client = MagicMock()
     client.call.return_value = _fake_insider_holders()
-    with patch("futu_ingest.backfill_shareholders.get_conn") as mock_conn:
+    with patch("apis.futu.backfill_shareholders.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -119,7 +119,7 @@ def test_backfill_insider_holders_upserts():
 def test_backfill_overview_returns_0_on_empty():
     client = MagicMock()
     client.call.return_value = {}
-    with patch("futu_ingest.backfill_shareholders.get_conn"):
+    with patch("apis.futu.backfill_shareholders.get_conn"):
         n = backfill_overview(client, "AAPL")
     assert n == 0
 
@@ -127,13 +127,13 @@ def test_backfill_overview_returns_0_on_empty():
 def test_backfill_insider_trades_returns_0_on_empty():
     client = MagicMock()
     client.call.return_value = []
-    with patch("futu_ingest.backfill_shareholders.get_conn"):
+    with patch("apis.futu.backfill_shareholders.get_conn"):
         n = backfill_insider_trades(client, "AAPL")
     assert n == 0
 
 
 def test_backfill_all_aggregates_via_streams(monkeypatch):
-    import futu_ingest.backfill_shareholders as m
+    import apis.futu.backfill_shareholders as m
 
     def fake_ts(fn, client, tickers, data_type, force=False):
         n = fn(client, tickers[0]) if tickers else 0
@@ -156,7 +156,7 @@ def test_backfill_all_aggregates_via_streams(monkeypatch):
 
 def test_shareholders_backfill_all_passes_5_data_types():
     """验证 backfill_all 正确传递 5 个 data_type 和 force 参数到 ticker_stream。"""
-    from futu_ingest.backfill_shareholders import backfill_all as sh_all
+    from apis.futu.backfill_shareholders import backfill_all as sh_all
 
     captured = []
 
@@ -164,8 +164,8 @@ def test_shareholders_backfill_all_passes_5_data_types():
         captured.append(data_type)
         return (1, 1, 0)
 
-    with patch("futu_ingest.backfill_shareholders.get_client"), \
-         patch("futu_ingest.backfill_shareholders.ticker_stream", side_effect=fake_ts):
+    with patch("apis.futu.backfill_shareholders.get_client"), \
+         patch("apis.futu.backfill_shareholders.ticker_stream", side_effect=fake_ts):
         rep = sh_all(["AAPL"], force=True)
     assert set(captured) == {
         "us_shareholders_overview", "us_holding_changes", "us_institutional",

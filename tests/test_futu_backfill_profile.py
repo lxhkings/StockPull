@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-from futu_ingest.backfill_profile import backfill_profile
+from apis.futu.backfill_profile import backfill_profile
 
 
 def _fake_profile():
@@ -14,7 +14,7 @@ def _fake_profile():
 def test_backfill_profile_upserts():
     client = MagicMock()
     client.call.return_value = _fake_profile()
-    with patch("futu_ingest.backfill_profile.get_conn") as mock_conn:
+    with patch("apis.futu.backfill_profile.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -32,17 +32,17 @@ def test_backfill_profile_upserts():
 def test_backfill_profile_skips_empty():
     client = MagicMock()
     client.call.return_value = None
-    with patch("futu_ingest.backfill_profile.get_conn"):
+    with patch("apis.futu.backfill_profile.get_conn"):
         n = backfill_profile(client, "AAPL")
     assert n == 0
 
 
-from futu_ingest.backfill_profile import backfill_all as profile_all
+from apis.futu.backfill_profile import backfill_all as profile_all
 
 
 def test_profile_backfill_all_uses_ticker_stream():
-    with patch("futu_ingest.backfill_profile.get_client"), \
-         patch("futu_ingest.backfill_profile.ticker_stream",
+    with patch("apis.futu.backfill_profile.get_client"), \
+         patch("apis.futu.backfill_profile.ticker_stream",
                return_value=(5, 1, 1)) as ts:
         rep = profile_all(["AAPL", "MSFT"], force=True)
     assert rep == {"rows": 5, "tickers": 1, "skipped": 1}

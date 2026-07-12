@@ -1,6 +1,6 @@
 import pandas as pd
 
-from ts_ingest.transform_prices import _normalize_pro_bar, pro_bar_rows
+from apis.tushare.transform_prices import _normalize_pro_bar, pro_bar_rows
 
 
 def _bar_df():

@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-from futu_ingest.client import to_futu_code, from_futu_code
+from apis.futu.client import to_futu_code, from_futu_code
 
 
 def test_to_futu_code_adds_us_prefix():
@@ -20,7 +20,7 @@ def test_from_futu_code_strips_us_prefix():
 
 
 def test_client_call_returns_data_on_ret_ok():
-    from futu_ingest.client import FutuClient
+    from apis.futu.client import FutuClient
     fake_ctx = MagicMock()
     fake_ctx.get_corporate_actions_dividends.return_value = (0, {"dividend_list": []})
     c = FutuClient()
@@ -31,7 +31,7 @@ def test_client_call_returns_data_on_ret_ok():
 
 
 def test_client_call_retries_then_raises_on_ret_error():
-    from futu_ingest.client import FutuClient
+    from apis.futu.client import FutuClient
     fake_ctx = MagicMock()
     fake_ctx.get_market_snapshot.return_value = (-1, "permission denied")
     c = FutuClient()
@@ -48,7 +48,7 @@ def test_client_call_retries_then_raises_on_ret_error():
 
 def test_client_call_handles_3_value_return():
     """get_short_interest / get_daily_short_volume 返回 3 个值。"""
-    from futu_ingest.client import FutuClient
+    from apis.futu.client import FutuClient
     fake_ctx = MagicMock()
     fake_df = MagicMock()
     fake_secondary = MagicMock()
@@ -62,7 +62,7 @@ def test_client_call_handles_3_value_return():
 
 def test_limiter_for_uses_per_method_interval():
     """不同 method 拿到各自 interval；未列接口走默认。"""
-    from futu_ingest.client import FutuClient
+    from apis.futu.client import FutuClient
     from config import FUTU_DEFAULT_INTERVAL
     c = FutuClient()
     fast = c._limiter_for("get_company_operational_efficiency")  # 120-cap
@@ -73,14 +73,14 @@ def test_limiter_for_uses_per_method_interval():
 
 def test_limiter_for_caches_same_instance():
     """同 method 多次取返回同一 limiter（共享窗口）。"""
-    from futu_ingest.client import FutuClient
+    from apis.futu.client import FutuClient
     c = FutuClient()
     assert c._limiter_for("get_market_snapshot") is c._limiter_for("get_market_snapshot")
 
 
 def test_client_call_3_value_retries_on_error():
     """3值返回 + ret != RET_OK 也应正确重试。"""
-    from futu_ingest.client import FutuClient
+    from apis.futu.client import FutuClient
     fake_ctx = MagicMock()
     fake_ctx.get_short_interest.return_value = (-1, "no permission", None)
     c = FutuClient()

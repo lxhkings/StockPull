@@ -1,7 +1,7 @@
 import json
 from unittest.mock import MagicMock, patch
 
-from futu_ingest.backfill_financial import backfill_statement, STATEMENT_TABLES
+from apis.futu.backfill_financial import backfill_statement, STATEMENT_TABLES
 
 
 def _fake_page():
@@ -27,7 +27,7 @@ def test_statement_tables_has_4_entries():
 def test_backfill_statement_upserts_with_raw_payload():
     client = MagicMock()
     client.call.return_value = _fake_page()
-    with patch("futu_ingest.backfill_financial.get_conn") as mock_conn:
+    with patch("apis.futu.backfill_financial.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -52,7 +52,7 @@ def test_backfill_statement_paginates_until_minus_one():
     page1 = _fake_page(); page1["next_key"] = "10"
     page2 = _fake_page(); page2["next_key"] = "-1"
     client.call.side_effect = [page1, page2]
-    with patch("futu_ingest.backfill_financial.get_conn") as mock_conn:
+    with patch("apis.futu.backfill_financial.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
         backfill_statement(client, "AAPL", statement_type=1, table="us_fin_income")
@@ -60,9 +60,9 @@ def test_backfill_statement_paginates_until_minus_one():
 
 
 def test_fin_sync_one_sums_4_statements():
-    from futu_ingest.backfill_financial import fin_sync_one
+    from apis.futu.backfill_financial import fin_sync_one
     client = MagicMock()
-    with patch("futu_ingest.backfill_financial.backfill_statement",
+    with patch("apis.futu.backfill_financial.backfill_statement",
                return_value=(3, "2025-09-26")) as bs:
         total = fin_sync_one(client, "AAPL")
     assert total == 12          # 4 表 × 3
@@ -70,9 +70,9 @@ def test_fin_sync_one_sums_4_statements():
 
 
 def test_backfill_all_delegates_to_ticker_stream_with_data_type():
-    from futu_ingest.backfill_financial import backfill_all
-    with patch("futu_ingest.backfill_financial.get_client"), \
-         patch("futu_ingest.backfill_financial.ticker_stream",
+    from apis.futu.backfill_financial import backfill_all
+    with patch("apis.futu.backfill_financial.get_client"), \
+         patch("apis.futu.backfill_financial.ticker_stream",
                return_value=(10, 1, 2)) as ts:
         rep = backfill_all(["AAPL", "MSFT", "GOOG"], force=True)
     assert rep == {"rows": 10, "tickers": 1, "skipped": 2}

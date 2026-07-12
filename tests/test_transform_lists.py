@@ -1,6 +1,6 @@
 import pandas as pd
 
-from ts_ingest.transform_lists import (
+from apis.tushare.transform_lists import (
     transform_stocks_a, transform_stocks_hk, transform_etf_basic,
     transform_hk_connect, transform_index_weight,
 )

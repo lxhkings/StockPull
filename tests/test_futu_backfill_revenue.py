@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-from futu_ingest.backfill_revenue import (
+from apis.futu.backfill_revenue import (
     backfill_revenue, backfill_earnings_move, RECENT_PERIODS
 )
 
@@ -34,7 +34,7 @@ def test_backfill_revenue_limits_periods():
     """应限制近 N 期，避免全量 71 期。"""
     client = MagicMock()
     client.call.return_value = _fake_revenue()
-    with patch("futu_ingest.backfill_revenue.get_conn") as mock_conn:
+    with patch("apis.futu.backfill_revenue.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -47,7 +47,7 @@ def test_backfill_revenue_limits_periods():
 def test_backfill_earnings_move_upserts():
     client = MagicMock()
     client.call.return_value = _fake_earnings_move()
-    with patch("futu_ingest.backfill_revenue.get_conn") as mock_conn:
+    with patch("apis.futu.backfill_revenue.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -58,7 +58,7 @@ def test_backfill_earnings_move_upserts():
 
 
 def test_backfill_all_aggregates_via_streams(monkeypatch):
-    import futu_ingest.backfill_revenue as m
+    import apis.futu.backfill_revenue as m
 
     def fake_ts(fn, client, tickers, data_type, force=False):
         n = fn(client, tickers[0]) if tickers else 0
@@ -74,7 +74,7 @@ def test_backfill_all_aggregates_via_streams(monkeypatch):
 
 def test_revenue_backfill_all_passes_data_types():
     """验证 backfill_all 正确传递 data_type 和 force 参数到 ticker_stream。"""
-    from futu_ingest.backfill_revenue import backfill_all as revenue_all
+    from apis.futu.backfill_revenue import backfill_all as revenue_all
 
     captured = []
 
@@ -82,8 +82,8 @@ def test_revenue_backfill_all_passes_data_types():
         captured.append((data_type, force))
         return (6, 3, 1)
 
-    with patch("futu_ingest.backfill_revenue.get_client"), \
-         patch("futu_ingest.backfill_revenue.ticker_stream", side_effect=fake_ts):
+    with patch("apis.futu.backfill_revenue.get_client"), \
+         patch("apis.futu.backfill_revenue.ticker_stream", side_effect=fake_ts):
         rep = revenue_all(["AAPL"], force=False)
     assert ("us_revenue_breakdown", False) in captured
     assert ("us_earnings_price_move", False) in captured

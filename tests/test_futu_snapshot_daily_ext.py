@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-from futu_ingest.snapshot_daily_ext import (
+from apis.futu.snapshot_daily_ext import (
     snapshot_capital_flow, snapshot_short_interest
 )
 
@@ -44,7 +44,7 @@ def _fake_short_volume():
 def test_snapshot_capital_flow_upserts():
     client = MagicMock()
     client.call.return_value = _fake_capital_flow()
-    with patch("futu_ingest.snapshot_daily_ext.get_conn") as mock_conn:
+    with patch("apis.futu.snapshot_daily_ext.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -58,7 +58,7 @@ def test_snapshot_short_interest_handles_3_value_return():
     """short_interest 返回 3 值，client 已适配。"""
     client = MagicMock()
     client.call.return_value = _fake_short_interest()
-    with patch("futu_ingest.snapshot_daily_ext.get_conn") as mock_conn:
+    with patch("apis.futu.snapshot_daily_ext.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -69,8 +69,8 @@ def test_snapshot_short_interest_handles_3_value_return():
 
 
 def test_run_daily_ext_aggregates_via_streams(monkeypatch):
-    import futu_ingest.snapshot_daily_ext as m
-    import futu_ingest.concurrency as conc
+    import apis.futu.snapshot_daily_ext as m
+    import apis.futu.concurrency as conc
     monkeypatch.setattr(m, "get_client", lambda: object())
     monkeypatch.setattr(m, "snapshot_capital_flow", lambda c, t: 1)
     monkeypatch.setattr(m, "snapshot_capital_dist", lambda c, t: 2)
@@ -89,15 +89,15 @@ def test_run_daily_ext_aggregates_via_streams(monkeypatch):
 
 def test_run_daily_ext_passes_4_daily_data_types():
     from unittest.mock import patch
-    from futu_ingest.snapshot_daily_ext import run_daily_ext as ext_run
+    from apis.futu.snapshot_daily_ext import run_daily_ext as ext_run
     captured = []
 
     def fake_ts(fn, client, tickers, data_type, force=False):
         captured.append((data_type, force))
         return (1, 1, 0)
 
-    with patch("futu_ingest.snapshot_daily_ext.get_client"), \
-         patch("futu_ingest.snapshot_daily_ext.ticker_stream", side_effect=fake_ts):
+    with patch("apis.futu.snapshot_daily_ext.get_client"), \
+         patch("apis.futu.snapshot_daily_ext.ticker_stream", side_effect=fake_ts):
         ext_run(["AAPL"], force=False)
     dtypes = {c[0] for c in captured}
     assert dtypes == {"us_capital_flow", "us_capital_distribution",

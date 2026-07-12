@@ -2,7 +2,7 @@ from datetime import date
 
 import pandas as pd
 
-from ts_ingest.transform_periodic import resample_ohlcv, periodic_rows
+from apis.tushare.transform_periodic import resample_ohlcv, periodic_rows
 
 
 def test_resample_ohlcv_weekly_aggregates_correctly():

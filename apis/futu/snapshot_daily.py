@@ -12,10 +12,10 @@ import pandas as pd
 
 from core.db_client import get_conn
 from config import FUTU_REFRESH_DAYS
-from futu_ingest.client import get_client, to_futu_code, from_futu_code
+from apis.futu.client import get_client, to_futu_code, from_futu_code
 from core.batch_utils import chunked
-from futu_ingest.concurrency import batch_with_bisect, run_streams, ticker_stream
-from futu_ingest.sync import fresh_tickers, mark_ok
+from apis.futu.concurrency import batch_with_bisect, run_streams, ticker_stream
+from apis.futu.sync import fresh_tickers, mark_ok
 
 log = logging.getLogger(__name__)
 

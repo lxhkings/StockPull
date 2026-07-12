@@ -1,4 +1,4 @@
-from ts_ingest.ticker_map import (
+from apis.tushare.ticker_map import (
     index_id_to_ts_code,
     is_a_share, is_hk, is_us,
     ts_code_to_canonical,

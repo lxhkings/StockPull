@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
-from ts_ingest.backfill_stock_dates import backfill_stock_dates, _sync_status
+from apis.tushare.backfill_stock_dates import backfill_stock_dates, _sync_status
 
 
 def test_sync_status_updates_matched_rows():
@@ -12,8 +12,8 @@ def test_sync_status_updates_matched_rows():
         "list_date": ["19940103", "19910403"],
         "delist_date": [None, None],
     })
-    with patch("ts_ingest.backfill_stock_dates.get_conn") as mock_conn, \
-         patch("ts_ingest.backfill_stock_dates.get_client", return_value=fake_client):
+    with patch("apis.tushare.backfill_stock_dates.get_conn") as mock_conn, \
+         patch("apis.tushare.backfill_stock_dates.get_client", return_value=fake_client):
         cur = MagicMock()
         cur.rowcount = 1
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
@@ -32,8 +32,8 @@ def test_backfill_stock_dates_calls_both_statuses():
     fake_client.call.return_value = pd.DataFrame({
         "ts_code": ["600519.SH"], "list_date": ["19940103"], "delist_date": [None],
     })
-    with patch("ts_ingest.backfill_stock_dates.get_conn") as mock_conn, \
-         patch("ts_ingest.backfill_stock_dates.get_client", return_value=fake_client):
+    with patch("apis.tushare.backfill_stock_dates.get_conn") as mock_conn, \
+         patch("apis.tushare.backfill_stock_dates.get_client", return_value=fake_client):
         cur = MagicMock()
         cur.rowcount = 1
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value

@@ -1,6 +1,6 @@
 import pandas as pd
 
-from ts_ingest.transform_valuation import transform_valuation_rows
+from apis.tushare.transform_valuation import transform_valuation_rows
 
 
 def test_transform_valuation_rows_converts_date_and_casts_floats():

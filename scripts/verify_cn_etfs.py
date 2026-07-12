@@ -3,7 +3,7 @@
 跑法: uv run python scripts/verify_cn_etfs.py
 """
 from config import CN_SECTOR_ETFS
-from ts_ingest.client import get_client
+from apis.tushare.client import get_client
 
 
 def main() -> int:

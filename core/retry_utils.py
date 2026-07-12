@@ -1,6 +1,6 @@
 """retry_utils.py — 通用重试+指数退避骨架。
 
-三家 client（yf_client.py / ts_ingest/client.py / futu_ingest/client.py）
+三家 client（yf_client.py / apis.tushare/client.py / apis.futu/client.py）
 此前各自实现了一份指数退避循环，本模块收敛为单一实现。
 """
 from __future__ import annotations

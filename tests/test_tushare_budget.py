@@ -3,12 +3,12 @@ from unittest.mock import MagicMock
 
 
 def setup_function():
-    from ts_ingest import budget
+    from apis.tushare import budget
     budget.reset()
 
 
 def test_tick_increments_total_and_per_api():
-    from ts_ingest import budget
+    from apis.tushare import budget
     budget.tick("stock_basic")
     budget.tick("stock_basic")
     budget.tick("pro_bar")
@@ -19,7 +19,7 @@ def test_tick_increments_total_and_per_api():
 
 
 def test_report_includes_elapsed_and_rate():
-    from ts_ingest import budget
+    from apis.tushare import budget
     budget.tick("a")
     rep = budget.report()
     assert "calls=" in rep
@@ -27,7 +27,7 @@ def test_report_includes_elapsed_and_rate():
 
 
 def test_precheck_passes_when_sample_call_returns_data():
-    from ts_ingest import budget
+    from apis.tushare import budget
     fake_client = MagicMock()
     fake_df = MagicMock()
     fake_df.empty = False
@@ -37,7 +37,7 @@ def test_precheck_passes_when_sample_call_returns_data():
 
 
 def test_precheck_returns_failed_apis():
-    from ts_ingest import budget
+    from apis.tushare import budget
     fake_client = MagicMock()
     fake_df = MagicMock()
     fake_df.empty = False

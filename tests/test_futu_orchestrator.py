@@ -1,14 +1,14 @@
 from unittest.mock import patch
 
-import futu_ingest.orchestrator as orch
-from futu_ingest.orchestrator import run_sync
+import apis.futu.orchestrator as orch
+from apis.futu.orchestrator import run_sync
 
 
 def test_run_backfill_financial_scope_calls_only_financial():
-    with patch("futu_ingest.orchestrator.list_us_tickers", return_value=["AAPL"]), \
-         patch("futu_ingest.orchestrator.fin_backfill_all", return_value={"rows": 4}) as fin, \
-         patch("futu_ingest.orchestrator.earnings_backfill_all") as earn, \
-         patch("futu_ingest.orchestrator.actions_backfill_all") as act:
+    with patch("apis.futu.orchestrator.list_us_tickers", return_value=["AAPL"]), \
+         patch("apis.futu.orchestrator.fin_backfill_all", return_value={"rows": 4}) as fin, \
+         patch("apis.futu.orchestrator.earnings_backfill_all") as earn, \
+         patch("apis.futu.orchestrator.actions_backfill_all") as act:
         rep = run_sync(scope="financial", force=True)
     fin.assert_called_once()
     earn.assert_not_called()
@@ -17,17 +17,17 @@ def test_run_backfill_financial_scope_calls_only_financial():
 
 
 def test_run_backfill_all_calls_financial_earnings_actions():
-    with patch("futu_ingest.orchestrator.list_us_tickers", return_value=["AAPL"]), \
-         patch("futu_ingest.orchestrator.fin_backfill_all", return_value={}) as fin, \
-         patch("futu_ingest.orchestrator.earnings_backfill_all", return_value={}) as earn, \
-         patch("futu_ingest.orchestrator.actions_backfill_all", return_value={}) as act, \
-         patch("futu_ingest.orchestrator.profile_backfill_all", return_value={}), \
-         patch("futu_ingest.orchestrator.revenue_backfill_all", return_value={}), \
-         patch("futu_ingest.orchestrator.shareholders_backfill_all", return_value={}), \
-         patch("futu_ingest.orchestrator.efficiency_backfill_all", return_value={}), \
-         patch("futu_ingest.orchestrator.snapshot_run_daily", return_value={}), \
-         patch("futu_ingest.orchestrator.daily_ext_run", return_value={}), \
-         patch("futu_ingest.orchestrator.snapshot_run_weekly", return_value={}):
+    with patch("apis.futu.orchestrator.list_us_tickers", return_value=["AAPL"]), \
+         patch("apis.futu.orchestrator.fin_backfill_all", return_value={}) as fin, \
+         patch("apis.futu.orchestrator.earnings_backfill_all", return_value={}) as earn, \
+         patch("apis.futu.orchestrator.actions_backfill_all", return_value={}) as act, \
+         patch("apis.futu.orchestrator.profile_backfill_all", return_value={}), \
+         patch("apis.futu.orchestrator.revenue_backfill_all", return_value={}), \
+         patch("apis.futu.orchestrator.shareholders_backfill_all", return_value={}), \
+         patch("apis.futu.orchestrator.efficiency_backfill_all", return_value={}), \
+         patch("apis.futu.orchestrator.snapshot_run_daily", return_value={}), \
+         patch("apis.futu.orchestrator.daily_ext_run", return_value={}), \
+         patch("apis.futu.orchestrator.snapshot_run_weekly", return_value={}):
         run_sync(scope="all", force=True)
     fin.assert_called_once()
     earn.assert_called_once()

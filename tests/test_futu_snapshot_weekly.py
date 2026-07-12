@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-from futu_ingest.snapshot_weekly import (
+from apis.futu.snapshot_weekly import (
     snapshot_valuation, snapshot_rating, snapshot_morningstar
 )
 
@@ -43,7 +43,7 @@ def _fake_morningstar():
 def test_snapshot_valuation_extracts_key_fields():
     client = MagicMock()
     client.call.return_value = _fake_valuation()
-    with patch("futu_ingest.snapshot_weekly.get_conn") as mock_conn:
+    with patch("apis.futu.snapshot_weekly.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -63,7 +63,7 @@ def test_snapshot_rating_paginates():
     page2 = _fake_rating()
     page2["next_key"] = "-1"
     client.call.side_effect = [page1, page2]
-    with patch("futu_ingest.snapshot_weekly.get_conn") as mock_conn:
+    with patch("apis.futu.snapshot_weekly.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -75,7 +75,7 @@ def test_snapshot_rating_paginates():
 def test_snapshot_morningstar_upserts():
     client = MagicMock()
     client.call.return_value = _fake_morningstar()
-    with patch("futu_ingest.snapshot_weekly.get_conn") as mock_conn:
+    with patch("apis.futu.snapshot_weekly.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -89,8 +89,8 @@ def test_snapshot_morningstar_upserts():
 
 
 def test_run_weekly_aggregates_via_streams(monkeypatch):
-    import futu_ingest.snapshot_weekly as m
-    import futu_ingest.concurrency as conc
+    import apis.futu.snapshot_weekly as m
+    import apis.futu.concurrency as conc
     monkeypatch.setattr(m, "get_client", lambda: object())
     monkeypatch.setattr(m, "snapshot_valuation", lambda c, t: 1)
     monkeypatch.setattr(m, "snapshot_rating", lambda c, t: 2)
@@ -104,15 +104,15 @@ def test_run_weekly_aggregates_via_streams(monkeypatch):
 
 def test_run_weekly_passes_3_data_types():
     from unittest.mock import patch
-    from futu_ingest.snapshot_weekly import run_weekly as weekly_run
+    from apis.futu.snapshot_weekly import run_weekly as weekly_run
     captured = []
 
     def fake_ts(fn, client, tickers, data_type, force=False):
         captured.append((data_type, force))
         return (1, 1, 0)
 
-    with patch("futu_ingest.snapshot_daily_ext.get_client"), \
-         patch("futu_ingest.snapshot_weekly.ticker_stream", side_effect=fake_ts):
+    with patch("apis.futu.snapshot_daily_ext.get_client"), \
+         patch("apis.futu.snapshot_weekly.ticker_stream", side_effect=fake_ts):
         weekly_run(["AAPL"], force=True)
     assert {c[0] for c in captured} == {
         "us_valuation_snapshot", "us_rating_summary", "us_morningstar"}

@@ -9,8 +9,8 @@ from tqdm import tqdm
 
 from config import TUSHARE_BACKFILL_START
 from core.db_client import get_conn
-from ts_ingest.client import get_client
-from ts_ingest.transform_shareholder_return import (
+from apis.tushare.client import get_client
+from apis.tushare.transform_shareholder_return import (
     transform_dividend_rows,
     transform_repurchase_rows,
     transform_holdertrade_rows,

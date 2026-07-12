@@ -22,7 +22,7 @@ from config import (
 )
 from core.http_utils import RateLimiter
 from core.retry_utils import retry_with_backoff
-from ts_ingest import budget
+from apis.tushare import budget
 
 log = logging.getLogger(__name__)
 

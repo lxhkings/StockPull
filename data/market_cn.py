@@ -8,11 +8,11 @@ from typing import Optional
 import pandas as pd
 
 from core.db_client import get_conn, query, execute
-from ts_ingest import prices_cn as stock_updater_cn
+from apis.tushare import prices_cn as stock_updater_cn
 from core.http_utils import to_float
-from ts_ingest.backfill_lists import backfill_stocks_a
-from ts_ingest.client import get_client
-from ts_ingest.ticker_map import index_id_to_ts_code
+from apis.tushare.backfill_lists import backfill_stocks_a
+from apis.tushare.client import get_client
+from apis.tushare.ticker_map import index_id_to_ts_code
 
 log = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ def incremental(tickers: list[str]) -> dict[str, str]:
 def update_index_price() -> int:
     """中证800 指数 close via tushare index_daily + 行业 ETF hfq close via fund_daily × fund_adj。"""
     csi800_count = _update_csi800()
-    from ts_ingest.etf_cn import update_etf_prices
+    from apis.tushare.etf_cn import update_etf_prices
     etf_count = update_etf_prices()
     return csi800_count + etf_count
 
@@ -136,6 +136,6 @@ def rebase(
 
 def weekly(tickers: list[str] | None = None) -> dict[str, str]:
     """Pull weekly prices for CN universe into prices_weekly."""
-    from ts_ingest import prices_cn_weekly
+    from apis.tushare import prices_cn_weekly
     targets = tickers or list_active_tickers()
     return prices_cn_weekly.update_weekly_batch(targets)

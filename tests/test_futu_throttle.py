@@ -1,10 +1,10 @@
 from unittest.mock import MagicMock, patch
 
-from futu_ingest.sync import fresh_tickers, mark_ok, mark_error
+from apis.futu.sync import fresh_tickers, mark_ok, mark_error
 
 
 def test_fresh_tickers_returns_set_from_query():
-    with patch("futu_ingest.sync.get_conn") as mock_conn:
+    with patch("apis.futu.sync.get_conn") as mock_conn:
         cur = MagicMock()
         cur.fetchall.return_value = [("AAPL",), ("MSFT",)]
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -17,7 +17,7 @@ def test_fresh_tickers_returns_set_from_query():
 
 
 def test_fresh_tickers_empty():
-    with patch("futu_ingest.sync.get_conn") as mock_conn:
+    with patch("apis.futu.sync.get_conn") as mock_conn:
         cur = MagicMock()
         cur.fetchall.return_value = []
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -25,8 +25,8 @@ def test_fresh_tickers_empty():
 
 
 def test_mark_ok_calls_set_sync_ok_with_today():
-    with patch("futu_ingest.sync.get_conn") as mock_conn, \
-         patch("futu_ingest.sync.set_sync_ok") as sso:
+    with patch("apis.futu.sync.get_conn") as mock_conn, \
+         patch("apis.futu.sync.set_sync_ok") as sso:
         conn = mock_conn.return_value
         mark_ok("AAPL", "us_financial", 12)
     args = sso.call_args[0]
@@ -36,8 +36,8 @@ def test_mark_ok_calls_set_sync_ok_with_today():
 
 
 def test_mark_error_calls_set_sync_error():
-    with patch("futu_ingest.sync.get_conn") as mock_conn, \
-         patch("futu_ingest.sync.set_sync_error") as sse:
+    with patch("apis.futu.sync.get_conn") as mock_conn, \
+         patch("apis.futu.sync.set_sync_error") as sse:
         conn = mock_conn.return_value
         mark_error("AAPL", "us_financial", "boom")
     args = sse.call_args[0]

@@ -2,7 +2,7 @@ import json
 
 import pandas as pd
 
-from ts_ingest.transform_financial import transform_financial_rows
+from apis.tushare.transform_financial import transform_financial_rows
 
 
 def test_transform_with_report_type_builds_json_payload():

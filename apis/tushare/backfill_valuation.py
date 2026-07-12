@@ -8,8 +8,8 @@ import pymysql.cursors
 
 from config import TUSHARE_BACKFILL_START
 from core.db_client import get_conn
-from ts_ingest.client import get_client
-from ts_ingest.transform_valuation import transform_valuation_rows
+from apis.tushare.client import get_client
+from apis.tushare.transform_valuation import transform_valuation_rows
 
 log = logging.getLogger(__name__)
 

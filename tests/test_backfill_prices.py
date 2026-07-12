@@ -1,7 +1,7 @@
 from unittest.mock import patch, MagicMock
 import pandas as pd
 
-from ts_ingest.backfill_prices import backfill_one, backfill_market
+from apis.tushare.backfill_prices import backfill_one, backfill_market
 
 
 def _bar_df():
@@ -19,9 +19,9 @@ def _bar_df():
 def test_backfill_one_writes_with_on_duplicate():
     fake_client = MagicMock()
     fake_client.pro_bar.return_value = _bar_df()
-    with patch("ts_ingest.backfill_prices.get_conn") as mock_conn, \
-         patch("ts_ingest.backfill_prices.get_client", return_value=fake_client), \
-         patch("ts_ingest.backfill_prices.set_sync_ok") as mock_ok:
+    with patch("apis.tushare.backfill_prices.get_conn") as mock_conn, \
+         patch("apis.tushare.backfill_prices.get_client", return_value=fake_client), \
+         patch("apis.tushare.backfill_prices.set_sync_ok") as mock_ok:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -38,9 +38,9 @@ def test_backfill_one_writes_with_on_duplicate():
 def test_backfill_one_us_does_not_use_hfq():
     fake_client = MagicMock()
     fake_client.pro_bar.return_value = _bar_df().assign(ts_code="AAPL")
-    with patch("ts_ingest.backfill_prices.get_conn") as mock_conn, \
-         patch("ts_ingest.backfill_prices.get_client", return_value=fake_client), \
-         patch("ts_ingest.backfill_prices.set_sync_ok"):
+    with patch("apis.tushare.backfill_prices.get_conn") as mock_conn, \
+         patch("apis.tushare.backfill_prices.get_client", return_value=fake_client), \
+         patch("apis.tushare.backfill_prices.set_sync_ok"):
         cur = MagicMock()
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
         backfill_one("AAPL", market="us")
@@ -55,10 +55,10 @@ def test_backfill_market_continues_on_per_ticker_failure():
         Exception("ticker A failed"),
         _bar_df(),
     ]
-    with patch("ts_ingest.backfill_prices.get_conn") as mock_conn, \
-         patch("ts_ingest.backfill_prices.get_client", return_value=fake_client), \
-         patch("ts_ingest.backfill_prices.set_sync_ok"), \
-         patch("ts_ingest.backfill_prices.set_sync_error") as mock_err:
+    with patch("apis.tushare.backfill_prices.get_conn") as mock_conn, \
+         patch("apis.tushare.backfill_prices.get_client", return_value=fake_client), \
+         patch("apis.tushare.backfill_prices.set_sync_ok"), \
+         patch("apis.tushare.backfill_prices.set_sync_error") as mock_err:
         cur = MagicMock()
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
         report = backfill_market(["A.SH", "B.SH"], market="cn")

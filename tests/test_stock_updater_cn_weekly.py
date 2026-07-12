@@ -6,7 +6,7 @@ import pandas as pd
 # ── _normalize_pro_bar ────────────────────────────────────────────────────────
 
 def test_normalize_pro_bar_happy_path():
-    from ts_ingest.prices_cn_weekly import _normalize_pro_bar
+    from apis.tushare.prices_cn_weekly import _normalize_pro_bar
     df = pd.DataFrame({
         "trade_date": ["20260511", "20260518"],
         "open":  [100.0, 102.0],
@@ -23,14 +23,14 @@ def test_normalize_pro_bar_happy_path():
 
 
 def test_normalize_pro_bar_empty():
-    from ts_ingest.prices_cn_weekly import _normalize_pro_bar
+    from apis.tushare.prices_cn_weekly import _normalize_pro_bar
     result = _normalize_pro_bar(pd.DataFrame())
     assert result.empty
 
 
 def test_normalize_pro_bar_sorted_ascending():
     """Rows returned in ascending date order regardless of tushare order."""
-    from ts_ingest.prices_cn_weekly import _normalize_pro_bar
+    from apis.tushare.prices_cn_weekly import _normalize_pro_bar
     df = pd.DataFrame({
         "trade_date": ["20260518", "20260511"],  # reversed
         "open":  [102.0, 100.0],
@@ -47,7 +47,7 @@ def test_normalize_pro_bar_sorted_ascending():
 # ── _save_weekly_prices_batch ─────────────────────────────────────────────────
 
 def test_save_weekly_prices_batch_uses_prices_weekly_table():
-    from ts_ingest.prices_cn_weekly import _save_weekly_prices_batch
+    from apis.tushare.prices_cn_weekly import _save_weekly_prices_batch
     mock_conn = MagicMock()
     mock_cur = MagicMock()
     mock_conn.cursor.return_value.__enter__ = lambda s: mock_cur
@@ -66,17 +66,17 @@ def test_save_weekly_prices_batch_uses_prices_weekly_table():
 # ── update_weekly_batch ───────────────────────────────────────────────────────
 
 def test_update_weekly_batch_empty():
-    from ts_ingest.prices_cn_weekly import update_weekly_batch
+    from apis.tushare.prices_cn_weekly import update_weekly_batch
     assert update_weekly_batch([]) == {}
 
 
 def test_update_weekly_batch_all_already_synced():
     """All tickers already at last_trading: skips without fetching."""
-    from ts_ingest.prices_cn_weekly import update_weekly_batch
-    with patch("ts_ingest.prices_cn_weekly.last_cn_trading_date",
+    from apis.tushare.prices_cn_weekly import update_weekly_batch
+    with patch("apis.tushare.prices_cn_weekly.last_cn_trading_date",
                return_value=date(2026, 5, 16)), \
-         patch("ts_ingest.prices_cn_weekly.get_conn") as mock_conn_fn, \
-         patch("ts_ingest.prices_cn_weekly.get_last_sync_map",
+         patch("apis.tushare.prices_cn_weekly.get_conn") as mock_conn_fn, \
+         patch("apis.tushare.prices_cn_weekly.get_last_sync_map",
                return_value={"600519.SH": date(2026, 5, 16),
                              "000001.SZ": date(2026, 5, 16)}):
         mock_conn = MagicMock()
@@ -87,20 +87,20 @@ def test_update_weekly_batch_all_already_synced():
 
 def test_update_weekly_batch_new_tickers_trigger_full_backfill():
     """New tickers (no sync_log) trigger full history fetch."""
-    from ts_ingest.prices_cn_weekly import update_weekly_batch
+    from apis.tushare.prices_cn_weekly import update_weekly_batch
     from config import TUSHARE_BACKFILL_START
 
-    with patch("ts_ingest.prices_cn_weekly.last_cn_trading_date",
+    with patch("apis.tushare.prices_cn_weekly.last_cn_trading_date",
                return_value=date(2026, 5, 16)), \
-         patch("ts_ingest.prices_cn_weekly.get_conn") as mock_conn_fn, \
-         patch("ts_ingest.prices_cn_weekly.get_last_sync_map",
+         patch("apis.tushare.prices_cn_weekly.get_conn") as mock_conn_fn, \
+         patch("apis.tushare.prices_cn_weekly.get_last_sync_map",
                return_value={"600519.SH": None}), \
-         patch("ts_ingest.prices_cn_weekly._fetch_one", return_value=pd.DataFrame({
+         patch("apis.tushare.prices_cn_weekly._fetch_one", return_value=pd.DataFrame({
              "date": [date(2026, 5, 16)],
              "open": [100.0], "high": [105.0], "low": [99.0],
              "close": [103.0], "volume": [1_000_000],
          })) as mock_fetch, \
-         patch("ts_ingest.prices_cn_weekly._flush_batch"):
+         patch("apis.tushare.prices_cn_weekly._flush_batch"):
         mock_conn = MagicMock()
         mock_conn_fn.return_value = mock_conn
         result = update_weekly_batch(["600519.SH"])
@@ -112,5 +112,5 @@ def test_update_weekly_batch_new_tickers_trigger_full_backfill():
 
 def test_sync_data_type_is_price_weekly():
     """SYNC_DATA_TYPE constant must be 'price_weekly'."""
-    from ts_ingest.prices_cn_weekly import SYNC_DATA_TYPE
+    from apis.tushare.prices_cn_weekly import SYNC_DATA_TYPE
     assert SYNC_DATA_TYPE == "price_weekly"

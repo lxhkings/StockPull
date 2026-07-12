@@ -2,7 +2,7 @@
 from unittest.mock import patch
 
 
-@patch("ts_ingest.etf_cn.update_etf_prices")
+@patch("apis.tushare.etf_cn.update_etf_prices")
 def test_rebase_etf_only_calls_update_with_full_rebase(mock_update):
     """main.py rebase --market cn --etf-only → update_etf_prices(full_rebase=True)."""
     mock_update.return_value = 100

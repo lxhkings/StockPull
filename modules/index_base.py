@@ -1,6 +1,6 @@
 """Index updater shared helpers.
 
-Used by index_updater_us, index_cn (ts_ingest), index_updater_hk.
+Used by index_updater_us, index_cn (apis.tushare), index_updater_hk.
 """
 
 from __future__ import annotations

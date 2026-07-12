@@ -5,7 +5,7 @@ import pandas as pd
 
 from core.db_client import get_conn
 from core.http_utils import to_date
-from ts_ingest.client import get_client
+from apis.tushare.client import get_client
 
 log = logging.getLogger(__name__)
 

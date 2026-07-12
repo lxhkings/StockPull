@@ -5,8 +5,8 @@ import json
 import logging
 
 from core.db_client import get_conn
-from futu_ingest.client import clean_date, get_client, to_futu_code
-from futu_ingest.concurrency import ticker_stream
+from apis.futu.client import clean_date, get_client, to_futu_code
+from apis.futu.concurrency import ticker_stream
 
 log = logging.getLogger(__name__)
 

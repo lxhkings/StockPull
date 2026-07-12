@@ -7,8 +7,8 @@ from datetime import date
 # Tushare-based tests
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-@patch("ts_ingest.index_cn.query")
-@patch("ts_ingest.index_cn.get_client")
+@patch("apis.tushare.index_cn.query")
+@patch("apis.tushare.index_cn.get_client")
 def test_fetch_csi800_uses_tushare_index_weight(mock_get_client, mock_query):
     """Test that _fetch_csi800 uses tushare index_weight API."""
     mock_client = MagicMock()
@@ -30,7 +30,7 @@ def test_fetch_csi800_uses_tushare_index_weight(mock_get_client, mock_query):
         {"ticker": "300750.SZ", "name": "宁德时代", "gics_sector": "电力设备"},
     ]
 
-    from ts_ingest.index_cn import _fetch_csi800
+    from apis.tushare.index_cn import _fetch_csi800
     df = _fetch_csi800()
 
     # Verify tushare API called correctly
@@ -43,8 +43,8 @@ def test_fetch_csi800_uses_tushare_index_weight(mock_get_client, mock_query):
     assert df[df["ticker"] == "600519.SH"]["sector"].iloc[0] == "食品饮料"
 
 
-@patch("ts_ingest.index_cn.query")
-@patch("ts_ingest.index_cn.get_client")
+@patch("apis.tushare.index_cn.query")
+@patch("apis.tushare.index_cn.get_client")
 def test_fetch_csi800_handles_missing_stock_info(mock_get_client, mock_query):
     """Test that _fetch_csi800 handles tickers not in stocks table."""
     mock_client = MagicMock()
@@ -61,7 +61,7 @@ def test_fetch_csi800_handles_missing_stock_info(mock_get_client, mock_query):
     # No matching stock in stocks table
     mock_query.return_value = []
 
-    from ts_ingest.index_cn import _fetch_csi800
+    from apis.tushare.index_cn import _fetch_csi800
     df = _fetch_csi800()
 
     assert len(df) == 1
@@ -70,35 +70,35 @@ def test_fetch_csi800_handles_missing_stock_info(mock_get_client, mock_query):
     assert pd.isna(df["sector"].iloc[0]) or df["sector"].iloc[0] is None
 
 
-@patch("ts_ingest.index_cn.get_client")
+@patch("apis.tushare.index_cn.get_client")
 def test_fetch_csi800_handles_empty_response(mock_get_client):
     """Test that _fetch_csi800 handles empty DataFrame from tushare."""
     mock_client = MagicMock()
     mock_get_client.return_value = mock_client
     mock_client.call.return_value = pd.DataFrame()  # empty
 
-    from ts_ingest.index_cn import _fetch_csi800
+    from apis.tushare.index_cn import _fetch_csi800
     df = _fetch_csi800()
 
     assert df.empty
     assert list(df.columns) == ["ticker", "name", "sector"]
 
 
-@patch("ts_ingest.index_cn.get_client")
+@patch("apis.tushare.index_cn.get_client")
 def test_fetch_csi800_handles_none_response(mock_get_client):
     """Test that _fetch_csi800 handles None response from tushare."""
     mock_client = MagicMock()
     mock_get_client.return_value = mock_client
     mock_client.call.return_value = None
 
-    from ts_ingest.index_cn import _fetch_csi800
+    from apis.tushare.index_cn import _fetch_csi800
     df = _fetch_csi800()
 
     assert df.empty
     assert list(df.columns) == ["ticker", "name", "sector"]
 
 
-@patch("ts_ingest.index_cn.get_client")
+@patch("apis.tushare.index_cn.get_client")
 def test_fetch_csi800_handles_missing_columns(mock_get_client):
     """Test that _fetch_csi800 handles response with missing required columns."""
     mock_client = MagicMock()
@@ -109,18 +109,18 @@ def test_fetch_csi800_handles_missing_columns(mock_get_client):
         "trade_date": ["20260513"],
     })
 
-    from ts_ingest.index_cn import _fetch_csi800
+    from apis.tushare.index_cn import _fetch_csi800
     df = _fetch_csi800()
 
     assert df.empty
     assert list(df.columns) == ["ticker", "name", "sector"]
 
 
-@patch("ts_ingest.index_cn._fetch_csi800")
-@patch("ts_ingest.index_cn.get_conn")
+@patch("apis.tushare.index_cn._fetch_csi800")
+@patch("apis.tushare.index_cn.get_conn")
 def test_update_csi800_skips_when_today_already_done(mock_get_conn, mock_fetch):
     """If snapshot already exists for today, skip without fetching constituents."""
-    from ts_ingest.index_cn import update_csi800
+    from apis.tushare.index_cn import update_csi800
 
     # Mock connection with proper context manager support
     mock_conn = MagicMock()

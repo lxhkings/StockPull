@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import date
 
 
-@patch("ts_ingest.etf_cn.update_etf_prices", return_value=0)
+@patch("apis.tushare.etf_cn.update_etf_prices", return_value=0)
 @patch("data.market_cn.query")
 @patch("data.market_cn.execute")
 @patch("data.market_cn.get_client")
@@ -55,7 +55,7 @@ def test_update_index_price_uses_tushare_index_daily(mock_get_client, mock_execu
     assert rows[1][2] == 5610.0  # close
 
 
-@patch("ts_ingest.etf_cn.update_etf_prices", return_value=0)
+@patch("apis.tushare.etf_cn.update_etf_prices", return_value=0)
 @patch("data.market_cn.query")
 @patch("data.market_cn.execute")
 @patch("data.market_cn.get_client")
@@ -74,7 +74,7 @@ def test_update_index_price_empty_response(mock_get_client, mock_execute, mock_q
     assert not mock_execute.called
 
 
-@patch("ts_ingest.etf_cn.update_etf_prices", return_value=0)
+@patch("apis.tushare.etf_cn.update_etf_prices", return_value=0)
 @patch("data.market_cn.query")
 @patch("data.market_cn.execute")
 @patch("data.market_cn.get_client")
@@ -105,7 +105,7 @@ def test_update_index_price_no_last_date(mock_get_client, mock_execute, mock_que
     assert len(rows) == 1
 
 
-@patch("ts_ingest.etf_cn.update_etf_prices", return_value=0)
+@patch("apis.tushare.etf_cn.update_etf_prices", return_value=0)
 @patch("data.market_cn.query")
 @patch("data.market_cn.execute")
 @patch("data.market_cn.get_client")
@@ -124,7 +124,7 @@ def test_update_index_price_handles_exception(mock_get_client, mock_execute, moc
     assert not mock_execute.called
 
 
-@patch("ts_ingest.etf_cn.update_etf_prices", return_value=0)
+@patch("apis.tushare.etf_cn.update_etf_prices", return_value=0)
 @patch("data.market_cn.query")
 @patch("data.market_cn.get_client")
 def test_update_index_price_missing_columns(mock_get_client, mock_query, mock_etf_update):
@@ -142,7 +142,7 @@ def test_update_index_price_missing_columns(mock_get_client, mock_query, mock_et
     assert count == 0
 
 
-@patch("ts_ingest.etf_cn.update_etf_prices", return_value=0)
+@patch("apis.tushare.etf_cn.update_etf_prices", return_value=0)
 @patch("data.market_cn.query")
 @patch("data.market_cn.get_client")
 def test_update_index_price_none_response(mock_get_client, mock_query, mock_etf_update):
