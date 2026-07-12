@@ -1,4 +1,7 @@
-"""CLI argument parser: new secondary commands + suppressed legacy top-level."""
+"""CLI argument parser: prices | tushare | futu | init | status | db.
+
+旧顶层命令由 cli.deprecate.rewrite_legacy_argv 在 parse 前改写，本文件不再镜像。
+"""
 
 from __future__ import annotations
 
@@ -14,16 +17,8 @@ _FUTU_SCOPES = (
 )
 
 
-def _hide_suppressed(sub: argparse._SubParsersAction) -> None:
-    """argparse 对 help=SUPPRESS 的子命令仍会列出 `==SUPPRESS==`；从 help 列表移除。"""
-    sub._choices_actions = [
-        a for a in sub._choices_actions if a.help is not argparse.SUPPRESS
-    ]
-
-
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="main.py", description="StockPull ingest CLI")
-    # metavar 只展示新顶层，避免 usage 行堆满旧名（旧命令仍可解析）
     sub = p.add_subparsers(
         dest="cmd",
         required=True,
@@ -137,77 +132,4 @@ def build_parser() -> argparse.ArgumentParser:
         help="确认删除；不加则只打印各表行数（dry-run）",
     )
 
-    # --- legacy top-level (hidden from -h, still callable) ---
-    p_daily_old = sub.add_parser("daily", help=argparse.SUPPRESS)
-    p_daily_old.add_argument("--market", choices=MARKETS, default="all")
-    p_daily_old.add_argument("--code", action="append", default=None,
-                             help="Only this ticker (repeatable, debug aid)")
-    p_daily_old.add_argument("--index", default=None,
-                             help="指数成分股（仅 US 市场：SP500）")
-
-    p_rebase_old = sub.add_parser("rebase", help=argparse.SUPPRESS)
-    p_rebase_old.add_argument("--market", choices=("cn", "hk", "us"), required=True)
-    p_rebase_old.add_argument("--code", action="append", default=None)
-    p_rebase_old.add_argument("--years", type=int, default=None, help="历史年数（默认：US=5, CN/HK=15）")
-    p_rebase_old.add_argument("--index", default=None,
-                              help="指数成分股（仅 US 市场：SP500）")
-    p_rebase_old.add_argument("--etf-only", action="store_true",
-                              help="仅重灌 ETF index_prices（仅 CN 市场）")
-
-    p_weekly_old = sub.add_parser("weekly", help=argparse.SUPPRESS)
-    p_weekly_old.add_argument("--market", choices=("us", "cn"), default="us")
-    p_weekly_old.add_argument("--code", action="append", default=None,
-                              help="Only this ticker (repeatable, debug aid)")
-
-    sub.add_parser("migrate-intraday", help=argparse.SUPPRESS)
-
-    p_intraday_old = sub.add_parser("intraday", help=argparse.SUPPRESS)
-    p_intraday_old.add_argument(
-        "--interval",
-        choices=["15m", "1h"],
-        default=None,
-        help="仅拉取指定 interval（默认：15m 和 1h 均拉）",
-    )
-    p_intraday_old.add_argument(
-        "--rebase",
-        action="store_true",
-        default=False,
-        help="全量回补，忽略 sync_log，拉满最大可得历史（1h=730天，15m=60天）",
-    )
-
-    p_ts_old = sub.add_parser("tushare-backfill", help=argparse.SUPPRESS)
-    p_ts_old.add_argument("--scope", choices=_TS_SCOPES, default="all")
-    p_ts_old.add_argument("--market", choices=("all", "cn", "hk", "us"), default="all")
-    p_ts_old.add_argument("--dry-run", action="store_true")
-    p_ts_old.add_argument(
-        "--start", default=None,
-        help="YYYYMMDD，强制指定起点重新回填历史（valuation 默认从上次同步点增量续拉，"
-             "需要这个才会往回填；financial 默认已是 TUSHARE_BACKFILL_START 全量，"
-             "传了就换成这个起点）",
-    )
-
-    p_tfull_old = sub.add_parser("tushare-full", help=argparse.SUPPRESS)
-    p_tfull_old.add_argument("--scope", choices=_TS_SCOPES, default="all")
-    p_tfull_old.add_argument("--market", choices=("all", "cn", "hk", "us"), default="all")
-    p_tfull_old.add_argument("--dry-run", action="store_true")
-
-    p_tsync_old = sub.add_parser("tushare-sync", help=argparse.SUPPRESS)
-    p_tsync_old.add_argument("--scope", choices=_TS_SCOPES, default="all")
-    p_tsync_old.add_argument("--market", choices=("all", "cn", "hk", "us"), default="all")
-    p_tsync_old.add_argument("--dry-run", action="store_true")
-
-    p_ff_old = sub.add_parser("futu-full", help=argparse.SUPPRESS)
-    p_ff_old.add_argument("--scope", choices=_FUTU_SCOPES, default="all")
-    p_fs_old = sub.add_parser("futu-sync", help=argparse.SUPPRESS)
-    p_fs_old.add_argument("--scope", choices=_FUTU_SCOPES, default="all")
-    sub.add_parser("futu-flush", help=argparse.SUPPRESS)
-
-    p_tf_old = sub.add_parser("tushare-flush", help=argparse.SUPPRESS)
-    p_tf_old.add_argument(
-        "--workers", type=int, default=1,
-        help="并发连接数，默认1(顺序，安全)。>1 时不保证跨行执行顺序，"
-             "只适合同表无依赖写入（如估值快照按日 upsert）",
-    )
-
-    _hide_suppressed(sub)
     return p

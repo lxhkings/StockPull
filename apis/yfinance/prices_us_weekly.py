@@ -10,7 +10,6 @@ sync_log data_type: "price_weekly"
 """
 
 import time
-import signal
 import random
 import logging
 from datetime import datetime, timedelta, date
@@ -19,7 +18,6 @@ from typing import Optional, List, Dict
 from core.batch_utils import chunked
 
 import pandas as pd
-import yfinance as yf
 
 from config import (
     START_DATE_US,
@@ -59,14 +57,15 @@ def _test_aapl_weekly(target_monday: date) -> tuple[Optional[pd.DataFrame], str]
     start = target_monday - timedelta(days=14)
     end = target_monday + timedelta(days=7)
     try:
-        signal.signal(signal.SIGINT, signal.SIG_DFL)
-        df = yf.download(
+        df = download_with_retry(
             tickers="AAPL",
             start=start.strftime("%Y-%m-%d"),
             end=end.strftime("%Y-%m-%d"),
             interval="1wk",
-            progress=False,
+            group_by="column",
+            threads=False,
             timeout=30,
+            context="[AAPL weekly probe] ",
         )
         if df is None or df.empty:
             return None, "no_data"

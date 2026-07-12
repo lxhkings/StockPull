@@ -122,14 +122,14 @@ uv run pytest tests/test_market_cn.py tests/test_market_hk.py tests/test_pipelin
 
 ---
 
-## Phase 4 — 后续（本轮不强制落地）
+## Phase 4 — 已落地
 
-| 项 | 方向 |
+| 项 | 实现 |
 |---|---|
-| CLI 旧入口双轨 | argv rewrite：`daily`→`prices daily` 等，删 parser 镜像与 main 长 if 链 |
-| tushare/futu buffer+flush | `main` 抽 `_run_buffered(path, fn)` |
-| `backfill_new` ≡ `incremental` | Pipeline 合并或 Step3 排除 new；三 market 可留薄委托 |
-| yfinance AAPL/探测 `yf.download` | 一律走 `client.download_with_retry` |
+| CLI 旧入口双轨 | `cli.deprecate.rewrite_legacy_argv`；parser 无 SUPPRESS 镜像；main 无 legacy if 链 |
+| tushare/futu buffer+flush | `main._run_buffered` |
+| `backfill_new` ≡ `incremental` | Protocol/markets 删除 `backfill_new`；Pipeline 单步 `incremental` |
+| yfinance 探测 `yf.download` | `prices_us` / `prices_us_weekly` / `prices_intraday` 探测与 single 走 `download_with_retry` |
 
 ---
 
@@ -138,7 +138,7 @@ uv run pytest tests/test_market_cn.py tests/test_market_hk.py tests/test_pipelin
 - [x] `jobs/` 无 `download_with_retry` / `get_client` / SDK  （Phase 1–3）
 - [x] Pipeline 无 `hasattr` 能力探测  
 - [x] Intraday 默认 interval 与 CLI 一致  
-- [x] 全量 `uv run pytest tests/ -q` 绿（405 passed）
+- [x] 全量 `uv run pytest tests/ -q` 绿（407 passed，Phase 4 后）
 - [x] README/CLAUDE 与实现一致（CN 全 A；US 指数价在 apis）  
 
 ### 本轮落地进度
@@ -149,7 +149,7 @@ uv run pytest tests/test_market_cn.py tests/test_market_hk.py tests/test_pipelin
 | 1 US prices_index | 本轮 |
 | 2 Protocol + intraday | 本轮 |
 | 3 小清理 | 本轮 |
-| 4 CLI rewrite / buffer / yf probe / backfill 合并 | **未做** |
+| 4 CLI rewrite / buffer / yf probe / backfill 合并 | 本轮 |
 
 ## 风险
 

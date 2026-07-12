@@ -61,10 +61,10 @@ Three-market daily-K ingest (US/CN/HK) into shared MariaDB on Synology NAS (192.
 
 **Pipeline flow** (`jobs/pipeline.py`):
 1. `update_index()` — snapshot index constituents, detect added/removed
-2. `backfill_new()` — full history for new tickers
-3. `incremental()` — resume from sync_log for existing tickers
-4. `update_index_price()` — index daily close
-5. `weekly()` / `intraday()` — optional when market module implements them
+2. `incremental()` — day prices (new tickers full-history via empty sync_log)
+3. `update_index_price()` — index/ETF daily close
+4. `intraday()` — always called (US real; CN/HK no-op)
+5. `weekly()` / `rebase()` — separate CLI, not in daily
 
 **Market modules** follow `MarketModule` protocol (defined in `jobs/pipeline.py`):
 - `jobs/market_us.py` — 编排 `apis.static`（SP500/R1000）+ `apis.yfinance`（日线/周线/分钟线/prices_index）
@@ -126,7 +126,7 @@ modules/*   → core, config                    ❌ jobs, apis
 | `jobs/` 日线编排 | `jobs/pipeline.py` | 新市场 MUST 实现 `MarketModule`，在 `jobs/market_*.py`；只调 apis，不调 SDK | — |
 
 **`MarketModule` protocol**（`jobs/pipeline.py` 定义，`jobs/market_{us,cn,hk}.py` 各自实现）：
-`update_index()` / `list_active_tickers(index: str | None = None)` / `backfill_new(tickers)` / `incremental(tickers)` / `update_index_price()` / `rebase(tickers)` / `weekly(tickers)` / `intraday()`
+`update_index()` / `list_active_tickers(index: str | None = None)` / `incremental(tickers)` / `update_index_price()` / `rebase(tickers)` / `weekly(tickers)` / `intraday()`
 
 - **`list_active_tickers(index=...)`：** US 解析 `SP500`/`RUSSELL1000`/默认并集；**CN/HK 的 `index` 参数忽略**（单 universe，docstring 须写明）。
 

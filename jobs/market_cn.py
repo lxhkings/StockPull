@@ -42,13 +42,8 @@ def list_active_tickers(index: str | None = None) -> list[str]:
     return [r["ticker"] for r in rows]
 
 
-def backfill_new(new_tickers: list[str]) -> dict[str, str]:
-    if not new_tickers:
-        return {}
-    return stock_updater_cn.update_prices_batch(new_tickers)
-
-
 def incremental(tickers: list[str]) -> dict[str, str]:
+    """日线增量；新 ticker（无 sync_log）由 updater 自动全量回填。"""
     if not tickers:
         return {}
     return stock_updater_cn.update_prices_batch(tickers)

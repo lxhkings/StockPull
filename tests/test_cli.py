@@ -45,22 +45,26 @@ def test_unknown_subcommand_errors():
 
 
 def test_daily_market_choice_validated():
-    # 旧入口仍可解析参数校验
+    # rewrite → prices daily，再校验 market
     out = _run("daily", "--market", "europe")
     assert out.returncode != 0
-    assert "europe" in out.stderr or "europe" in out.stdout
+    combined = out.stderr + out.stdout
+    assert "europe" in combined or "invalid choice" in combined
 
 
 def test_old_daily_help_still_works():
+    # rewrite → prices daily --help
     out = _run("daily", "--help")
     assert out.returncode == 0
+    assert "--market" in out.stdout
 
 
 def test_old_daily_emits_deprecation_on_run(capsys):
     with patch("main.cmd_daily", return_value=0) as daily:
         rc = main(["daily", "--market", "us"])
     assert rc == 0
-    daily.assert_called_once()
+    # argv rewrite → prices daily
+    daily.assert_called_once_with("us", None, None)
     err = capsys.readouterr().err
     assert "[deprecated]" in err
     assert "`daily`" in err
@@ -68,14 +72,24 @@ def test_old_daily_emits_deprecation_on_run(capsys):
 
 
 def test_old_tushare_sync_emits_deprecation_on_run(capsys):
-    with patch("main.cmd_tushare_sync", return_value=0) as sync:
+    with patch("main.cmd_tushare_backfill", return_value=0) as backfill:
         rc = main(["tushare-sync", "--scope", "lists"])
     assert rc == 0
-    sync.assert_called_once()
+    # rewrite → tushare sync → cmd_tushare_backfill
+    backfill.assert_called_once()
     err = capsys.readouterr().err
     assert "[deprecated]" in err
     assert "`tushare-sync`" in err
     assert "`tushare sync`" in err
+
+
+def test_rewrite_legacy_argv_unit():
+    from cli.deprecate import rewrite_legacy_argv
+    assert rewrite_legacy_argv(["prices", "daily"]) == ["prices", "daily"]
+    out = rewrite_legacy_argv(["daily", "--market", "cn"])
+    assert out == ["prices", "daily", "--market", "cn"]
+    out = rewrite_legacy_argv(["migrate-intraday"])
+    assert out == ["db", "migrate-intraday"]
 
 
 def test_db_purge_index_help():

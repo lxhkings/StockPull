@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from collections.abc import Callable
+from typing import Any
 
-from cli.deprecate import warn_deprecated
+from cli.deprecate import rewrite_legacy_argv
 from cli.parser import build_parser
 
 # akshare/efinance (eastmoney.com) must bypass proxy — direct connect only.
@@ -140,39 +142,61 @@ def cmd_intraday(interval: str | None, rebase: bool = False) -> int:
     return 0
 
 
-def cmd_tushare_backfill(scope: str, market: str, dry_run: bool, start: str | None = None) -> int:
-    """两阶段：backfill 写本地缓冲 → 自动 flush 到 NAS。flush 失败则保留缓冲、提示兜底。"""
+def _run_buffered(
+    buffer_path: str,
+    run_fn: Callable[[], Any],
+    *,
+    done_label: str,
+    flush_cmd: str,
+) -> int:
+    """本地缓冲两阶段：set_local_first → run_fn → flush。flush 失败保留缓冲。"""
     from core.db_client import set_local_first
-    from apis.tushare.orchestrator import run_full_backfill
     from core.local_buffer import flush, pending_count
-    from config import TUSHARE_BUFFER_PATH
 
-    if dry_run:
-        # 预检不写数据，不需要走本地缓冲
-        rep = run_full_backfill(scope=scope, market=market, dry_run=dry_run, start=start)
-        print(rep.render())
-        return 0
-
-    set_local_first(True, buffer_path=TUSHARE_BUFFER_PATH)
+    set_local_first(True, buffer_path=buffer_path)
     try:
-        rep = run_full_backfill(scope=scope, market=market, dry_run=dry_run, start=start)
+        result = run_fn()
     finally:
         set_local_first(False)
-    print(rep.render())
+
+    if hasattr(result, "render"):
+        print(result.render())
+    else:
+        print(result)
 
     try:
-        fstat = flush(TUSHARE_BUFFER_PATH)
+        fstat = flush(buffer_path)
         print(f"flush -> NAS: {fstat}")
     except Exception as e:  # noqa: BLE001
-        n = pending_count(TUSHARE_BUFFER_PATH)
-        print(f"BACKFILL 完成并已存本地。FLUSH 失败: {e}\n"
-              f"缓冲 {n} 条待传保留。NAS 恢复后跑: uv run main.py tushare flush")
+        n = pending_count(buffer_path)
+        print(
+            f"{done_label}完成并已存本地。FLUSH 失败: {e}\n"
+            f"缓冲 {n} 条待传保留。NAS 恢复后跑: uv run main.py {flush_cmd}"
+        )
         return 1
     return 0
 
 
+def cmd_tushare_backfill(scope: str, market: str, dry_run: bool, start: str | None = None) -> int:
+    """两阶段：backfill 写本地缓冲 → 自动 flush 到 NAS。flush 失败则保留缓冲、提示兜底。"""
+    from apis.tushare.orchestrator import run_full_backfill
+    from config import TUSHARE_BUFFER_PATH
+
+    if dry_run:
+        rep = run_full_backfill(scope=scope, market=market, dry_run=dry_run, start=start)
+        print(rep.render())
+        return 0
+
+    return _run_buffered(
+        TUSHARE_BUFFER_PATH,
+        lambda: run_full_backfill(scope=scope, market=market, dry_run=False, start=start),
+        done_label="BACKFILL ",
+        flush_cmd="tushare flush",
+    )
+
+
 def cmd_tushare_full(scope: str, market: str, dry_run: bool) -> int:
-    """全量强制回填：起点固定为 TUSHARE_BACKFILL_START，等价 tushare-backfill --start 2010起。"""
+    """全量强制回填：起点固定为 TUSHARE_BACKFILL_START，等价 tushare sync --start 2010起。"""
     from config import TUSHARE_BACKFILL_START
     return cmd_tushare_backfill(scope, market, dry_run, start=TUSHARE_BACKFILL_START)
 
@@ -199,28 +223,15 @@ def cmd_tushare_flush(workers: int = 1) -> int:
 
 
 def _run_futu(scope: str, force: bool) -> int:
-    """两阶段：fetch 写本地缓冲 → 自动 flush 到 NAS。flush 失败则保留缓冲、提示兜底。"""
-    from core.db_client import set_local_first
     from apis.futu.orchestrator import run_sync
-    from core.local_buffer import flush, pending_count
     from config import FUTU_BUFFER_PATH
 
-    set_local_first(True)
-    try:
-        rep = run_sync(scope=scope, force=force)
-    finally:
-        set_local_first(False)
-    print(rep)
-
-    try:
-        fstat = flush(FUTU_BUFFER_PATH)
-        print(f"flush -> NAS: {fstat}")
-    except Exception as e:  # noqa: BLE001
-        n = pending_count(FUTU_BUFFER_PATH)
-        print(f"FETCH 完成并已存本地。FLUSH 失败: {e}\n"
-              f"缓冲 {n} 条待传保留。NAS 恢复后跑: uv run main.py futu flush")
-        return 1
-    return 0
+    return _run_buffered(
+        FUTU_BUFFER_PATH,
+        lambda: run_sync(scope=scope, force=force),
+        done_label="FETCH ",
+        flush_cmd="futu flush",
+    )
 
 
 def cmd_futu_full(scope: str) -> int:
@@ -301,7 +312,9 @@ def _dispatch_db(args) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    # None → sys.argv[1:] so subprocess / `python main.py daily` also rewrite
+    raw = list(argv) if argv is not None else sys.argv[1:]
+    args = build_parser().parse_args(rewrite_legacy_argv(raw))
     if args.cmd == "prices":
         return _dispatch_prices(args)
     if args.cmd == "tushare":
@@ -314,43 +327,6 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_init()
     if args.cmd == "status":
         return cmd_status()
-    # Legacy top-level — warn then forward to existing cmd_*
-    if args.cmd == "daily":
-        warn_deprecated("daily", "prices daily")
-        return cmd_daily(args.market, args.code, args.index)
-    if args.cmd == "weekly":
-        warn_deprecated("weekly", "prices weekly")
-        return cmd_weekly(args.market, args.code)
-    if args.cmd == "intraday":
-        warn_deprecated("intraday", "prices intraday")
-        return cmd_intraday(args.interval, args.rebase)
-    if args.cmd == "rebase":
-        warn_deprecated("rebase", "prices rebase")
-        return cmd_rebase(args.market, args.code, args.years, args.index, args.etf_only)
-    if args.cmd == "tushare-sync":
-        warn_deprecated("tushare-sync", "tushare sync")
-        return cmd_tushare_sync(args.scope, args.market, args.dry_run)
-    if args.cmd == "tushare-full":
-        warn_deprecated("tushare-full", "tushare full")
-        return cmd_tushare_full(args.scope, args.market, args.dry_run)
-    if args.cmd == "tushare-backfill":
-        warn_deprecated("tushare-backfill", "tushare sync")
-        return cmd_tushare_backfill(args.scope, args.market, args.dry_run, args.start)
-    if args.cmd == "tushare-flush":
-        warn_deprecated("tushare-flush", "tushare flush")
-        return cmd_tushare_flush(args.workers)
-    if args.cmd == "futu-sync":
-        warn_deprecated("futu-sync", "futu sync")
-        return cmd_futu_sync(args.scope)
-    if args.cmd == "futu-full":
-        warn_deprecated("futu-full", "futu full")
-        return cmd_futu_full(args.scope)
-    if args.cmd == "futu-flush":
-        warn_deprecated("futu-flush", "futu flush")
-        return cmd_futu_flush()
-    if args.cmd == "migrate-intraday":
-        warn_deprecated("migrate-intraday", "db migrate-intraday")
-        return cmd_migrate_intraday()
     return 1
 
 

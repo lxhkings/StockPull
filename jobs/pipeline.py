@@ -3,6 +3,9 @@
 A market module must expose MarketModule (see Protocol below).
 CN/HK: list_active_tickers ignores index; intraday is no-op.
 US: index filters SP500/RUSSELL1000; intraday pulls 15m/1h.
+
+Price path: single incremental() — new tickers have empty sync_log so
+updaters already full-history pull; no separate backfill_new step.
 """
 
 from __future__ import annotations
@@ -18,7 +21,6 @@ class MarketModule(Protocol):
 
     def update_index(self) -> tuple[list[str], int, int]: ...
     def list_active_tickers(self, index: str | None = None) -> list[str]: ...
-    def backfill_new(self, new_tickers: list[str]) -> dict[str, str]: ...
     def incremental(self, tickers: list[str]) -> dict[str, str]: ...
     def update_index_price(self) -> int: ...
     def rebase(
@@ -47,21 +49,22 @@ class Pipeline:
             f"[{mid}] index: +{len(new_tickers)} new, "
             f"{inserted} rows in snapshot, -{removed} removed"
         )
-
         if new_tickers:
-            log.info(f"[{mid}] === Step 2: backfill {len(new_tickers)} new tickers ===")
-            self.m.backfill_new(new_tickers)
+            log.info(
+                f"[{mid}] {len(new_tickers)} new tickers will full-history via incremental "
+                f"(empty sync_log)"
+            )
 
-        log.info(f"[{mid}] === Step 3: incremental update ===")
+        log.info(f"[{mid}] === Step 2: incremental prices ===")
         all_tickers = self.m.list_active_tickers(index=index)
         log.info(f"[{mid}] incremental: {len(all_tickers)} tickers")
         self.m.incremental(all_tickers)
 
-        log.info(f"[{mid}] === Step 4: update index / ETF price ===")
+        log.info(f"[{mid}] === Step 3: update index / ETF price ===")
         rows = self.m.update_index_price()
         log.info(f"[{mid}] index price: +{rows} rows")
 
-        log.info(f"[{mid}] === Step 5: intraday update ===")
+        log.info(f"[{mid}] === Step 4: intraday update ===")
         self.m.intraday()
 
         log.info(f"[{mid}] === pipeline complete ===")

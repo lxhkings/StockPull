@@ -1,4 +1,4 @@
-"""Tests for Pipeline.daily() Step 5 intraday (always called)."""
+"""Tests for Pipeline.daily() intraday step (always called)."""
 from unittest.mock import MagicMock
 
 from jobs.pipeline import Pipeline
@@ -9,7 +9,6 @@ def _full_mod(**overrides):
     mod.market_id = "us"
     mod.update_index.return_value = ([], 0, 0)
     mod.list_active_tickers.return_value = []
-    mod.backfill_new.return_value = {}
     mod.incremental.return_value = {}
     mod.update_index_price.return_value = 0
     mod.intraday.return_value = {}

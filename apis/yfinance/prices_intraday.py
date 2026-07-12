@@ -16,7 +16,6 @@ from typing import Optional
 
 import pandas as pd
 import pymysql.err
-import yfinance as yf
 
 from core.batch_utils import chunked
 
@@ -58,21 +57,18 @@ def _sync_type(interval: str) -> str:
 def _download_single(ticker: str, yf_symbol: str, start_date: date, end_date: date, interval: str) -> Optional[pd.DataFrame]:
     """单独下载单个 ticker 的数据（批量失败时的 fallback）。"""
     try:
-        df = yf.download(
+        df = download_with_retry(
             tickers=yf_symbol,
             start=start_date.strftime("%Y-%m-%d"),
             end=end_date.strftime("%Y-%m-%d"),
             interval=interval,
             group_by="ticker",
-            auto_adjust=False,
-            actions=False,
             threads=False,
-            progress=False,
             timeout=YF_TIMEOUT,
+            context=f"[{ticker} single] ",
         )
         if df is None or df.empty:
             return None
-        # 单 ticker 返回 plain DataFrame（无 MultiIndex）
         return df
     except Exception as e:
         log.warning(f"[{ticker}] 单独下载失败: {e}")
@@ -90,22 +86,19 @@ def _test_aapl_intraday(interval: str) -> tuple[Optional[date], str]:
         - "error": 其他错误
     """
     try:
-        # 计算 Yahoo 730 天限制的有效范围
         today = date.today()
         floor = today - timedelta(days=INTERVAL_LOOKBACK_DAYS[interval] - 1)
         end = today + timedelta(days=1)
 
-        df = yf.download(
+        df = download_with_retry(
             tickers="AAPL",
             start=floor.strftime("%Y-%m-%d"),
             end=end.strftime("%Y-%m-%d"),
             interval=YF_INTERVAL_MAP[interval],
             group_by="ticker",
-            auto_adjust=False,
-            actions=False,
             threads=False,
-            progress=False,
             timeout=YF_TIMEOUT,
+            context=f"[AAPL {interval} probe] ",
         )
 
         if df is None or df.empty:

@@ -10,11 +10,9 @@ stock_updater.py — 股票行情更新
 """
 
 import time
-import signal
 import random
 import logging
 import pandas as pd
-import yfinance as yf
 from datetime import timedelta, date
 from typing import Optional, List, Dict
 
@@ -41,57 +39,35 @@ def _test_aapl_data(target_date: date) -> tuple[Optional[pd.DataFrame], str]:
     """
     测试 AAPL 是否有目标日期数据，判断 yfinance 是否已更新
 
-    Args:
-        target_date: 目标交易日
-
     Returns:
         (DataFrame, status) 其中 status 为:
         - "ok": 有目标日期数据
-        - "rate_limit": 被限速或无数据，需等待
+        - "rate_limit": 被限速
         - "error": 其他错误
+        - "no_data": 空/无目标日
     """
     end_dt = target_date + timedelta(days=1)
     start_dt = target_date - timedelta(days=5)
 
     try:
-        import logging as _logging
-
-        _yf_log = _logging.getLogger("yfinance")
-        _captured: list[str] = []
-
-        class _Cap(_logging.Handler):
-            def emit(self, record):
-                _captured.append(record.getMessage())
-
-        _cap = _Cap()
-        _yf_log.addHandler(_cap)
-        try:
-            signal.signal(signal.SIGINT, signal.SIG_DFL)
-            df = yf.download(
-                tickers="AAPL",
-                start=start_dt.strftime("%Y-%m-%d"),
-                end=end_dt.strftime("%Y-%m-%d"),
-                interval="1d",
-                progress=False,
-                timeout=30,
-            )
-        finally:
-            _yf_log.removeHandler(_cap)
-
+        df = download_with_retry(
+            tickers="AAPL",
+            start=start_dt.strftime("%Y-%m-%d"),
+            end=end_dt.strftime("%Y-%m-%d"),
+            interval="1d",
+            group_by="column",
+            threads=False,
+            timeout=30,
+            context="[AAPL probe] ",
+        )
         if df is None or df.empty:
-            if any("RateLimit" in m or "Too Many Requests" in m for m in _captured):
-                log.warning("[AAPL] yfinance 被限速（内部日志检测）")
-                return None, "rate_limit"
             return None, "no_data"
 
-        # 处理 MultiIndex 列名（单 ticker 也返回 MultiIndex）
         df = df.reset_index()
         if isinstance(df.columns, pd.MultiIndex):
-            # 取第一层列名（Price 层）
             df.columns = df.columns.get_level_values(0)
         df.columns = [str(c).lower() for c in df.columns]
 
-        # 索引重命名
         if "date" not in df.columns and "datetime" in df.columns:
             df = df.rename(columns={"datetime": "date"})
         if "date" not in df.columns and "index" in df.columns:

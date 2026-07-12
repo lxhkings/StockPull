@@ -346,12 +346,11 @@ core/                            # 纯组件（无表语义）
 每个市场模块遵循 `MarketModule` 协议（`jobs/pipeline.py`）：
 - `update_index()` — 成分股快照，检测新增/剔除
 - `list_active_tickers(index=None)` — 当前股票池（US 可筛 SP500/RUSSELL1000；**CN/HK 忽略 index**）
-- `backfill_new(tickers)` — 新股全量历史
-- `incremental(tickers)` — 存量股票增量（从 sync_log 恢复）
+- `incremental(tickers)` — 日线（新票无 sync_log → updater 全量；无单独 backfill 步）
 - `update_index_price()` — 指数/ETF 日线（US→`apis.yfinance.prices_index`；CN→行业 ETF；HK no-op）
 - `rebase(tickers)` — 全量重拉（修复 qfq 漂移）
 - `weekly(tickers)` — 周线（US/CN；HK `NotImplementedError`）
-- `intraday()` — 分钟线（US 默认 15m+1h；CN/HK no-op；Pipeline Step 5 始终调用）
+- `intraday()` — 分钟线（US 默认 15m+1h；CN/HK no-op；daily 始终调用）
 
 ---
 

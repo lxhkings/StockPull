@@ -74,15 +74,8 @@ def list_active_tickers(index: Optional[str] = None) -> list[str]:
     return combined
 
 
-def backfill_new(new_tickers: list[str]) -> dict[str, str]:
-    """Backfill = full HISTORY_YEARS_US pull. Same code path as incremental
-    because sync_log will be empty for these tickers."""
-    if not new_tickers:
-        return {}
-    return stock_updater_us.update_prices_batch(new_tickers)
-
-
 def incremental(tickers: list[str]) -> dict[str, str]:
+    """日线增量；新 ticker（无 sync_log）由 updater 自动全量回填。"""
     if not tickers:
         return {}
     return stock_updater_us.update_prices_batch(tickers)
