@@ -51,8 +51,8 @@ def update_index() -> tuple[list[str], int, int]:
     return [], inserted, 0
 
 
-def list_active_tickers() -> list[str]:
-    """返回全量A股ticker（从stocks表）。"""
+def list_active_tickers(index: str | None = None) -> list[str]:
+    """Return active tickers. ``index`` is ignored (CN/HK single-universe)."""
     rows = query(
         "SELECT ticker FROM stocks "
         "WHERE ticker LIKE '%%.SH' OR ticker LIKE '%%.SZ' OR ticker LIKE '%%.BJ' "
@@ -124,8 +124,12 @@ def _update_csi800() -> int:
         return 0
 
 
-def rebase(tickers: Optional[list[str]] = None, years: Optional[int] = None) -> dict[str, str]:
-    """Full re-pull from START_DATE_CN to fix qfq drift."""
+def rebase(
+    tickers: Optional[list[str]] = None,
+    years: Optional[int] = None,
+    index: str | None = None,
+) -> dict[str, str]:
+    """Full re-pull from START_DATE_CN to fix qfq drift. ``index`` is ignored (CN single-universe)."""
     targets = tickers if tickers else list_active_tickers()
     return stock_updater_cn.update_prices_batch(targets, full_rebase=True, years=years)
 

@@ -6,7 +6,7 @@ class _USModule:
     """Mock US market module with intraday support."""
     market_id = "us"
     def update_index(self): return ([], 0, 0)
-    def list_active_tickers(self): return []
+    def list_active_tickers(self, index=None): return []
     def backfill_new(self, new_tickers): return {}
     def incremental(self, tickers): return {}
     def update_index_price(self): return 0
@@ -17,7 +17,7 @@ class _CNModule:
     """Mock CN market module without intraday support."""
     market_id = "cn"
     def update_index(self): return ([], 0, 0)
-    def list_active_tickers(self): return []
+    def list_active_tickers(self, index=None): return []
     def backfill_new(self, new_tickers): return {}
     def incremental(self, tickers): return {}
     def update_index_price(self): return 0

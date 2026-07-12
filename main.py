@@ -168,29 +168,18 @@ def cmd_rebase(market: str, codes: list[str] | None, years: int | None, index: s
         print(f"[cn] ETF rebase wrote {n} rows to index_prices")
         return 0
 
-    import inspect
     mod = _import_market(market)
     if not hasattr(mod, "rebase"):
         print(f"[{market}] rebase not implemented", file=sys.stderr)
         return 1
 
-    # US 模块支持 index 参数，CN/HK 不支持（使用 inspect 判断）
-    sig_list = inspect.signature(mod.list_active_tickers)
-    if 'index' in sig_list.parameters:
-        targets = codes or mod.list_active_tickers(index=index)
-    else:
-        targets = codes or mod.list_active_tickers()
+    targets = codes or mod.list_active_tickers(index=index)
 
     years_msg = f" ({years} 年)" if years else ""
     index_msg = f" [{index}]" if index else ""
     print(f"[{market}] rebase {len(targets)} tickers{index_msg}{years_msg} (full history)")
 
-    # rebase 函数同样检查 index 参数
-    sig_rebase = inspect.signature(mod.rebase)
-    if 'index' in sig_rebase.parameters:
-        mod.rebase(targets, years=years, index=index)
-    else:
-        mod.rebase(targets, years=years)
+    mod.rebase(targets, years=years, index=index)
 
     return 0
 

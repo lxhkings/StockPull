@@ -4,8 +4,9 @@ A market module must expose:
   market_id: str
   update_index() -> tuple[list[str], int, int]
       (new_tickers_added_today, total_inserted, removed_count)
-  list_active_tickers() -> list[str]
+  list_active_tickers(index: str | None = None) -> list[str]
       All tickers currently in this market's universe.
+      US uses ``index`` for SP500/RUSSELL1000; CN/HK ignore it.
   backfill_new(new_tickers: list[str]) -> dict[str, str]
       Pull full history for newly added tickers. Returns per-ticker status.
   incremental(tickers: list[str]) -> dict[str, str]
@@ -19,7 +20,6 @@ A market module must expose:
 
 from __future__ import annotations
 
-import inspect
 import logging
 from typing import Optional, Protocol
 
@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 class MarketModule(Protocol):
     market_id: str
     def update_index(self) -> tuple[list[str], int, int]: ...
-    def list_active_tickers(self) -> list[str]: ...
+    def list_active_tickers(self, index: str | None = None) -> list[str]: ...
     def backfill_new(self, new_tickers: list[str]) -> dict[str, str]: ...
     def incremental(self, tickers: list[str]) -> dict[str, str]: ...
     def update_index_price(self) -> int: ...
@@ -50,12 +50,7 @@ class Pipeline:
             self.m.backfill_new(new_tickers)
 
         log.info(f"[{mid}] === Step 3: incremental update ===")
-        # US 模块支持 index 参数，CN/HK 不支持（使用默认调用）
-        sig = inspect.signature(self.m.list_active_tickers)
-        if 'index' in sig.parameters:
-            all_tickers = self.m.list_active_tickers(index=index)
-        else:
-            all_tickers = self.m.list_active_tickers()
+        all_tickers = self.m.list_active_tickers(index=index)
         log.info(f"[{mid}] incremental: {len(all_tickers)} tickers")
         self.m.incremental(all_tickers)
 
