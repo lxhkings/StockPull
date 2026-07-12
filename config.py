@@ -56,9 +56,6 @@ AKSHARE_RETRY_COUNT = 5
 AKSHARE_RETRY_DELAY = 3.0
 AKSHARE_REQUEST_DELAY = 1.5  # between per-stock calls
 
-# Reconcile tolerance for two-source comparison
-RECONCILE_PRICE_TOLERANCE = 0.005   # 0.5%
-
 # Index metadata. etf required by indices.etf_ticker NOT NULL.
 INDEX_CONFIG = {
     "SP500": {
