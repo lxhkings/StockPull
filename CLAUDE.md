@@ -18,8 +18,8 @@ cp .env.example .env  # fill DB_PASSWORD, TUSHARE_TOKEN
 
 # Run tests
 uv run pytest tests/ -v                    # all tests
-uv run pytest tests/test_index_updater_cn.py -v  # single file
-uv run pytest tests/test_cn_index_price.py::test_update_index_price_uses_tushare_index_daily  # single test
+uv run pytest tests/test_market_cn_etf_hook.py -v  # single file
+uv run pytest tests/test_etf_updater_cn.py -v      # CN sector ETF prices
 
 # CLI（二级命令：prices | tushare | futu | init | status | db）
 uv run main.py init                         # one-time: seed index metadata
@@ -66,14 +66,14 @@ Three-market daily-K ingest (US/CN/HK) into shared MariaDB on Synology NAS (192.
 
 **Market modules** follow `MarketModule` protocol (defined in `jobs/pipeline.py`):
 - `jobs/market_us.py` — 编排 `apis.static`（SP500/R1000）+ `apis.yfinance`（日线/周线/分钟线/指数价）
-- `jobs/market_cn.py` — 编排 `apis.tushare`（CSI800/日线/周线/ETF/指数价）
+- `jobs/market_cn.py` — 编排 `apis.tushare`（全 A 列表/日线/周线 + 行业 ETF 价）
 - `jobs/market_hk.py` — 编排 `apis.static`（HSI CSV）+ `apis.yfinance`（港股日线）
 
 **CN Market 数据源：**
-- CSI800 成分股: tushare `index_weight` API → stocks 表 join 获取 name/gics_sector
-- CSI800 指数价格: tushare `index_daily` API
+- 股票宇宙: 全 A（tushare `stock_basic`，非指数成分）
 - A股基础信息: tushare `stock_basic` API（含行业分类 `industry` 字段）
 - A股日线价格: tushare `pro_bar` API (hfq)
+- 行业 ETF 价: tushare `fund_daily` × `fund_adj` → `index_prices`（index_id = ts_code）
 
 **HK Market 数据源：**
 - HSI 成分股: 本地 CSV `apis/static/hsi_constituents.csv`（手动维护）

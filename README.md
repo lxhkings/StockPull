@@ -289,7 +289,7 @@ apis/yfinance/                   # 全部 yfinance SDK 调用
 apis/tushare/                    # 全部 tushare SDK 调用
   client.py / budget.py / orchestrator.py
   prices_cn.py / prices_cn_weekly.py
-  index_cn.py / etf_cn.py
+  etf_cn.py
   backfill_* / transform_* / derive_periodic.py
 
 apis/futu/                       # 全部 Futu OpenAPI 调用
@@ -325,11 +325,11 @@ core/                            # 纯组件（无表语义）
 
 ## 数据源明细
 
-| 市场 | 指数成分股 | 股票价格 | 指数价格 | 行业分类 |
-|------|-----------|---------|---------|---------|
-| 美股 | GitHub CSV (SP500) + iShares CSV (R1000) | yfinance | yfinance ^GSPC | N/A |
-| A股 | tushare `index_weight` | tushare `pro_bar` (qfq) | tushare `index_daily` | tushare `stock_basic.industry` |
-| 港股 | 本地 CSV (HSI) | yfinance auto_adjust | yfinance ETF | N/A |
+| 市场 | 股票宇宙 | 股票价格 | 指数/ETF 价格 | 行业分类 |
+|------|---------|---------|--------------|---------|
+| 美股 | GitHub CSV (SP500) + iShares CSV (R1000) | yfinance | yfinance ^GSPC / 行业 ETF | N/A |
+| A股 | 全 A：`stock_basic` | tushare `pro_bar` (hfq) | 行业 ETF：`fund_daily`×`fund_adj` | tushare `stock_basic.industry` |
+| 港股 | 本地 CSV (HSI) | yfinance auto_adjust | （暂未采指数价） | N/A |
 
 **美股指数组合策略：**
 - 默认：SP500 + Russell 1000（约1016支大盘股）
@@ -415,7 +415,7 @@ rows_affected = execute(
 # 常用查询函数
 from modules.db_admin import get_index_tickers
 sp500_tickers = get_index_tickers('SP500')
-latest_tickers = get_index_tickers('CSI800')
+hsi_tickers = get_index_tickers('HSI')
 ```
 
 命令行快速查询：
@@ -460,8 +460,8 @@ uv run pytest tests/ -v
 
 单模块测试：
 ```bash
-uv run pytest tests/test_index_updater_cn.py -v
-uv run pytest tests/test_cn_index_price.py -v
+uv run pytest tests/test_market_cn_etf_hook.py -v
+uv run pytest tests/test_etf_updater_cn.py -v
 ```
 
 ---

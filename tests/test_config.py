@@ -23,9 +23,8 @@ def test_history_years_defaults_per_market():
 def test_indices_metadata():
     from config import INDEX_CONFIG
     assert "SP500" in INDEX_CONFIG
-    assert "CSI800" in INDEX_CONFIG
     assert "HSI" in INDEX_CONFIG
-    assert INDEX_CONFIG["CSI800"]["etf"] == "510800"
+    assert "CSI800" not in INDEX_CONFIG  # CN is full A-share + sector ETFs
     assert INDEX_CONFIG["HSI"]["etf"] == "2800.HK"
 
 

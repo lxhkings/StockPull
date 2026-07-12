@@ -26,18 +26,18 @@ def _conn_with_cursor():
 def test_get_last_snapshot_date_returns_max_date():
     conn, cur = _conn_with_cursor()
     cur.fetchone.return_value = (date(2026, 7, 1),)
-    result = get_last_snapshot_date(conn, "CSI800")
+    result = get_last_snapshot_date(conn, "SP500")
     assert result == date(2026, 7, 1)
     cur.execute.assert_called_once()
     args = cur.execute.call_args[0]
     assert "MAX(snapshot_date)" in args[0]
-    assert args[1] == ("CSI800",)
+    assert args[1] == ("SP500",)
 
 
 def test_get_last_snapshot_date_returns_none_when_no_rows():
     conn, cur = _conn_with_cursor()
     cur.fetchone.return_value = (None,)
-    assert get_last_snapshot_date(conn, "CSI800") is None
+    assert get_last_snapshot_date(conn, "SP500") is None
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -52,13 +52,13 @@ def test_save_snapshot_inserts_all_rows():
         "name": ["贵州茅台", "平安银行"],
         "sector": ["食品饮料", "银行"],
     })
-    inserted = save_snapshot(conn, df, "CSI800", date(2026, 7, 1))
+    inserted = save_snapshot(conn, df, "SP500", date(2026, 7, 1))
     assert inserted == 2
     sql, rows = cur.executemany.call_args[0]
     assert "INSERT IGNORE INTO index_constituents" in sql
     assert rows == [
-        ("CSI800", date(2026, 7, 1), "600519.SH", "贵州茅台", "食品饮料"),
-        ("CSI800", date(2026, 7, 1), "000001.SZ", "平安银行", "银行"),
+        ("SP500", date(2026, 7, 1), "600519.SH", "贵州茅台", "食品饮料"),
+        ("SP500", date(2026, 7, 1), "000001.SZ", "平安银行", "银行"),
     ]
     conn.commit.assert_called_once()
 
@@ -67,9 +67,9 @@ def test_save_snapshot_defaults_missing_name_sector_to_none():
     conn, cur = _conn_with_cursor()
     cur.rowcount = 1
     df = pd.DataFrame({"ticker": ["999999.SH"]})
-    save_snapshot(conn, df, "CSI800", date(2026, 7, 1))
+    save_snapshot(conn, df, "SP500", date(2026, 7, 1))
     _, rows = cur.executemany.call_args[0]
-    assert rows == [("CSI800", date(2026, 7, 1), "999999.SH", None, None)]
+    assert rows == [("SP500", date(2026, 7, 1), "999999.SH", None, None)]
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -79,7 +79,7 @@ def test_save_snapshot_defaults_missing_name_sector_to_none():
 def test_detect_changes_first_snapshot_marks_all_added():
     conn, cur = _conn_with_cursor()
     added, removed = detect_and_record_changes(
-        conn, "CSI800", date(2026, 7, 1), {"A", "B"}, prev_date=None,
+        conn, "SP500", date(2026, 7, 1), {"A", "B"}, prev_date=None,
     )
     assert (added, removed) == (2, 0)
     sql, rows = cur.executemany.call_args[0]
@@ -94,7 +94,7 @@ def test_detect_changes_no_prev_tickers_returns_zero_without_write():
     conn, cur = _conn_with_cursor()
     cur.fetchall.return_value = []  # 上次快照日期存在但查不到成分股
     added, removed = detect_and_record_changes(
-        conn, "CSI800", date(2026, 7, 2), {"A", "B"}, prev_date=date(2026, 7, 1),
+        conn, "SP500", date(2026, 7, 2), {"A", "B"}, prev_date=date(2026, 7, 1),
     )
     assert (added, removed) == (0, 0)
     cur.executemany.assert_not_called()
@@ -105,7 +105,7 @@ def test_detect_changes_computes_added_and_removed():
     conn, cur = _conn_with_cursor()
     cur.fetchall.return_value = [("A",), ("B",)]  # 上次成分股 A, B
     added, removed = detect_and_record_changes(
-        conn, "CSI800", date(2026, 7, 2), {"B", "C"}, prev_date=date(2026, 7, 1),
+        conn, "SP500", date(2026, 7, 2), {"B", "C"}, prev_date=date(2026, 7, 1),
     )
     assert (added, removed) == (1, 1)  # C 新增, A 移除
     sql, rows = cur.executemany.call_args[0]
@@ -121,7 +121,7 @@ def test_detect_changes_no_diff_skips_write():
     conn, cur = _conn_with_cursor()
     cur.fetchall.return_value = [("A",), ("B",)]
     added, removed = detect_and_record_changes(
-        conn, "CSI800", date(2026, 7, 2), {"A", "B"}, prev_date=date(2026, 7, 1),
+        conn, "SP500", date(2026, 7, 2), {"A", "B"}, prev_date=date(2026, 7, 1),
     )
     assert (added, removed) == (0, 0)
     cur.executemany.assert_not_called()
@@ -167,9 +167,9 @@ def test_register_stocks_converts_nan_to_none():
 
 def test_upsert_index_log_writes_expected_params():
     conn, cur = _conn_with_cursor()
-    upsert_index_log(conn, "CSI800", date(2026, 7, 1), 800, 3, 2, status="ok", msg="")
+    upsert_index_log(conn, "SP500", date(2026, 7, 1), 800, 3, 2, status="ok", msg="")
     sql, params = cur.execute.call_args[0]
     assert "INSERT INTO index_sync_log" in sql
     assert "ON DUPLICATE KEY UPDATE" in sql
-    assert params == ("CSI800", date(2026, 7, 1), 800, 3, 2, "ok", "")
+    assert params == ("SP500", date(2026, 7, 1), 800, 3, 2, "ok", "")
     conn.commit.assert_called_once()

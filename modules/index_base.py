@@ -1,6 +1,6 @@
 """Index updater shared helpers.
 
-Used by apis.static (sp500/russell/hsi), apis.tushare.index_cn.
+Used by apis.static (sp500/russell/hsi).
 """
 
 from __future__ import annotations

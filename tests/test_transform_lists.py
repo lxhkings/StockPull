@@ -47,8 +47,8 @@ def test_transform_hk_connect_converts_dates():
 
 def test_transform_index_weight_converts_trade_date_to_snap_date():
     df = pd.DataFrame({"con_code": ["600519.SH", "000001.SZ"]})
-    rows = transform_index_weight(df, "CSI800", "20260706")
+    rows = transform_index_weight(df, "SP500", "20260706")
     assert rows == [
-        ("CSI800", "2026-07-06", "600519.SH", "600519.SH", None),
-        ("CSI800", "2026-07-06", "000001.SZ", "000001.SZ", None),
+        ("SP500", "2026-07-06", "600519.SH", "600519.SH", None),
+        ("SP500", "2026-07-06", "000001.SZ", "000001.SZ", None),
     ]

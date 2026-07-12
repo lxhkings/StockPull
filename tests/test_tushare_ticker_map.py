@@ -6,7 +6,6 @@ from apis.tushare.ticker_map import (
 
 
 def test_index_mapping():
-    assert index_id_to_ts_code("CSI800") == "000906.SH"
     assert index_id_to_ts_code("HSI") == "HSI"
     assert index_id_to_ts_code("SP500") == "SPX"
 

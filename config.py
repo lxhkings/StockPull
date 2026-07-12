@@ -65,14 +65,6 @@ INDEX_CONFIG = {
         "market": "us",
         "description": "iShares Core S&P 500 ETF",
     },
-    "CSI800": {
-        "name":   "中证800",
-        "source": "akshare",
-        "etf":    "510800",
-        "market": "cn",
-        "description": "中证800ETF (华夏)",
-        "ak_symbol": "000906",
-    },
     "HSI": {
         "name":   "恒生指数",
         "source": "akshare",

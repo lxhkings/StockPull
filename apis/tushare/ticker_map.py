@@ -6,7 +6,6 @@ A 股 (`600519.SH`) 和 HK (`00700.HK`) 在两边格式一致；
 from __future__ import annotations
 
 INDEX_TO_TS_CODE = {
-    "CSI800": "000906.SH",
     "HSI": "HSI",         # Tushare 港股指数代码
     "SP500": "SPX",       # Tushare 美股指数（如不可用，由 precheck 报告）
 }

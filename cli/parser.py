@@ -117,7 +117,7 @@ def build_parser() -> argparse.ArgumentParser:
     fs.add_parser("flush", help="把本地缓冲重放到 NAS（futu full/sync flush 失败后兜底）")
 
     # --- init / status ---
-    sub.add_parser("init", help="Insert CSI800/HSI rows into indices table (idempotent)")
+    sub.add_parser("init", help="Insert SP500/HSI rows into indices table (idempotent)")
     sub.add_parser("status", help="Print ingest status summary")
 
     # --- db ---
