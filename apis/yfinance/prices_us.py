@@ -31,6 +31,7 @@ from modules.price_write import flush_prices_and_sync
 from core.http_utils import to_float, to_int
 from core.trading_calendar import last_us_trading_date
 from apis.yfinance.client import download_with_retry
+from apis.yfinance.ticker_utils import to_yfinance_us
 
 log = logging.getLogger(__name__)
 
@@ -203,7 +204,7 @@ def _download_and_save(conn, tickers: List[str], start_date: Optional[date], res
     # end_dt 设为最近收盘日 + 1 天（yfinance end 参数不包含该日期）
     last_trading = last_us_trading_date()
     end_dt = last_trading + timedelta(days=1)
-    yf_symbols = [_yf_symbol(t) for t in tickers]
+    yf_symbols = [to_yfinance_us(t) for t in tickers]
 
     log.info(f"[batch] 下载 {len(tickers)} 只股票, 日期范围: {start_date} ~ {last_trading}")
 
@@ -236,7 +237,7 @@ def _download_and_save(conn, tickers: List[str], start_date: Optional[date], res
     ok_tickers: list = []
 
     for t in tickers:
-        yf_t = _yf_symbol(t)
+        yf_t = to_yfinance_us(t)
         if yf_t not in top_level:
             log.warning(f"[{t}] yfinance: ticker not in response, 无数据")
             set_sync_error(conn, t, "price", "yfinance: ticker not in response")
@@ -270,11 +271,6 @@ def _download_and_save(conn, tickers: List[str], start_date: Optional[date], res
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 内部工具
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-def _yf_symbol(ticker: str) -> str:
-    """DB ticker → yfinance ticker（BRK.B → BRK-B）"""
-    return ticker.upper().replace(".", "-")
-
-
 def _normalize_yf_frame(ticker: str, sub: pd.DataFrame) -> pd.DataFrame:
     """yfinance 单 ticker 子表 → [ticker, date, open, high, low, close, volume]"""
     cols = ["ticker", "date", "open", "high", "low", "close", "volume"]

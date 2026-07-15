@@ -29,6 +29,7 @@ from core.db_client import get_conn
 from modules.sync_log import get_last_sync_map, set_sync_ok, set_sync_error
 from core.http_utils import to_float, to_int
 from apis.yfinance.client import download_with_retry
+from apis.yfinance.ticker_utils import to_yfinance_us
 
 log = logging.getLogger(__name__)
 
@@ -202,7 +203,7 @@ def _download_and_save_weekly(
 
     target_monday = _last_us_weekly_date()
     end_dt = target_monday + timedelta(days=7)
-    yf_symbols = [_yf_symbol(t) for t in tickers]
+    yf_symbols = [to_yfinance_us(t) for t in tickers]
 
     log.info(f"[weekly batch] 下载 {len(tickers)} 只股票周线, {start_date} ~ {target_monday}")
 
@@ -231,7 +232,7 @@ def _download_and_save_weekly(
         top_level = set(df.columns.get_level_values(0))
 
     for t in tickers:
-        yf_t = _yf_symbol(t)
+        yf_t = to_yfinance_us(t)
         if yf_t not in top_level:
             log.warning(f"[{t}] yfinance weekly: ticker not in response")
             set_sync_error(conn, t, "price_weekly", "yfinance: ticker not in response")
@@ -254,11 +255,6 @@ def _download_and_save_weekly(
             log.error(f"[{t}] 周线写库失败: {e}")
             set_sync_error(conn, t, "price_weekly", str(e))
             result[t] = f"error: {e}"
-
-
-def _yf_symbol(ticker: str) -> str:
-    """DB ticker → yfinance symbol (BRK.B → BRK-B)."""
-    return ticker.upper().replace(".", "-")
 
 
 def _normalize_weekly_frame(ticker: str, sub: pd.DataFrame) -> pd.DataFrame:

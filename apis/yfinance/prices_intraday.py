@@ -28,6 +28,7 @@ from config import (
 )
 from core.http_utils import to_float, to_int
 from apis.yfinance.client import download_with_retry
+from apis.yfinance.ticker_utils import to_yfinance_us
 from core.db_client import get_conn
 from modules.db_admin import get_index_tickers
 from modules.sync_log import get_last_sync, set_sync_error, set_sync_ok
@@ -116,11 +117,6 @@ def _test_aapl_intraday(interval: str) -> tuple[Optional[date], str]:
             return None, "rate_limit"
         log.error(f"[AAPL {interval}] 测试失败: {e}")
         return None, "error"
-
-
-def _yf_symbol(ticker: str) -> str:
-    """DB ticker → yfinance symbol: BRK.B → BRK-B"""
-    return ticker.upper().replace(".", "-")
 
 
 def _normalize_frame(ticker: str, interval: str, sub: pd.DataFrame) -> pd.DataFrame:
@@ -267,7 +263,7 @@ def _download_and_save(
     """下载一批 ticker 的 intraday 数据并保存到 prices_intraday。"""
     end_date = last_trading + timedelta(days=1)
     yf_interval = YF_INTERVAL_MAP[interval]
-    yf_symbols = [_yf_symbol(t) for t in tickers]
+    yf_symbols = [to_yfinance_us(t) for t in tickers]
     sync_type = _sync_type(interval)
 
     log.info(f"[intraday {interval}] 下载 {len(tickers)} 只，{start_date} ~ {last_trading}")
@@ -296,7 +292,7 @@ def _download_and_save(
     top_level = set(df.columns.get_level_values(0)) if is_multi else set()
 
     for t in tickers:
-        yf_t = _yf_symbol(t)
+        yf_t = to_yfinance_us(t)
         if is_multi:
             if yf_t not in top_level:
                 log.warning(f"[{t}] not in batch response, retrying solo...")

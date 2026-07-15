@@ -28,10 +28,10 @@ def test_sync_type():
     assert _sync_type("1h") == "intraday_60m"
 
 
-def test_yf_symbol():
-    from apis.yfinance.prices_intraday import _yf_symbol
-    assert _yf_symbol("BRK.B") == "BRK-B"
-    assert _yf_symbol("AAPL") == "AAPL"
+def test_to_yfinance_us_dot_to_dash():
+    from apis.yfinance.ticker_utils import to_yfinance_us
+    assert to_yfinance_us("BRK.B") == "BRK-B"
+    assert to_yfinance_us("aapl") == "AAPL"
 
 
 def test_normalize_frame_basic():
