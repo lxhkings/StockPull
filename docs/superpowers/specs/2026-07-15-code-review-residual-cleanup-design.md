@@ -1,7 +1,7 @@
 # Code-review 残留清理 — 设计文档
 
 **日期:** 2026-07-15  
-**状态:** Plan 1 已实现；Plan 2 待做  
+**状态:** 已实现  
 **范围:** 上一轮 `/code-review` 五项结构债；**不**引入新数据源 / 新表 / 新市场  
 **来源:** `/code-review` 严格审查 + brainstorming  
 **前置:** `docs/superpowers/specs/2026-07-12-code-review-closure-design.md`（已实现）
