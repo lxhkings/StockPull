@@ -3,24 +3,56 @@ from unittest.mock import patch
 
 
 @patch("jobs.market_cn.backfill_stocks_a")
-@patch("jobs.market_cn.query")
-def test_update_index_delegates_to_backfill_stocks_a(mock_query, mock_backfill):
-    """update_index should call backfill_stocks_a and return stats."""
+@patch("jobs.market_cn.list_active_tickers")
+def test_update_index_returns_set_diff(mock_list, mock_backfill):
+    """prev/curr ticker sets → added list + removed count; inserted from backfill."""
     from jobs.market_cn import update_index
 
-    mock_query.side_effect = [
-        [{"n": 100}],  # prev
-        [{"n": 105}],  # curr
+    mock_list.side_effect = [
+        ["600519.SH", "000001.SZ"],           # prev
+        ["600519.SH", "000001.SZ", "300750.SZ"],  # curr: +300750
     ]
-    mock_backfill.return_value = 5
+    mock_backfill.return_value = 1
 
     new_tickers, inserted, removed = update_index()
 
     mock_backfill.assert_called_once()
-    assert inserted == 5
+    assert mock_list.call_count == 2
+    assert new_tickers == ["300750.SZ"]
+    assert inserted == 1
     assert removed == 0
+
+
+@patch("jobs.market_cn.backfill_stocks_a")
+@patch("jobs.market_cn.list_active_tickers")
+def test_update_index_removed_count(mock_list, mock_backfill):
+    from jobs.market_cn import update_index
+
+    mock_list.side_effect = [
+        ["600519.SH", "000001.SZ"],
+        ["600519.SH"],  # 000001 gone
+    ]
+    mock_backfill.return_value = 0
+
+    new_tickers, inserted, removed = update_index()
     assert new_tickers == []
-    assert mock_query.call_count == 2
+    assert inserted == 0
+    assert removed == 1
+
+
+@patch("jobs.market_cn.backfill_stocks_a")
+@patch("jobs.market_cn.list_active_tickers")
+def test_update_index_no_change(mock_list, mock_backfill):
+    from jobs.market_cn import update_index
+
+    mock_list.side_effect = [
+        ["600519.SH"],
+        ["600519.SH"],
+    ]
+    mock_backfill.return_value = 0
+    new_tickers, inserted, removed = update_index()
+    assert new_tickers == []
+    assert removed == 0
 
 
 @patch("jobs.market_cn.query")

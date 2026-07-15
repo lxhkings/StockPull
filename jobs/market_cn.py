@@ -14,22 +14,22 @@ log = logging.getLogger(__name__)
 market_id = "cn"
 
 
-_A_SHARE_COUNT_SQL = (
-    "SELECT COUNT(*) AS n FROM stocks "
-    "WHERE ticker LIKE '%%.SH' OR ticker LIKE '%%.SZ' OR ticker LIKE '%%.BJ'"
-)
-
-
 def update_index() -> tuple[list[str], int, int]:
-    """更新全量A股列表（从tushare stock_basic）。"""
-    prev_count = int(query(_A_SHARE_COUNT_SQL)[0]["n"])
-    inserted = backfill_stocks_a()
-    curr_count = int(query(_A_SHARE_COUNT_SQL)[0]["n"])
+    """更新全量 A 股列表；返回 (added_tickers, backfill_inserted, removed_count)。
 
-    added = curr_count - prev_count
-    log.info(f"[cn] stocks表更新: prev={prev_count}, curr={curr_count}, added={added}")
-    # new_tickers返回空，因为list_active_tickers直接读stocks表
-    return [], inserted, 0
+    added/removed 基于 stocks 表可见 A 股 ticker 集合前后差（非指数 constituent_changes）。
+    新票全量仍依赖空 sync_log + incremental；本函数不单独 backfill 价格。
+    """
+    prev = set(list_active_tickers())
+    inserted = backfill_stocks_a()
+    curr = set(list_active_tickers())
+    added = sorted(curr - prev)
+    removed = len(prev - curr)
+    log.info(
+        f"[cn] stocks set diff: prev={len(prev)}, curr={len(curr)}, "
+        f"+{len(added)} -{removed}, backfill_inserted={inserted}"
+    )
+    return added, inserted, removed
 
 
 def list_active_tickers(index: str | None = None) -> list[str]:
