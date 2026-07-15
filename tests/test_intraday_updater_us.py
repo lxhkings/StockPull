@@ -129,7 +129,7 @@ def _make_yf_multiindex_df(symbol: str) -> pd.DataFrame:
 @patch("apis.yfinance.prices_intraday.set_sync_error")
 @patch("apis.yfinance.client.yf.download")
 @patch("apis.yfinance.prices_intraday.get_index_tickers")
-@patch("apis.yfinance.prices_intraday._test_aapl_intraday")
+@patch("apis.yfinance.prices_intraday.probe_intraday")
 def test_update_intraday_calls_yf_download(
     mock_test_aapl, mock_get_index, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
 ):
@@ -157,7 +157,7 @@ def test_update_intraday_calls_yf_download(
 @patch("apis.yfinance.prices_intraday.set_sync_error")
 @patch("apis.yfinance.client.yf.download")
 @patch("apis.yfinance.prices_intraday.get_index_tickers")
-@patch("apis.yfinance.prices_intraday._test_aapl_intraday")
+@patch("apis.yfinance.prices_intraday.probe_intraday")
 def test_update_intraday_full_rebase_ignores_sync_log(
     mock_test_aapl, mock_get_index, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
 ):
@@ -183,7 +183,7 @@ def test_update_intraday_full_rebase_ignores_sync_log(
 @patch("apis.yfinance.prices_intraday.get_conn")
 @patch("apis.yfinance.prices_intraday.get_last_sync")
 @patch("apis.yfinance.prices_intraday.get_index_tickers")
-@patch("apis.yfinance.prices_intraday._test_aapl_intraday")
+@patch("apis.yfinance.prices_intraday.probe_intraday")
 def test_update_intraday_skips_up_to_date_ticker(mock_test_aapl, mock_get_index, mock_get_last_sync, mock_get_conn):
     # AAPL 测试返回成功，日期匹配
     mock_test_aapl.return_value = (date(2026, 5, 15), "ok")
@@ -206,7 +206,7 @@ def test_update_intraday_skips_up_to_date_ticker(mock_test_aapl, mock_get_index,
 @patch("apis.yfinance.prices_intraday.set_sync_error")
 @patch("apis.yfinance.client.yf.download")
 @patch("apis.yfinance.prices_intraday.get_index_tickers")
-@patch("apis.yfinance.prices_intraday._test_aapl_intraday")
+@patch("apis.yfinance.prices_intraday.probe_intraday")
 def test_update_intraday_floor_within_yahoo_window(
     mock_test_aapl, mock_get_index, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
 ):

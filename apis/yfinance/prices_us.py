@@ -32,60 +32,10 @@ from core.http_utils import to_float, to_int
 from core.trading_calendar import last_us_trading_date
 from apis.yfinance.client import download_with_retry
 from apis.yfinance.normalize import normalize_daily_frame
+from apis.yfinance.probe import probe_daily
 from apis.yfinance.ticker_utils import to_yfinance_us
 
 log = logging.getLogger(__name__)
-
-
-def _test_aapl_data(target_date: date) -> tuple[Optional[pd.DataFrame], str]:
-    """
-    测试 AAPL 是否有目标日期数据，判断 yfinance 是否已更新
-
-    Returns:
-        (DataFrame, status) 其中 status 为:
-        - "ok": 有目标日期数据
-        - "rate_limit": 被限速
-        - "error": 其他错误
-        - "no_data": 空/无目标日
-    """
-    end_dt = target_date + timedelta(days=1)
-    start_dt = target_date - timedelta(days=5)
-
-    try:
-        df = download_with_retry(
-            tickers="AAPL",
-            start=start_dt.strftime("%Y-%m-%d"),
-            end=end_dt.strftime("%Y-%m-%d"),
-            interval="1d",
-            group_by="column",
-            threads=False,
-            timeout=30,
-            context="[AAPL probe] ",
-        )
-        if df is None or df.empty:
-            return None, "no_data"
-
-        df = df.reset_index()
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        df.columns = [str(c).lower() for c in df.columns]
-
-        if "date" not in df.columns and "datetime" in df.columns:
-            df = df.rename(columns={"datetime": "date"})
-        if "date" not in df.columns and "index" in df.columns:
-            df = df.rename(columns={"index": "date"})
-
-        df["date"] = pd.to_datetime(df["date"]).dt.date
-        if target_date in df["date"].values:
-            return df, "ok"
-        return None, "no_data"
-    except Exception as e:
-        err_msg = str(e)
-        if "RateLimit" in err_msg or "Too Many Requests" in err_msg:
-            log.warning(f"[AAPL] yfinance 被限速: {e}")
-            return None, "rate_limit"
-        log.warning(f"[AAPL] 测试请求失败: {e}")
-        return None, "error"
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -108,7 +58,7 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
 
     # 先用 AAPL 测试 yfinance 是否已更新最近数据
     last_trading = last_us_trading_date()
-    test_df, status = _test_aapl_data(last_trading)
+    test_df, status = probe_daily(last_trading)
 
     if status == "rate_limit":
         log.warning("[AAPL] yfinance 被限速，跳过本次增量更新，稍后重试")

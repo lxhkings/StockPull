@@ -29,24 +29,17 @@ from config import (
 from core.http_utils import to_float, to_int
 from apis.yfinance.client import download_with_retry
 from apis.yfinance.normalize import normalize_intraday_frame
+from apis.yfinance.probe import (
+    INTERVAL_LOOKBACK_DAYS,
+    YF_INTERVAL_MAP,
+    probe_intraday,
+)
 from apis.yfinance.ticker_utils import to_yfinance_us
 from core.db_client import get_conn
 from modules.db_admin import get_index_tickers
 from modules.sync_log import get_last_sync, set_sync_error, set_sync_ok
 
 log = logging.getLogger(__name__)
-
-# interval → yfinance 参数字符串
-YF_INTERVAL_MAP: dict[str, str] = {
-    "15m": "15m",
-    "1h":  "60m",
-}
-
-# interval → yfinance 免费 tier 最大可拉天数
-INTERVAL_LOOKBACK_DAYS: dict[str, int] = {
-    "15m": 60,
-    "1h":  730,
-}
 
 SUPPORTED_INTERVALS = list(YF_INTERVAL_MAP.keys())
 
@@ -75,49 +68,6 @@ def _download_single(ticker: str, yf_symbol: str, start_date: date, end_date: da
     except Exception as e:
         log.warning(f"[{ticker}] 单独下载失败: {e}")
         return None
-
-
-def _test_aapl_intraday(interval: str) -> tuple[Optional[date], str]:
-    """
-    测试 AAPL 是否有最近交易日数据，判断 yfinance intraday API 是否可用
-
-    Returns:
-        (latest_date, status) 其中 status 为:
-        - "ok": 有数据，返回最新日期
-        - "no_data": 无数据（周末/假期或未更新）
-        - "rate_limit": 被限速
-        - "error": 其他错误
-    """
-    try:
-        today = date.today()
-        floor = today - timedelta(days=INTERVAL_LOOKBACK_DAYS[interval] - 1)
-        end = today + timedelta(days=1)
-
-        df = download_with_retry(
-            tickers="AAPL",
-            start=floor.strftime("%Y-%m-%d"),
-            end=end.strftime("%Y-%m-%d"),
-            interval=YF_INTERVAL_MAP[interval],
-            group_by="ticker",
-            threads=False,
-            timeout=YF_TIMEOUT,
-            context=f"[AAPL {interval} probe] ",
-        )
-
-        if df is None or df.empty:
-            return None, "no_data"
-
-        latest = df.index[-1].date()
-        log.info(f"[AAPL {interval}] 测试成功：最新日期 {latest}，范围 {floor} ~ {latest}")
-        return latest, "ok"
-
-    except Exception as e:
-        err_msg = str(e)
-        if "RateLimit" in err_msg or "Too Many Requests" in err_msg:
-            log.warning(f"[AAPL {interval}] yfinance 被限速: {e}")
-            return None, "rate_limit"
-        log.error(f"[AAPL {interval}] 测试失败: {e}")
-        return None, "error"
 
 
 def _save_rows(conn, df: pd.DataFrame) -> int:
@@ -159,7 +109,7 @@ def update_intraday(interval: str, full_rebase: bool = False) -> dict[str, str]:
         raise ValueError(f"Unsupported interval: {interval}. Supported: {SUPPORTED_INTERVALS}")
 
     # 先用 AAPL 测试 API 是否可用，并获取实际最新日期
-    latest_date, status = _test_aapl_intraday(interval)
+    latest_date, status = probe_intraday(interval)
 
     if status == "no_data":
         log.warning(f"[intraday {interval}] AAPL 无数据（周末/假期或未更新），跳过本次更新")
