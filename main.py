@@ -78,8 +78,8 @@ def cmd_rebase(market: str, codes: list[str] | None, years: int | None, index: s
         if market != "cn":
             print("--etf-only currently only supports --market cn", file=sys.stderr)
             return 1
-        from apis.tushare.etf_cn import update_etf_prices
-        n = update_etf_prices(full_rebase=True)
+        mod = _import_market("cn")
+        n = mod.rebase_etf(full_rebase=True)
         print(f"[cn] ETF rebase wrote {n} rows to index_prices")
         return 0
 
@@ -127,15 +127,15 @@ def cmd_purge_index(index_id: str, yes: bool = False) -> int:
 
 
 def cmd_intraday(interval: str | None, rebase: bool = False) -> int:
-    from jobs import market_us
     from apis.yfinance.prices_intraday import SUPPORTED_INTERVALS
-    intervals = [interval] if interval else None  # None → market_us 用 SUPPORTED_INTERVALS
+    mod = _import_market("us")
+    intervals = [interval] if interval else None
     log.info(
         f"[intraday] 开始拉取 "
         f"{intervals or SUPPORTED_INTERVALS}"
         + (" (rebase)" if rebase else "")
     )
-    result = market_us.intraday(intervals=intervals, full_rebase=rebase)
+    result = mod.intraday(intervals=intervals, full_rebase=rebase)
     ok = sum(1 for v in result.values() if v == "ok")
     err = sum(1 for v in result.values() if v.startswith("error"))
     log.info(f"[intraday] 完成: ok={ok}, error={err}")

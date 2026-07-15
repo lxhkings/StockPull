@@ -55,6 +55,12 @@ def update_index_price() -> int:
     return update_etf_prices()
 
 
+def rebase_etf(*, full_rebase: bool = True) -> int:
+    """行业 ETF index_prices 全量/增量重灌。非 MarketModule；仅 CLI --etf-only。"""
+    from apis.tushare.etf_cn import update_etf_prices
+    return update_etf_prices(full_rebase=full_rebase)
+
+
 def rebase(
     tickers: Optional[list[str]] = None,
     years: Optional[int] = None,

@@ -76,3 +76,10 @@ def test_intraday_is_noop():
     from jobs.market_cn import intraday
     assert intraday() == {}
     assert intraday(["1h"], full_rebase=True) == {}
+
+
+@patch("apis.tushare.etf_cn.update_etf_prices", return_value=42)
+def test_rebase_etf_delegates(mock_upd):
+    from jobs.market_cn import rebase_etf
+    assert rebase_etf(full_rebase=True) == 42
+    mock_upd.assert_called_once_with(full_rebase=True)
