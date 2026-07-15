@@ -48,7 +48,7 @@ def test_normalize_frame_basic():
     }, index=idx)
     sub.index.name = "Datetime"
 
-    from apis.yfinance.prices_intraday import _normalize_frame
+    from apis.yfinance.normalize import normalize_intraday_frame as _normalize_frame
     result = _normalize_frame("AAPL", "15m", sub)
 
     assert list(result.columns) == ["ticker", "interval", "datetime", "open", "high", "low", "close", "volume"]
@@ -61,7 +61,7 @@ def test_normalize_frame_basic():
 
 
 def test_normalize_frame_empty():
-    from apis.yfinance.prices_intraday import _normalize_frame
+    from apis.yfinance.normalize import normalize_intraday_frame as _normalize_frame
     result = _normalize_frame("AAPL", "15m", pd.DataFrame())
     assert result.empty
     assert list(result.columns) == ["ticker", "interval", "datetime", "open", "high", "low", "close", "volume"]

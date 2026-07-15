@@ -1,7 +1,7 @@
 import pandas as pd
 from datetime import date
 
-from apis.yfinance.normalize import normalize_daily_frame
+from apis.yfinance.normalize import normalize_daily_frame, normalize_intraday_frame
 
 
 def test_normalize_daily_empty():
@@ -40,3 +40,34 @@ def test_normalize_daily_drops_null_close():
     out = normalize_daily_frame("AAPL", sub)
     assert len(out) == 1
     assert out["date"].iloc[0] == date(2026, 5, 11)
+
+
+def test_normalize_intraday_frame_basic():
+    idx = pd.to_datetime([
+        "2026-05-15 14:30:00+00:00",
+        "2026-05-15 14:45:00+00:00",
+    ])
+    sub = pd.DataFrame({
+        "Open":   [150.0, 151.0],
+        "High":   [151.5, 152.0],
+        "Low":    [149.5, 150.5],
+        "Close":  [151.0, 151.5],
+        "Volume": [1000000, 900000],
+    }, index=idx)
+    sub.index.name = "Datetime"
+
+    result = normalize_intraday_frame("AAPL", "15m", sub)
+
+    assert list(result.columns) == ["ticker", "interval", "datetime", "open", "high", "low", "close", "volume"]
+    assert len(result) == 2
+    assert result["ticker"].iloc[0] == "AAPL"
+    assert result["interval"].iloc[0] == "15m"
+    assert result["datetime"].dtype.kind == "M"  # datetime type (ns or us)
+    assert result["datetime"].iloc[0].tzinfo is None
+    assert result["close"].iloc[0] == 151.0
+
+
+def test_normalize_intraday_frame_empty():
+    result = normalize_intraday_frame("AAPL", "15m", pd.DataFrame())
+    assert result.empty
+    assert list(result.columns) == ["ticker", "interval", "datetime", "open", "high", "low", "close", "volume"]

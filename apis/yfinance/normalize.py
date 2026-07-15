@@ -26,3 +26,30 @@ def normalize_daily_frame(ticker: str, sub: pd.DataFrame) -> pd.DataFrame:
     df = df.dropna(subset=["date", "close"])
     df = df[cols].sort_values("date").reset_index(drop=True)
     return df
+
+
+def normalize_intraday_frame(ticker: str, interval: str, sub: pd.DataFrame) -> pd.DataFrame:
+    """yfinance 单 ticker 子表 → 标准列 [ticker, interval, datetime, open, high, low, close, volume]"""
+    cols = ["ticker", "interval", "datetime", "open", "high", "low", "close", "volume"]
+    if sub is None or sub.empty:
+        return pd.DataFrame(columns=cols)
+
+    df = sub.reset_index()
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    df.columns = [str(c).lower() for c in df.columns]
+
+    for cand in ("datetime", "date", "index"):
+        if cand in df.columns:
+            df = df.rename(columns={cand: "datetime"})
+            break
+
+    df["datetime"] = pd.to_datetime(df["datetime"])
+    # 剥除时区，MySQL DATETIME 无时区（yfinance 返回 UTC）
+    if df["datetime"].dt.tz is not None:
+        df["datetime"] = df["datetime"].dt.tz_convert("UTC").dt.tz_localize(None)
+
+    df["ticker"] = ticker
+    df["interval"] = interval
+    df = df.dropna(subset=["datetime", "close"])
+    return df[cols].sort_values("datetime").reset_index(drop=True)

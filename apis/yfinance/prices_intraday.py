@@ -28,6 +28,7 @@ from config import (
 )
 from core.http_utils import to_float, to_int
 from apis.yfinance.client import download_with_retry
+from apis.yfinance.normalize import normalize_intraday_frame
 from apis.yfinance.ticker_utils import to_yfinance_us
 from core.db_client import get_conn
 from modules.db_admin import get_index_tickers
@@ -117,33 +118,6 @@ def _test_aapl_intraday(interval: str) -> tuple[Optional[date], str]:
             return None, "rate_limit"
         log.error(f"[AAPL {interval}] 测试失败: {e}")
         return None, "error"
-
-
-def _normalize_frame(ticker: str, interval: str, sub: pd.DataFrame) -> pd.DataFrame:
-    """yfinance 单 ticker 子表 → 标准列 [ticker, interval, datetime, open, high, low, close, volume]"""
-    cols = ["ticker", "interval", "datetime", "open", "high", "low", "close", "volume"]
-    if sub is None or sub.empty:
-        return pd.DataFrame(columns=cols)
-
-    df = sub.reset_index()
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    df.columns = [str(c).lower() for c in df.columns]
-
-    for cand in ("datetime", "date", "index"):
-        if cand in df.columns:
-            df = df.rename(columns={cand: "datetime"})
-            break
-
-    df["datetime"] = pd.to_datetime(df["datetime"])
-    # 剥除时区，MySQL DATETIME 无时区（yfinance 返回 UTC）
-    if df["datetime"].dt.tz is not None:
-        df["datetime"] = df["datetime"].dt.tz_convert("UTC").dt.tz_localize(None)
-
-    df["ticker"] = ticker
-    df["interval"] = interval
-    df = df.dropna(subset=["datetime", "close"])
-    return df[cols].sort_values("datetime").reset_index(drop=True)
 
 
 def _save_rows(conn, df: pd.DataFrame) -> int:
@@ -299,7 +273,7 @@ def _download_and_save(
                 # 尝试单独下载该 ticker
                 solo_df = _download_single(t, yf_t, start_date, end_date, yf_interval)
                 if solo_df is not None and not solo_df.empty:
-                    normalized = _normalize_frame(t, interval, solo_df)
+                    normalized = normalize_intraday_frame(t, interval, solo_df)
                     if not normalized.empty:
                         try:
                             rows_inserted = _save_rows(conn, normalized)
@@ -323,7 +297,7 @@ def _download_and_save(
             result[t] = "no_data"
             continue
 
-        normalized = _normalize_frame(t, interval, sub)
+        normalized = normalize_intraday_frame(t, interval, sub)
         if normalized.empty:
             log.warning(f"[{t}] empty frame")
             set_sync_error(conn, t, sync_type, "yfinance: empty frame")
