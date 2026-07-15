@@ -52,3 +52,41 @@ def test_transform_index_weight_converts_trade_date_to_snap_date():
         ("SP500", "2026-07-06", "600519.SH", "600519.SH", None),
         ("SP500", "2026-07-06", "000001.SZ", "000001.SZ", None),
     ]
+
+
+def test_transform_etf_basic_nan_fields_become_none():
+    df = pd.DataFrame({
+        "ts_code": ["510300.SH"],
+        "name": [float("nan")],
+        "management": [float("nan")],
+        "custodian": [float("nan")],
+        "fund_type": [float("nan")],
+        "market": [float("nan")],
+        "list_date": ["20120528"],
+        "issue_date": [None],
+        "delist_date": [float("nan")],
+        "status": [float("nan")],
+    })
+    rows = transform_etf_basic(df)
+    row = rows[0]
+    assert row[0] == "510300.SH"
+    assert row[1] is None  # name
+    assert row[2] is None  # management
+    assert row[3] is None  # custodian
+    assert row[4] is None  # fund_type
+    assert row[5] is None  # market
+    assert row[6] == "2012-05-28"
+    assert row[7] is None
+    assert row[8] is None  # delist via to_date
+    assert row[9] is None  # status
+
+
+def test_transform_hk_connect_nan_name_becomes_none():
+    df = pd.DataFrame({
+        "ts_code": ["600519.SH"],
+        "name": [float("nan")],
+        "in_date": ["20141117"],
+        "out_date": [None],
+    })
+    rows = transform_hk_connect(df, "SH")
+    assert rows == [("SH", "600519.SH", None, "2014-11-17", None)]

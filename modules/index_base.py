@@ -9,6 +9,8 @@ from datetime import date
 from typing import Optional, Set, Tuple
 import pandas as pd
 
+from core.http_utils import or_none
+
 
 
 def get_last_snapshot_date(conn, index_id: str) -> Optional[date]:
@@ -120,15 +122,11 @@ def register_stocks(conn, df: pd.DataFrame, exchange: str = None) -> None:
     Args:
         exchange: US market不传，CN/HK传交易所代码
     """
-    def _null(v):
-        """pandas iterrows 将 None 转为 float NaN，还原为 SQL NULL。"""
-        return None if pd.isna(v) else v
-
     rows = []
     for _, r in df.iterrows():
         ticker = r["ticker"]
-        name = _null(r.get("name", None))
-        sector = _null(r.get("sector", None))
+        name = or_none(r.get("name", None))
+        sector = or_none(r.get("sector", None))
         if exchange:
             rows.append((ticker, name, sector, exchange))
         else:

@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import pandas as pd
 
-from core.http_utils import to_date, to_float
+from core.http_utils import to_date, to_float, or_none
 
 
 def _to_str(value) -> str | None:
-    return None if pd.isna(value) else str(value)
+    v = or_none(value)
+    return None if v is None else str(v)
 
 
 def transform_dividend_rows(df: pd.DataFrame) -> list[tuple]:

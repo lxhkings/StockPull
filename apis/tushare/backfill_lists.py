@@ -16,12 +16,6 @@ from apis.tushare.transform_lists import (
 log = logging.getLogger(__name__)
 
 
-def _to_str(v) -> str | None:
-    if v is None or (isinstance(v, float) and pd.isna(v)):
-        return None
-    return str(v)
-
-
 def backfill_stocks_a() -> int:
     """A 股全量股票列表 → stocks（复用 modules/index_base.py:register_stocks，
     COALESCE 保护已有 gics_sector 不被空 industry 覆盖）。"""

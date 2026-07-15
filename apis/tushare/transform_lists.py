@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from core.http_utils import to_date
+from core.http_utils import to_date, or_none
 
 
 def transform_stocks_a(df: pd.DataFrame) -> pd.DataFrame:
@@ -16,22 +16,22 @@ def transform_stocks_a(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def transform_stocks_hk(df: pd.DataFrame) -> list[tuple]:
-    return [(r["ts_code"], r["name"], None, "HKEX") for _, r in df.iterrows()]
+    return [(r["ts_code"], or_none(r["name"]), None, "HKEX") for _, r in df.iterrows()]
 
 
 def transform_etf_basic(df: pd.DataFrame) -> list[tuple]:
     return [
-        (r["ts_code"], r.get("name"), r.get("management"), r.get("custodian"),
-         r.get("fund_type"), r.get("market"),
+        (r["ts_code"], or_none(r.get("name")), or_none(r.get("management")), or_none(r.get("custodian")),
+         or_none(r.get("fund_type")), or_none(r.get("market")),
          to_date(r.get("list_date")), to_date(r.get("issue_date")),
-         to_date(r.get("delist_date")), r.get("status"))
+         to_date(r.get("delist_date")), or_none(r.get("status")))
         for _, r in df.iterrows()
     ]
 
 
 def transform_hk_connect(df: pd.DataFrame, hs_type: str) -> list[tuple]:
     return [
-        (hs_type, r["ts_code"], r.get("name"),
+        (hs_type, r["ts_code"], or_none(r.get("name")),
          to_date(r.get("in_date")), to_date(r.get("out_date")))
         for _, r in df.iterrows()
     ]
