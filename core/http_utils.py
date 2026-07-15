@@ -164,6 +164,21 @@ def to_int(value) -> Optional[int]:
     return int(f) if f is not None else None
 
 
+def or_none(value):
+    """缺失值（None / NaN / NaT / pd.NA）→ None；其余原样返回。
+
+    仅处理标量。调用方勿传入整表。
+    """
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return value
+
+
 def to_date(value) -> Optional[str]:
     """
     YYYYMMDD 字符串/数值 → YYYY-MM-DD
@@ -178,6 +193,7 @@ def to_date(value) -> Optional[str]:
         return None
     s = str(value)
     return f"{s[:4]}-{s[4:6]}-{s[6:8]}" if len(s) == 8 else s
+
 
 
 def format_cik(cik) -> Optional[str]:

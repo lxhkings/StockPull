@@ -11,7 +11,10 @@ from core.http_utils import (
     to_int,
     to_date,
     format_cik,
+    or_none,
 )
+import pandas as pd
+import math
 
 
 # ── fetch_with_retry ──────────────────────────────────────────────
@@ -148,3 +151,18 @@ def test_to_date_handles_empty_string():
 
 def test_to_date_passes_through_non_8_char_string():
     assert to_date("2024-04-03") == "2024-04-03"
+
+
+# ── or_none ───────────────────────────────────────────────────────
+
+def test_or_none_none_and_nan():
+    assert or_none(None) is None
+    assert or_none(float("nan")) is None
+    assert or_none(pd.NA) is None
+
+
+def test_or_none_passthrough():
+    assert or_none("沪深300ETF") == "沪深300ETF"
+    assert or_none(0) == 0
+    assert or_none("") == ""
+
