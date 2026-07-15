@@ -29,6 +29,7 @@ from core.db_client import get_conn
 from modules.sync_log import get_last_sync_map, set_sync_ok, set_sync_error
 from core.http_utils import to_float, to_int
 from apis.yfinance.client import download_with_retry
+from apis.yfinance.normalize import normalize_daily_frame
 from apis.yfinance.ticker_utils import to_yfinance_us
 
 log = logging.getLogger(__name__)
@@ -239,7 +240,7 @@ def _download_and_save_weekly(
             result[t] = "no_data"
             continue
         sub = df[yf_t]
-        normalized = _normalize_weekly_frame(t, sub)
+        normalized = normalize_daily_frame(t, sub)
         if normalized.empty:
             log.warning(f"[{t}] yfinance weekly: empty frame")
             set_sync_error(conn, t, "price_weekly", "yfinance: empty frame")
@@ -255,27 +256,6 @@ def _download_and_save_weekly(
             log.error(f"[{t}] 周线写库失败: {e}")
             set_sync_error(conn, t, "price_weekly", str(e))
             result[t] = f"error: {e}"
-
-
-def _normalize_weekly_frame(ticker: str, sub: pd.DataFrame) -> pd.DataFrame:
-    """yfinance 单 ticker 周线子表 → [ticker, date, open, high, low, close, volume]"""
-    cols = ["ticker", "date", "open", "high", "low", "close", "volume"]
-    if sub is None or sub.empty:
-        return pd.DataFrame(columns=cols)
-    df = sub.reset_index()
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    df.columns = [str(c).lower() for c in df.columns]
-    if "date" not in df.columns:
-        for cand in ("datetime", "index"):
-            if cand in df.columns:
-                df = df.rename(columns={cand: "date"})
-                break
-    df["date"] = pd.to_datetime(df["date"]).dt.date
-    df["ticker"] = ticker
-    df = df.dropna(subset=["date", "close"])
-    df = df[cols].sort_values("date").reset_index(drop=True)
-    return df
 
 
 def _save_weekly_prices(conn, ticker: str, df: pd.DataFrame) -> int:

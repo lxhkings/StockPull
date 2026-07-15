@@ -31,6 +31,7 @@ from modules.price_write import flush_prices_and_sync
 from core.http_utils import to_float, to_int
 from core.trading_calendar import last_us_trading_date
 from apis.yfinance.client import download_with_retry
+from apis.yfinance.normalize import normalize_daily_frame
 from apis.yfinance.ticker_utils import to_yfinance_us
 
 log = logging.getLogger(__name__)
@@ -244,7 +245,7 @@ def _download_and_save(conn, tickers: List[str], start_date: Optional[date], res
             result[t] = "no_data"
             continue
         sub = df[yf_t]
-        normalized = _normalize_yf_frame(t, sub)
+        normalized = normalize_daily_frame(t, sub)
         if normalized.empty:
             log.warning(f"[{t}] yfinance: empty frame, 无数据")
             set_sync_error(conn, t, "price", "yfinance: empty frame")
@@ -271,30 +272,6 @@ def _download_and_save(conn, tickers: List[str], start_date: Optional[date], res
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 内部工具
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-def _normalize_yf_frame(ticker: str, sub: pd.DataFrame) -> pd.DataFrame:
-    """yfinance 单 ticker 子表 → [ticker, date, open, high, low, close, volume]"""
-    cols = ["ticker", "date", "open", "high", "low", "close", "volume"]
-    if sub is None or sub.empty:
-        return pd.DataFrame(columns=cols)
-
-    df = sub.reset_index()
-    # 处理 MultiIndex 列名（yfinance 单 ticker 也返回 MultiIndex）
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    df.columns = [str(c).lower() for c in df.columns]
-    if "date" not in df.columns:
-        for cand in ("datetime", "index"):
-            if cand in df.columns:
-                df = df.rename(columns={cand: "date"})
-                break
-
-    df["date"] = pd.to_datetime(df["date"]).dt.date
-    df["ticker"] = ticker
-    df = df.dropna(subset=["date", "close"])
-    df = df[cols].sort_values("date").reset_index(drop=True)
-    return df
-
-
 def _price_rows_from_df(df: pd.DataFrame) -> list:
     """DataFrame → price row tuples for flush_prices_and_sync."""
     return [

@@ -92,17 +92,17 @@ def test_update_weekly_batch_test_error_skips_all():
     assert result == {"AAPL": "error: test_failed"}
 
 
-# ── _normalize_weekly_frame ───────────────────────────────────────────────────
+# ── normalize_daily_frame（周线共用）──────────────────────────────────────────
 
 def test_normalize_weekly_frame_empty_returns_empty():
-    from apis.yfinance.prices_us_weekly import _normalize_weekly_frame
-    result = _normalize_weekly_frame("AAPL", pd.DataFrame())
+    from apis.yfinance.normalize import normalize_daily_frame
+    result = normalize_daily_frame("AAPL", pd.DataFrame())
     assert result.empty
     assert list(result.columns) == ["ticker", "date", "open", "high", "low", "close", "volume"]
 
 
 def test_normalize_weekly_frame_happy_path():
-    from apis.yfinance.prices_us_weekly import _normalize_weekly_frame
+    from apis.yfinance.normalize import normalize_daily_frame
     sub = pd.DataFrame({
         "Date": pd.to_datetime(["2026-05-04", "2026-05-11"]),
         "Open": [180.0, 185.0],
@@ -111,7 +111,7 @@ def test_normalize_weekly_frame_happy_path():
         "Close": [181.0, 186.0],
         "Volume": [1_000_000, 1_200_000],
     })
-    result = _normalize_weekly_frame("AAPL", sub)
+    result = normalize_daily_frame("AAPL", sub)
     assert list(result.columns) == ["ticker", "date", "open", "high", "low", "close", "volume"]
     assert len(result) == 2
     assert result["ticker"].iloc[0] == "AAPL"
@@ -120,7 +120,7 @@ def test_normalize_weekly_frame_happy_path():
 
 
 def test_normalize_weekly_frame_drops_null_close():
-    from apis.yfinance.prices_us_weekly import _normalize_weekly_frame
+    from apis.yfinance.normalize import normalize_daily_frame
     sub = pd.DataFrame({
         "Date": pd.to_datetime(["2026-05-04", "2026-05-11"]),
         "Open": [180.0, 185.0],
@@ -129,7 +129,7 @@ def test_normalize_weekly_frame_drops_null_close():
         "Close": [None, 186.0],
         "Volume": [1_000_000, 1_200_000],
     })
-    result = _normalize_weekly_frame("AAPL", sub)
+    result = normalize_daily_frame("AAPL", sub)
     assert len(result) == 1
     assert result["date"].iloc[0] == date(2026, 5, 11)
 
