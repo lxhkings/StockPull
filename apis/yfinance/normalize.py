@@ -4,17 +4,27 @@ from __future__ import annotations
 import pandas as pd
 
 
+def lower_ohlc_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Flatten MultiIndex / tuple column names to level-0 and lower-case them.
+
+    Shared by daily/intraday normalize and prices_index (close-only). Mutates columns.
+    """
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    df.columns = [
+        str(c).lower() if not isinstance(c, tuple) else str(c[0]).lower()
+        for c in df.columns
+    ]
+    return df
+
+
 def normalize_daily_frame(ticker: str, sub: pd.DataFrame) -> pd.DataFrame:
     """单 ticker 子表 → [ticker, date, open, high, low, close, volume]。"""
     cols = ["ticker", "date", "open", "high", "low", "close", "volume"]
     if sub is None or sub.empty:
         return pd.DataFrame(columns=cols)
 
-    df = sub.reset_index()
-    # 处理 MultiIndex 列名（yfinance 单 ticker 也返回 MultiIndex）
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    df.columns = [str(c).lower() for c in df.columns]
+    df = lower_ohlc_columns(sub.reset_index())
     if "date" not in df.columns:
         for cand in ("datetime", "index"):
             if cand in df.columns:
@@ -34,10 +44,7 @@ def normalize_intraday_frame(ticker: str, interval: str, sub: pd.DataFrame) -> p
     if sub is None or sub.empty:
         return pd.DataFrame(columns=cols)
 
-    df = sub.reset_index()
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    df.columns = [str(c).lower() for c in df.columns]
+    df = lower_ohlc_columns(sub.reset_index())
 
     for cand in ("datetime", "date", "index"):
         if cand in df.columns:

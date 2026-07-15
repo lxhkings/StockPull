@@ -12,6 +12,7 @@ from core.db_client import query, execute
 from core.http_utils import to_float
 from core.trading_calendar import last_us_trading_date
 from apis.yfinance.client import download_with_retry
+from apis.yfinance.normalize import lower_ohlc_columns
 
 log = logging.getLogger(__name__)
 
@@ -60,11 +61,7 @@ def update_index_prices() -> int:
         if df.empty:
             continue
 
-        df = df.reset_index()
-        df.columns = [
-            str(c).lower() if not isinstance(c, tuple) else str(c[0]).lower()
-            for c in df.columns
-        ]
+        df = lower_ohlc_columns(df.reset_index())
         rows = []
         for _, r in df.iterrows():
             d = r["date"].date() if hasattr(r["date"], "date") else r["date"]
