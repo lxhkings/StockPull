@@ -1,7 +1,7 @@
 # Code-review Probe Cleanup — 设计文档
 
 **日期:** 2026-07-16  
-**状态:** 已批准（方案 A）  
+**状态:** 已实现  
 **范围:** 上一轮 `/code-review` 对 residual cleanup 的残留项 P0+P1+P2  
 **非目标:** 不合并 `prices_us` / `prices_us_weekly` batch 编排（P3）  
 **来源:** `/code-review` 严格审查 + brainstorming  
