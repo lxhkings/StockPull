@@ -1,9 +1,6 @@
-"""
-intraday_updater_us.py — 美股分钟级行情拉取（15m / 1h）
+"""US equity intraday prices via yfinance free tier (15m / 1h).
 
-数据源: yfinance 免费 tier
-存储: prices_intraday 表
-Sync: sync_log data_type='intraday_15m'|'intraday_60m'
+Writes prices_intraday; sync_log data_type intraday_15m / intraday_60m.
 """
 
 from __future__ import annotations

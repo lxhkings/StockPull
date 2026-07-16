@@ -1,12 +1,7 @@
-# data/stock_updater_us_weekly.py
-"""
-stock_updater_us_weekly.py — 美股周线行情更新
+"""US equity weekly prices via yfinance (interval=1wk).
 
-数据源：yfinance (interval="1wk")
-写入：prices_weekly 表
-sync_log data_type: "price_weekly"
-
-逻辑完全镜像 stock_updater_us.py，差异仅在 interval、表名、data_type。
+Writes prices_weekly; sync_log data_type price_weekly.
+Mirrors prices_us batch structure; differs in interval, table, data_type.
 """
 
 import time

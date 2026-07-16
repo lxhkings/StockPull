@@ -1,12 +1,6 @@
-"""
-stock_updater.py — 股票行情更新
+"""US equity daily prices via yfinance (incremental by sync_log).
 
-数据源：yfinance（增量，按日期续拉）
-
-职责：
-- 从 yfinance 拉取股票历史行情数据
-- 支持单只入口和批量入口（pipeline 用批量）
-- INSERT IGNORE 通过 prices.UNIQUE KEY (ticker, date) 自动防重
+Writes prices table; batch entry for pipeline. INSERT IGNORE on (ticker, date).
 """
 
 import time

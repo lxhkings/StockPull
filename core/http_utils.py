@@ -178,7 +178,6 @@ def or_none(value):
         pass
     return value
 
-
 def to_date(value) -> Optional[str]:
     """
     YYYYMMDD 字符串/数值 → YYYY-MM-DD
@@ -193,8 +192,6 @@ def to_date(value) -> Optional[str]:
         return None
     s = str(value)
     return f"{s[:4]}-{s[4:6]}-{s[6:8]}" if len(s) == 8 else s
-
-
 
 def format_cik(cik) -> Optional[str]:
     """
