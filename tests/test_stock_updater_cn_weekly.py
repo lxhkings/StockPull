@@ -87,7 +87,7 @@ def test_update_weekly_batch_new_tickers_trigger_full_backfill():
         result = update_weekly_batch(["600519.SH"])
 
     assert mock_fetch.called
-    start_arg = mock_fetch.call_args[0][1]
+    start_arg = mock_fetch.call_args[0][2]
     assert start_arg == TUSHARE_BACKFILL_START
 
 

@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Tuple
 import pandas as pd
 from tqdm import tqdm
 
-from config import HISTORY_YEARS_CN, TUSHARE_BACKFILL_START
+from config import TUSHARE_BACKFILL_START
 from core.db_client import get_conn
 from core.http_utils import to_float, to_int
 from core.trading_calendar import last_cn_trading_date
@@ -50,9 +50,8 @@ def normalize_pro_bar(df: pd.DataFrame) -> pd.DataFrame:
     return out.sort_values("date").reset_index(drop=True)
 
 
-def _fetch_one(ticker: str, start: str, end: str, freq: str) -> pd.DataFrame:
+def _fetch_one(client, ticker: str, start: str, end: str, freq: str) -> pd.DataFrame:
     """tushare pro_bar 单 ticker 拉取。start/end 格式 YYYYMMDD。"""
-    client = get_client()
     df_raw = client.pro_bar(
         ts_code=ticker, adj="qfq", start_date=start, end_date=end, freq=freq,
     )
@@ -78,6 +77,7 @@ def _flush_batch(
 
 def _process_tickers_batched(
     conn,
+    client,
     tickers: List[str],
     last_trading: date,
     full_rebase: bool,
@@ -111,7 +111,7 @@ def _process_tickers_batched(
                     start = TUSHARE_BACKFILL_START
             end = last_trading.strftime("%Y%m%d")
 
-            df = _fetch_one(t, start, end, spec.freq)
+            df = _fetch_one(client, t, start, end, spec.freq)
             if df.empty:
                 # 节假日无数据是正常的，只有当天缺失才记 error
                 if end == date.today().strftime("%Y%m%d"):
@@ -129,10 +129,13 @@ def _process_tickers_batched(
 
             for _, r in df.iterrows():
                 prices_buf.append((
-                    t, r["date"],
-                    to_float(r["open"]), to_float(r["high"]),
-                    to_float(r["low"]), to_float(r["close"]),
-                    to_int(r["volume"]),
+                    t,
+                    r["date"],
+                    r["open"],
+                    r["high"],
+                    r["low"],
+                    r["close"],
+                    r["volume"],
                 ))
             new_last = df["date"].max()
             rows_count = len(df)
@@ -182,6 +185,7 @@ def run_cn_equity_batch(
 
     conn = get_conn()
     try:
+        client = get_client()
         new_tickers: List[str] = []
         pending_tickers: List[str] = []
 
@@ -204,12 +208,20 @@ def run_cn_equity_batch(
         )
 
         if new_tickers:
+            # new 路径内部 full_rebase=True：与 CLI rebase 不同，仅表示忽略
+            # sync_log、从 backfill 起点拉全量（见 _process_tickers_batched）。
+            if years:
+                start_disp = (
+                    last_trading - timedelta(days=365 * years)
+                ).strftime("%Y%m%d")
+            else:
+                start_disp = TUSHARE_BACKFILL_START
             log.info(
                 f"[{spec.label}] {len(new_tickers)} 新ticker需回填 "
-                f"{HISTORY_YEARS_CN} 年历史"
+                f"from {start_disp}"
             )
             buf_p, buf_s = _process_tickers_batched(
-                conn, new_tickers, last_trading,
+                conn, client, new_tickers, last_trading,
                 full_rebase=True, result=result,
                 spec=spec, last_map=last_map,
                 progress_label="回填", years=years,
@@ -219,7 +231,7 @@ def run_cn_equity_batch(
         if pending_tickers:
             log.info(f"[{spec.label}] {len(pending_tickers)} ticker需增量补缺")
             buf_p, buf_s = _process_tickers_batched(
-                conn, pending_tickers, last_trading,
+                conn, client, pending_tickers, last_trading,
                 full_rebase=full_rebase, result=result,
                 spec=spec, last_map=last_map,
                 progress_label="补缺" if not full_rebase else "回填",

@@ -93,7 +93,98 @@ def test_incremental_uses_last_map_not_per_ticker_get_last_sync():
 
     assert result["600519.SH"] == "ok"
     mock_map.assert_called_once()
-    start_arg = mock_fetch.call_args[0][1]
+    start_arg = mock_fetch.call_args[0][2]  # client, ticker, start, end, freq
     assert start_arg == "20260511"  # last_sync + 1 day
     # freq passed through
-    assert mock_fetch.call_args[0][3] == "D"
+    assert mock_fetch.call_args[0][4] == "D"
+
+
+def test_get_client_called_once_per_run_not_per_ticker():
+    """run_cn_equity_batch must hoist get_client to run scope."""
+    from apis.tushare.prices_cn_batch import CnPriceSpec, run_cn_equity_batch
+
+    spec = CnPriceSpec(
+        label="cn", freq="D", data_type="price", price_table="prices",
+    )
+    fake_client = MagicMock()
+    fake_client.pro_bar.return_value = pd.DataFrame({
+        "trade_date": ["20260516"],
+        "open": [1.0], "high": [2.0], "low": [0.5],
+        "close": [1.5], "vol": [100],
+    })
+
+    with patch("apis.tushare.prices_cn_batch.last_cn_trading_date",
+               return_value=date(2026, 5, 16)), \
+         patch("apis.tushare.prices_cn_batch.get_conn", return_value=MagicMock()), \
+         patch("apis.tushare.prices_cn_batch.get_last_sync_map",
+               return_value={"600519.SH": None, "000001.SZ": None}), \
+         patch("apis.tushare.prices_cn_batch.get_client",
+               return_value=fake_client) as mock_gc, \
+         patch("apis.tushare.prices_cn_batch._flush_batch"):
+        result = run_cn_equity_batch(
+            ["600519.SH", "000001.SZ"], spec=spec
+        )
+
+    assert result["600519.SH"] == "ok"
+    assert result["000001.SZ"] == "ok"
+    assert mock_gc.call_count == 1
+    assert fake_client.pro_bar.call_count == 2
+
+
+def test_price_rows_use_normalized_values_without_rewrap(caplog):
+    """After normalize_pro_bar, batch must append column values as-is."""
+    import logging
+    from apis.tushare.prices_cn_batch import CnPriceSpec, run_cn_equity_batch
+
+    spec = CnPriceSpec(
+        label="cn", freq="D", data_type="price", price_table="prices",
+    )
+    flush_calls = []
+
+    def capture_flush(conn, prices_buf, sync_buf, *, spec):
+        flush_calls.append(list(prices_buf))
+
+    with patch("apis.tushare.prices_cn_batch.last_cn_trading_date",
+               return_value=date(2026, 5, 16)), \
+         patch("apis.tushare.prices_cn_batch.get_conn", return_value=MagicMock()), \
+         patch("apis.tushare.prices_cn_batch.get_last_sync_map",
+               return_value={"600519.SH": None}), \
+         patch("apis.tushare.prices_cn_batch._fetch_one", return_value=pd.DataFrame({
+             "date": [date(2026, 5, 16)],
+             "open": [100.0], "high": [105.0], "low": [99.0],
+             "close": [103.0], "volume": [1_000_000],
+         })), \
+         patch("apis.tushare.prices_cn_batch._flush_batch", side_effect=capture_flush):
+        run_cn_equity_batch(["600519.SH"], spec=spec)
+
+    assert flush_calls
+    row = flush_calls[-1][0]
+    assert row == (
+        "600519.SH", date(2026, 5, 16),
+        100.0, 105.0, 99.0, 103.0, 1_000_000,
+    )
+
+
+def test_new_ticker_log_prints_real_backfill_start(caplog):
+    """New-ticker log must show TUSHARE_BACKFILL_START, not HISTORY_YEARS_CN slogan."""
+    import logging
+    from config import TUSHARE_BACKFILL_START
+    from apis.tushare.prices_cn_batch import CnPriceSpec, run_cn_equity_batch
+
+    spec = CnPriceSpec(
+        label="cn", freq="D", data_type="price", price_table="prices",
+    )
+    with patch("apis.tushare.prices_cn_batch.last_cn_trading_date",
+               return_value=date(2026, 5, 16)), \
+         patch("apis.tushare.prices_cn_batch.get_conn", return_value=MagicMock()), \
+         patch("apis.tushare.prices_cn_batch.get_last_sync_map",
+               return_value={"600519.SH": None}), \
+         patch("apis.tushare.prices_cn_batch._fetch_one", return_value=pd.DataFrame()), \
+         patch("apis.tushare.prices_cn_batch._flush_batch"), \
+         caplog.at_level(logging.INFO, logger="apis.tushare.prices_cn_batch"):
+        run_cn_equity_batch(["600519.SH"], spec=spec)
+
+    joined = " ".join(r.message for r in caplog.records)
+    assert TUSHARE_BACKFILL_START in joined
+    # must not claim N years when start is fixed YYYYMMDD
+    assert "年历史" not in joined

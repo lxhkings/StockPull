@@ -46,7 +46,7 @@ class UsPriceSpec:
     price_table: str
     probe: Callable[[date], str]
     target_date: Callable[[], date]
-    end_exclusive: Callable[[date], date]
+    end_pad_days: int
     on_duplicate: bool
     support_years: bool
 
@@ -93,7 +93,7 @@ def _download_and_save(
         else:
             start_date = date.fromisoformat(START_DATE_US)
 
-    end_dt = spec.end_exclusive(target)
+    end_dt = target + timedelta(days=spec.end_pad_days)
     yf_symbols = [to_yfinance_us(t) for t in tickers]
     log.info(
         f"[{spec.label}] 下载 {len(tickers)} 只, {start_date} ~ {target} interval={spec.interval}"
@@ -165,6 +165,24 @@ def _download_and_save(
                 result[t] = f"error: {e}"
 
 
+def _run_ticker_batches(
+    conn,
+    tickers: List[str],
+    start_date: Optional[date],
+    result: Dict[str, str],
+    *,
+    spec: UsPriceSpec,
+    years: Optional[int] = None,
+) -> None:
+    if not tickers:
+        return
+    batches = list(chunked(tickers, YF_BATCH_SIZE))
+    for i, batch in enumerate(batches, 1):
+        _download_and_save(conn, batch, start_date, result, spec=spec, years=years)
+        if i < len(batches):
+            _sleep_between_batches(spec.label)
+
+
 def run_us_equity_batch(
     tickers: List[str],
     *,
@@ -197,13 +215,9 @@ def run_us_equity_batch(
                 HISTORY_YEARS_US if spec.support_years else None
             )
             log.info(f"[{spec.label}] rebase: {len(tickers)} tickers years={actual_years}")
-            batches = list(chunked(tickers, YF_BATCH_SIZE))
-            for idx, batch in enumerate(batches, 1):
-                _download_and_save(
-                    conn, batch, None, result, spec=spec, years=actual_years
-                )
-                if idx < len(batches):
-                    _sleep_between_batches(spec.label)
+            _run_ticker_batches(
+                conn, tickers, None, result, spec=spec, years=actual_years
+            )
         else:
             new_tickers: list[str] = []
             pending_tickers: list[str] = []
@@ -222,24 +236,16 @@ def run_us_equity_batch(
 
             if new_tickers:
                 log.info(f"[{spec.label}] {len(new_tickers)} 新 ticker 全量")
-                batches_new = list(chunked(new_tickers, YF_BATCH_SIZE))
-                for idx, batch_new in enumerate(batches_new, 1):
-                    _download_and_save(conn, batch_new, None, result, spec=spec)
-                    if idx < len(batches_new):
-                        _sleep_between_batches(spec.label)
+                _run_ticker_batches(conn, new_tickers, None, result, spec=spec)
 
             if pending_tickers:
                 log.info(
                     f"[{spec.label}] {len(pending_tickers)} 增量 "
                     f"from {pending_start} to {target}"
                 )
-                batches_pending = list(chunked(pending_tickers, YF_BATCH_SIZE))
-                for idx, batch_pending in enumerate(batches_pending, 1):
-                    _download_and_save(
-                        conn, batch_pending, pending_start, result, spec=spec
-                    )
-                    if idx < len(batches_pending):
-                        _sleep_between_batches(spec.label)
+                _run_ticker_batches(
+                    conn, pending_tickers, pending_start, result, spec=spec
+                )
 
             if not new_tickers and not pending_tickers:
                 log.info(f"[{spec.label}] 全部已同步到 {target}")

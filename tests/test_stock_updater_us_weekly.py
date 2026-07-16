@@ -137,7 +137,7 @@ def test_normalize_weekly_frame_drops_null_close():
 # ── weekly batch entry contract ───────────────────────────────────────────────
 
 def test_build_us_weekly_spec_contract():
-    """Weekly Spec: table / data_type / interval / on_duplicate / end window."""
+    """Weekly Spec: table / data_type / interval / on_duplicate / end_pad_days."""
     from apis.yfinance.prices_us_weekly import build_us_weekly_spec
 
     spec = build_us_weekly_spec()
@@ -147,7 +147,4 @@ def test_build_us_weekly_spec_contract():
     assert spec.on_duplicate is False
     assert spec.support_years is False
     assert spec.label == "weekly batch"
-    # end window: target + 7 days (Callable until Task 6 end_pad_days)
-    from datetime import date as d
-    t = d(2026, 5, 11)
-    assert spec.end_exclusive(t) == d(2026, 5, 18)
+    assert spec.end_pad_days == 7

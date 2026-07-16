@@ -22,9 +22,6 @@ def _last_us_weekly_date() -> date:
 
 def build_us_weekly_spec() -> UsPriceSpec:
     """Build weekly UsPriceSpec at call time (patches on this module still apply)."""
-    def _end_exclusive(target: date) -> date:
-        return target + timedelta(days=7)
-
     return UsPriceSpec(
         label="weekly batch",
         interval="1wk",
@@ -32,7 +29,7 @@ def build_us_weekly_spec() -> UsPriceSpec:
         price_table="prices_weekly",
         probe=probe_weekly,
         target_date=_last_us_weekly_date,
-        end_exclusive=_end_exclusive,
+        end_pad_days=7,
         on_duplicate=False,
         support_years=False,
     )
