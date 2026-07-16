@@ -131,13 +131,22 @@ def test_get_client_called_once_per_run_not_per_ticker():
     assert fake_client.pro_bar.call_count == 2
 
 
-def test_cn_history_start_default_and_years():
-    from apis.tushare.prices_cn_batch import _cn_history_start
+def test_cn_start_full_history_incremental_and_missing_last():
+    from apis.tushare.prices_cn_batch import _cn_start
     from config import TUSHARE_BACKFILL_START
 
-    last = date(2026, 5, 16)
-    assert _cn_history_start(last, None) == TUSHARE_BACKFILL_START
-    assert _cn_history_start(last, 2) == "20240516"  # 365*2 days back
+    last_trading = date(2026, 5, 16)
+    # full history
+    assert _cn_start(None, last_trading, full_history=True) == TUSHARE_BACKFILL_START
+    assert _cn_start(
+        date(2020, 1, 1), last_trading, full_history=True, years=2
+    ) == "20240516"
+    # missing last → same as full history (even if full_history=False)
+    assert _cn_start(None, last_trading, full_history=False) == TUSHARE_BACKFILL_START
+    # incremental
+    assert _cn_start(
+        date(2026, 5, 10), last_trading, full_history=False
+    ) == "20260511"
 
 
 def test_price_rows_from_normalized_itertuples():
@@ -213,16 +222,12 @@ def test_new_ticker_log_prints_real_backfill_start(caplog):
 
 
 def test_new_ticker_log_and_fetch_share_years_start(caplog):
-    """Log start and _fetch_one start must both come from _cn_history_start(years)."""
+    """Log start and _fetch_one start must both come from _cn_start(years)."""
     import logging
-    from apis.tushare.prices_cn_batch import (
-        CnPriceSpec,
-        _cn_history_start,
-        run_cn_equity_batch,
-    )
+    from apis.tushare.prices_cn_batch import CnPriceSpec, _cn_start, run_cn_equity_batch
 
     last_trading = date(2026, 5, 16)
-    expected = _cn_history_start(last_trading, 2)
+    expected = _cn_start(None, last_trading, full_history=True, years=2)
     spec = CnPriceSpec(
         label="cn", freq="D", data_type="price", price_table="prices",
     )
@@ -239,3 +244,31 @@ def test_new_ticker_log_and_fetch_share_years_start(caplog):
     assert mock_fetch.call_args[0][2] == expected
     joined = " ".join(r.message for r in caplog.records)
     assert expected in joined
+
+
+def test_incremental_fetch_start_via_cn_start():
+    """Pending ticker uses last+1 through the same _cn_start entry."""
+    from apis.tushare.prices_cn_batch import CnPriceSpec, _cn_start, run_cn_equity_batch
+
+    last_trading = date(2026, 5, 16)
+    last_sync = date(2026, 5, 10)
+    expected = _cn_start(last_sync, last_trading, full_history=False)
+    assert expected == "20260511"
+
+    spec = CnPriceSpec(
+        label="cn", freq="D", data_type="price", price_table="prices",
+    )
+    with patch("apis.tushare.prices_cn_batch.last_cn_trading_date",
+               return_value=last_trading), \
+         patch("apis.tushare.prices_cn_batch.get_conn", return_value=MagicMock()), \
+         patch("apis.tushare.prices_cn_batch.get_last_sync_map",
+               return_value={"600519.SH": last_sync}), \
+         patch("apis.tushare.prices_cn_batch._fetch_one", return_value=pd.DataFrame({
+             "date": [last_trading],
+             "open": [1.0], "high": [2.0], "low": [0.5],
+             "close": [1.5], "volume": [100],
+         })) as mock_fetch, \
+         patch("apis.tushare.prices_cn_batch._flush_batch"):
+        run_cn_equity_batch(["600519.SH"], spec=spec)
+
+    assert mock_fetch.call_args[0][2] == expected

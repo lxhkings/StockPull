@@ -50,11 +50,23 @@ def normalize_pro_bar(df: pd.DataFrame) -> pd.DataFrame:
     return out.sort_values("date").reset_index(drop=True)
 
 
-def _cn_history_start(last_trading: date, years: Optional[int]) -> str:
-    """Full-history window start (YYYYMMDD). Shared by fetch path and logs."""
-    if years:
-        return (last_trading - timedelta(days=365 * years)).strftime("%Y%m%d")
-    return TUSHARE_BACKFILL_START
+def _cn_start(
+    last: Optional[date],
+    last_trading: date,
+    *,
+    full_history: bool = False,
+    years: Optional[int] = None,
+) -> str:
+    """Single start resolver (YYYYMMDD) for fetch and logs.
+
+    full_history or missing last → backfill window (years or TUSHARE_BACKFILL_START);
+    else → day after last sync.
+    """
+    if full_history or last is None:
+        if years:
+            return (last_trading - timedelta(days=365 * years)).strftime("%Y%m%d")
+        return TUSHARE_BACKFILL_START
+    return (last + timedelta(days=1)).strftime("%Y%m%d")
 
 
 def _price_rows_from_normalized(ticker: str, df: pd.DataFrame) -> List[Tuple]:
@@ -112,14 +124,12 @@ def _process_tickers_batched(
 
     for t in tqdm(tickers, desc=f"[{spec.label}] {progress_label}", unit="ticker"):
         try:
-            if full_rebase:
-                start = _cn_history_start(last_trading, years)
-            else:
-                last = last_map.get(t)
-                if last:
-                    start = (last + timedelta(days=1)).strftime("%Y%m%d")
-                else:
-                    start = TUSHARE_BACKFILL_START
+            start = _cn_start(
+                last_map.get(t),
+                last_trading,
+                full_history=full_rebase,
+                years=years,
+            )
             end = last_trading.strftime("%Y%m%d")
 
             df = _fetch_one(client, t, start, end, spec.freq)
@@ -212,7 +222,9 @@ def run_cn_equity_batch(
         if new_tickers:
             # new 路径内部 full_rebase=True：与 CLI rebase 不同，仅表示忽略
             # sync_log、从 backfill 起点拉全量（见 _process_tickers_batched）。
-            start_disp = _cn_history_start(last_trading, years)
+            start_disp = _cn_start(
+                None, last_trading, full_history=True, years=years
+            )
             log.info(
                 f"[{spec.label}] {len(new_tickers)} 新ticker需回填 "
                 f"from {start_disp}"
