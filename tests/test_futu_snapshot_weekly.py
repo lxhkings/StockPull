@@ -43,15 +43,15 @@ def _fake_morningstar():
 def test_snapshot_valuation_extracts_key_fields():
     client = MagicMock()
     client.call.return_value = _fake_valuation()
-    with patch("apis.futu.snapshot_weekly.get_conn") as mock_conn:
+    with patch("apis.futu.write_utils.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
         n = snapshot_valuation(client, "AAPL")
     assert n == 1
-    sql = cur.execute.call_args[0][0]
+    sql = cur.executemany.call_args[0][0]
     assert "INSERT INTO us_valuation_snapshot" in sql
-    params = cur.execute.call_args[0][1]
+    params = cur.executemany.call_args[0][1][0]
     assert params[0] == "AAPL"
     assert params[2] == 28.5  # pe_ttm
 
@@ -63,7 +63,7 @@ def test_snapshot_rating_paginates():
     page2 = _fake_rating()
     page2["next_key"] = "-1"
     client.call.side_effect = [page1, page2]
-    with patch("apis.futu.snapshot_weekly.get_conn") as mock_conn:
+    with patch("apis.futu.write_utils.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -75,15 +75,15 @@ def test_snapshot_rating_paginates():
 def test_snapshot_morningstar_upserts():
     client = MagicMock()
     client.call.return_value = _fake_morningstar()
-    with patch("apis.futu.snapshot_weekly.get_conn") as mock_conn:
+    with patch("apis.futu.write_utils.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
         n = snapshot_morningstar(client, "AAPL")
     assert n == 1
-    sql = cur.execute.call_args[0][0]
+    sql = cur.executemany.call_args[0][0]
     assert "INSERT INTO us_morningstar" in sql
-    params = cur.execute.call_args[0][1]
+    params = cur.executemany.call_args[0][1][0]
     assert params[2] == 4  # star_rating
     assert params[4] == 195.0  # fair_value
 

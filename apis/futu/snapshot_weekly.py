@@ -5,14 +5,11 @@ append-only 时序，ON DUPLICATE KEY UPDATE 覆盖当期。
 from __future__ import annotations
 
 import json
-import logging
 from datetime import date
 
-from core.db_client import get_conn
 from apis.futu.client import clean_date, get_client, to_futu_code
 from apis.futu.concurrency import run_streams, ticker_stream
-
-log = logging.getLogger(__name__)
+from apis.futu.write_utils import upsert_rows
 
 PAGE_NUM = 50
 
@@ -43,24 +40,16 @@ def snapshot_valuation(client, ticker: str) -> int:
         json.dumps(data, ensure_ascii=False, default=str),
     )
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO us_valuation_snapshot "
-                "(ticker, snapshot_date, pe_ttm, pe_percentile, pe_avg, "
-                " pb, pb_percentile, ps_ttm, ps_percentile, "
-                " plate_code, plate_name, plate_ranking, raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  pe_ttm=VALUES(pe_ttm), pe_percentile=VALUES(pe_percentile), "
-                "  pb=VALUES(pb), pb_percentile=VALUES(pb_percentile), "
-                "  ps_ttm=VALUES(ps_ttm), ps_percentile=VALUES(ps_percentile), "
-                "  plate_ranking=VALUES(plate_ranking), raw_payload=VALUES(raw_payload)",
-                row,
-            )
-        conn.commit()
-    log.info(f"us_valuation_snapshot {ticker}: 1 row")
-    return 1
+    return upsert_rows(
+        "us_valuation_snapshot",
+        ["ticker", "snapshot_date", "pe_ttm", "pe_percentile", "pe_avg",
+         "pb", "pb_percentile", "ps_ttm", "ps_percentile",
+         "plate_code", "plate_name", "plate_ranking", "raw_payload"],
+        [row],
+        ["pe_ttm", "pe_percentile", "pb", "pb_percentile",
+         "ps_ttm", "ps_percentile", "plate_ranking", "raw_payload"],
+        ticker=ticker,
+    )
 
 
 def snapshot_rating(client, ticker: str) -> int:
@@ -97,21 +86,14 @@ def snapshot_rating(client, ticker: str) -> int:
     if not rows:
         return 0
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO us_rating_summary "
-                "(ticker, snapshot_date, institution_uid, institution_name, "
-                " institution_picture_url, rating, target_price, update_time, raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  rating=VALUES(rating), target_price=VALUES(target_price), "
-                "  update_time=VALUES(update_time), raw_payload=VALUES(raw_payload)",
-                rows,
-            )
-        conn.commit()
-    log.info(f"us_rating_summary {ticker}: {len(rows)} rows")
-    return len(rows)
+    return upsert_rows(
+        "us_rating_summary",
+        ["ticker", "snapshot_date", "institution_uid", "institution_name",
+         "institution_picture_url", "rating", "target_price", "update_time", "raw_payload"],
+        rows,
+        ["rating", "target_price", "update_time", "raw_payload"],
+        ticker=ticker,
+    )
 
 
 def snapshot_morningstar(client, ticker: str) -> int:
@@ -135,23 +117,15 @@ def snapshot_morningstar(client, ticker: str) -> int:
         json.dumps(data, ensure_ascii=False, default=str),
     )
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO us_morningstar "
-                "(ticker, snapshot_date, star_rating, star_update_time, fair_value, "
-                " economic_moat, uncertainty, capital_allocation, analyst_name, "
-                " analyst_update_time, raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  star_rating=VALUES(star_rating), fair_value=VALUES(fair_value), "
-                "  economic_moat=VALUES(economic_moat), uncertainty=VALUES(uncertainty), "
-                "  raw_payload=VALUES(raw_payload)",
-                row,
-            )
-        conn.commit()
-    log.info(f"us_morningstar {ticker}: 1 row")
-    return 1
+    return upsert_rows(
+        "us_morningstar",
+        ["ticker", "snapshot_date", "star_rating", "star_update_time", "fair_value",
+         "economic_moat", "uncertainty", "capital_allocation", "analyst_name",
+         "analyst_update_time", "raw_payload"],
+        [row],
+        ["star_rating", "fair_value", "economic_moat", "uncertainty", "raw_payload"],
+        ticker=ticker,
+    )
 
 
 def run_weekly(tickers: list[str], force: bool = False) -> dict:

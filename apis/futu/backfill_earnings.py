@@ -8,11 +8,12 @@ from __future__ import annotations
 import json
 import logging
 
-from core.db_client import get_conn, execute
+from core.db_client import execute
 from core.http_utils import or_none
 
 from apis.futu.client import get_client, to_futu_code
 from apis.futu.concurrency import ticker_stream
+from apis.futu.write_utils import upsert_rows
 
 log = logging.getLogger(__name__)
 
@@ -62,20 +63,13 @@ def backfill_earnings(client, ticker: str) -> int:
         ))
     if not rows:
         return 0
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO us_earnings_dates "
-                "(ticker, period_text, fiscal_year, financial_type, pub_date, raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  fiscal_year=VALUES(fiscal_year), financial_type=VALUES(financial_type), "
-                "  pub_date=VALUES(pub_date), raw_payload=VALUES(raw_payload)",
-                rows,
-            )
-        conn.commit()
-    log.info(f"us_earnings_dates {ticker}: {len(rows)} rows")
-    return len(rows)
+    return upsert_rows(
+        "us_earnings_dates",
+        ["ticker", "period_text", "fiscal_year", "financial_type", "pub_date", "raw_payload"],
+        rows,
+        ["fiscal_year", "financial_type", "pub_date", "raw_payload"],
+        ticker=ticker,
+    )
 
 
 def run_pit_backfill() -> dict:

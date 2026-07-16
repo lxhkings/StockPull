@@ -34,7 +34,7 @@ def test_backfill_revenue_limits_periods():
     """应限制近 N 期，避免全量 71 期。"""
     client = MagicMock()
     client.call.return_value = _fake_revenue()
-    with patch("apis.futu.backfill_revenue.get_conn") as mock_conn:
+    with patch("apis.futu.write_utils.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -47,7 +47,7 @@ def test_backfill_revenue_limits_periods():
 def test_backfill_earnings_move_upserts():
     client = MagicMock()
     client.call.return_value = _fake_earnings_move()
-    with patch("apis.futu.backfill_revenue.get_conn") as mock_conn:
+    with patch("apis.futu.write_utils.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur

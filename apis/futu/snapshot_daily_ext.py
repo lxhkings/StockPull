@@ -8,14 +8,11 @@ short_interest / daily_short_volume: 分页，client 已适配 3 值返回。
 from __future__ import annotations
 
 import json
-import logging
 from datetime import date
 
-from core.db_client import get_conn
 from apis.futu.client import clean_date, get_client, to_futu_code
 from apis.futu.concurrency import run_streams, ticker_stream
-
-log = logging.getLogger(__name__)
+from apis.futu.write_utils import upsert_rows
 
 PAGE_NUM = 50
 
@@ -49,23 +46,15 @@ def snapshot_capital_flow(client, ticker: str) -> int:
     if not rows:
         return 0
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO us_capital_flow "
-                "(ticker, date, in_flow, super_in_flow, big_in_flow, "
-                " mid_in_flow, sml_in_flow, main_in_flow, raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  in_flow=VALUES(in_flow), super_in_flow=VALUES(super_in_flow), "
-                "  big_in_flow=VALUES(big_in_flow), mid_in_flow=VALUES(mid_in_flow), "
-                "  sml_in_flow=VALUES(sml_in_flow), main_in_flow=VALUES(main_in_flow), "
-                "  raw_payload=VALUES(raw_payload)",
-                rows,
-            )
-        conn.commit()
-    log.info(f"us_capital_flow {ticker}: {len(rows)} rows")
-    return len(rows)
+    return upsert_rows(
+        "us_capital_flow",
+        ["ticker", "date", "in_flow", "super_in_flow", "big_in_flow",
+         "mid_in_flow", "sml_in_flow", "main_in_flow", "raw_payload"],
+        rows,
+        ["in_flow", "super_in_flow", "big_in_flow", "mid_in_flow",
+         "sml_in_flow", "main_in_flow", "raw_payload"],
+        ticker=ticker,
+    )
 
 
 def snapshot_capital_dist(client, ticker: str) -> int:
@@ -90,23 +79,15 @@ def snapshot_capital_dist(client, ticker: str) -> int:
         json.dumps(data, ensure_ascii=False, default=str),
     )
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO us_capital_distribution "
-                "(ticker, date, capital_in_super, capital_in_big, capital_in_mid, "
-                " capital_in_small, capital_out_super, capital_out_big, "
-                " capital_out_mid, capital_out_small, update_time, raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  capital_in_super=VALUES(capital_in_super), "
-                "  capital_out_super=VALUES(capital_out_super), "
-                "  raw_payload=VALUES(raw_payload)",
-                row,
-            )
-        conn.commit()
-    log.info(f"us_capital_distribution {ticker}: 1 row")
-    return 1
+    return upsert_rows(
+        "us_capital_distribution",
+        ["ticker", "date", "capital_in_super", "capital_in_big", "capital_in_mid",
+         "capital_in_small", "capital_out_super", "capital_out_big",
+         "capital_out_mid", "capital_out_small", "update_time", "raw_payload"],
+        [row],
+        ["capital_in_super", "capital_out_super", "raw_payload"],
+        ticker=ticker,
+    )
 
 
 def snapshot_short_interest(client, ticker: str) -> int:
@@ -139,6 +120,7 @@ def snapshot_short_interest(client, ticker: str) -> int:
                 json.dumps(item, ensure_ascii=False, default=str),
             ))
 
+        # size-based stop — do not use paginate_call
         if not items or len(items) < PAGE_NUM:
             break
         next_key = data.get("next_key") if isinstance(data, dict) else None
@@ -146,21 +128,14 @@ def snapshot_short_interest(client, ticker: str) -> int:
     if not rows:
         return 0
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO us_short_interest "
-                "(ticker, timestamp, shares_short, short_percent, avg_daily_share_volume, "
-                " days_to_cover, close_price, last_close_price, raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  shares_short=VALUES(shares_short), short_percent=VALUES(short_percent), "
-                "  days_to_cover=VALUES(days_to_cover), raw_payload=VALUES(raw_payload)",
-                rows,
-            )
-        conn.commit()
-    log.info(f"us_short_interest {ticker}: {len(rows)} rows")
-    return len(rows)
+    return upsert_rows(
+        "us_short_interest",
+        ["ticker", "timestamp", "shares_short", "short_percent", "avg_daily_share_volume",
+         "days_to_cover", "close_price", "last_close_price", "raw_payload"],
+        rows,
+        ["shares_short", "short_percent", "days_to_cover", "raw_payload"],
+        ticker=ticker,
+    )
 
 
 def snapshot_short_volume(client, ticker: str) -> int:
@@ -195,6 +170,7 @@ def snapshot_short_volume(client, ticker: str) -> int:
                 json.dumps(item, ensure_ascii=False, default=str),
             ))
 
+        # size-based stop — do not use paginate_call
         if not items or len(items) < PAGE_NUM:
             break
         next_key = data.get("next_key") if isinstance(data, dict) else None
@@ -202,22 +178,15 @@ def snapshot_short_volume(client, ticker: str) -> int:
     if not rows:
         return 0
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO us_daily_short_volume "
-                "(ticker, timestamp, total_shares_short, nasdaq_shares_short, "
-                " nyse_shares_short, short_percent, volume, close_price, "
-                " last_close_price, daily_trade_avg_ratio, raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  total_shares_short=VALUES(total_shares_short), "
-                "  short_percent=VALUES(short_percent), raw_payload=VALUES(raw_payload)",
-                rows,
-            )
-        conn.commit()
-    log.info(f"us_daily_short_volume {ticker}: {len(rows)} rows")
-    return len(rows)
+    return upsert_rows(
+        "us_daily_short_volume",
+        ["ticker", "timestamp", "total_shares_short", "nasdaq_shares_short",
+         "nyse_shares_short", "short_percent", "volume", "close_price",
+         "last_close_price", "daily_trade_avg_ratio", "raw_payload"],
+        rows,
+        ["total_shares_short", "short_percent", "raw_payload"],
+        ticker=ticker,
+    )
 
 
 def run_daily_ext(tickers: list[str], force: bool = False) -> dict:

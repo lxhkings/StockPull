@@ -5,10 +5,7 @@
 from __future__ import annotations
 
 import json
-import logging
 from datetime import date
-
-from core.db_client import get_conn
 
 from config import FUTU_REFRESH_DAYS
 from apis.futu.client import get_client, to_futu_code, from_futu_code
@@ -16,8 +13,7 @@ from core.batch_utils import chunked
 from core.http_utils import or_none
 from apis.futu.concurrency import batch_with_bisect, run_streams, ticker_stream
 from apis.futu.sync import fresh_tickers, mark_ok
-
-log = logging.getLogger(__name__)
+from apis.futu.write_utils import upsert_rows
 
 SNAPSHOT_BATCH = 200   # get_market_snapshot 单次最多 400，留余量
 
@@ -52,24 +48,14 @@ def snapshot_shares(client, tickers: list[str]) -> int:
             rows.extend(_share_row(r, today) for _, r in df.iterrows())
     if not rows:
         return 0
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO us_shares_daily "
-                "(ticker, date, issued_shares, outstanding_shares, "
-                " total_market_val, circular_market_val, raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  issued_shares=VALUES(issued_shares), "
-                "  outstanding_shares=VALUES(outstanding_shares), "
-                "  total_market_val=VALUES(total_market_val), "
-                "  circular_market_val=VALUES(circular_market_val), "
-                "  raw_payload=VALUES(raw_payload)",
-                rows,
-            )
-        conn.commit()
-    log.info(f"us_shares_daily {today}: {len(rows)} rows")
-    return len(rows)
+    return upsert_rows(
+        "us_shares_daily",
+        ["ticker", "date", "issued_shares", "outstanding_shares",
+         "total_market_val", "circular_market_val", "raw_payload"],
+        rows,
+        ["issued_shares", "outstanding_shares", "total_market_val",
+         "circular_market_val", "raw_payload"],
+    )
 
 
 def snapshot_analyst(client, ticker: str) -> int:
@@ -84,23 +70,15 @@ def snapshot_analyst(client, ticker: str) -> int:
         _num(data.get("buy")), _num(data.get("hold")), _num(data.get("sell")),
         json.dumps(data, ensure_ascii=False, default=str),
     )
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO us_analyst_consensus "
-                "(ticker, snapshot_date, target_high, target_avg, target_low, "
-                " rating, total_analysts, buy_pct, hold_pct, sell_pct, raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  target_high=VALUES(target_high), target_avg=VALUES(target_avg), "
-                "  target_low=VALUES(target_low), rating=VALUES(rating), "
-                "  total_analysts=VALUES(total_analysts), buy_pct=VALUES(buy_pct), "
-                "  hold_pct=VALUES(hold_pct), sell_pct=VALUES(sell_pct), "
-                "  raw_payload=VALUES(raw_payload)",
-                params,
-            )
-        conn.commit()
-    return 1
+    return upsert_rows(
+        "us_analyst_consensus",
+        ["ticker", "snapshot_date", "target_high", "target_avg", "target_low",
+         "rating", "total_analysts", "buy_pct", "hold_pct", "sell_pct", "raw_payload"],
+        [params],
+        ["target_high", "target_avg", "target_low", "rating",
+         "total_analysts", "buy_pct", "hold_pct", "sell_pct", "raw_payload"],
+        ticker=ticker,
+    )
 
 
 def sync_shares(client, tickers: list[str], force: bool = False) -> tuple[int, int, int]:

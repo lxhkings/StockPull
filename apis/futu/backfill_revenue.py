@@ -9,9 +9,9 @@ import json
 import logging
 from datetime import date
 
-from core.db_client import get_conn
 from apis.futu.client import clean_date, get_client, to_futu_code
 from apis.futu.concurrency import run_streams, ticker_stream
+from apis.futu.write_utils import upsert_rows
 
 log = logging.getLogger(__name__)
 
@@ -72,20 +72,13 @@ def backfill_revenue(client, ticker: str) -> int:
     if not rows:
         return 0
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO us_revenue_breakdown "
-                "(ticker, period_text, type, item_name, main_oper_income, ratio, updated_at) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  main_oper_income=VALUES(main_oper_income), ratio=VALUES(ratio), "
-                "  updated_at=VALUES(updated_at)",
-                rows,
-            )
-        conn.commit()
-    log.info(f"us_revenue_breakdown {ticker}: {len(rows)} rows")
-    return len(rows)
+    return upsert_rows(
+        "us_revenue_breakdown",
+        ["ticker", "period_text", "type", "item_name", "main_oper_income", "ratio", "updated_at"],
+        rows,
+        ["main_oper_income", "ratio", "updated_at"],
+        ticker=ticker,
+    )
 
 
 def backfill_earnings_move(client, ticker: str) -> int:
@@ -120,23 +113,17 @@ def backfill_earnings_move(client, ticker: str) -> int:
     if not rows:
         return 0
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO us_earnings_price_move "
-                "(ticker, period_text, day_offset, fiscal_year, financial_type, "
-                " pub_trading_day, trading_day, open, close, high, low, volume, "
-                " turnover, implied_vol, history_vol, raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  open=VALUES(open), close=VALUES(close), high=VALUES(high), "
-                "  low=VALUES(low), volume=VALUES(volume), turnover=VALUES(turnover), "
-                "  raw_payload=VALUES(raw_payload)",
-                rows,
-            )
-        conn.commit()
-    log.info(f"us_earnings_price_move {ticker}: {len(rows)} rows")
-    return len(rows)
+    return upsert_rows(
+        "us_earnings_price_move",
+        [
+            "ticker", "period_text", "day_offset", "fiscal_year", "financial_type",
+            "pub_trading_day", "trading_day", "open", "close", "high", "low", "volume",
+            "turnover", "implied_vol", "history_vol", "raw_payload",
+        ],
+        rows,
+        ["open", "close", "high", "low", "volume", "turnover", "raw_payload"],
+        ticker=ticker,
+    )
 
 
 def backfill_all(tickers: list[str], force: bool = False) -> dict:

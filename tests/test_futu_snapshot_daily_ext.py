@@ -44,7 +44,7 @@ def _fake_short_volume():
 def test_snapshot_capital_flow_upserts():
     client = MagicMock()
     client.call.return_value = _fake_capital_flow()
-    with patch("apis.futu.snapshot_daily_ext.get_conn") as mock_conn:
+    with patch("apis.futu.write_utils.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -58,7 +58,7 @@ def test_snapshot_short_interest_handles_3_value_return():
     """short_interest 返回 3 值，client 已适配。"""
     client = MagicMock()
     client.call.return_value = _fake_short_interest()
-    with patch("apis.futu.snapshot_daily_ext.get_conn") as mock_conn:
+    with patch("apis.futu.write_utils.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur

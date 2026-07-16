@@ -54,7 +54,7 @@ def _fake_insider_trades():
 def test_backfill_overview_merges_main_and_type():
     client = MagicMock()
     client.call.return_value = _fake_overview()
-    with patch("apis.futu.backfill_shareholders.get_conn") as mock_conn:
+    with patch("apis.futu.write_utils.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -67,7 +67,7 @@ def test_backfill_overview_merges_main_and_type():
 def test_backfill_insider_trades_upserts():
     client = MagicMock()
     client.call.return_value = _fake_insider_trades()
-    with patch("apis.futu.backfill_shareholders.get_conn") as mock_conn:
+    with patch("apis.futu.write_utils.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -80,7 +80,7 @@ def test_backfill_insider_trades_upserts():
 def test_backfill_holding_changes_upserts():
     client = MagicMock()
     client.call.return_value = _fake_holding_changes()
-    with patch("apis.futu.backfill_shareholders.get_conn") as mock_conn:
+    with patch("apis.futu.write_utils.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -93,20 +93,20 @@ def test_backfill_holding_changes_upserts():
 def test_backfill_institutional_upserts():
     client = MagicMock()
     client.call.return_value = _fake_institutional()
-    with patch("apis.futu.backfill_shareholders.get_conn") as mock_conn:
+    with patch("apis.futu.write_utils.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
         n = backfill_institutional(client, "AAPL")
     assert n == 1
-    sql = cur.execute.call_args[0][0]
+    sql = cur.executemany.call_args[0][0]
     assert "INSERT INTO us_institutional" in sql
 
 
 def test_backfill_insider_holders_upserts():
     client = MagicMock()
     client.call.return_value = _fake_insider_holders()
-    with patch("apis.futu.backfill_shareholders.get_conn") as mock_conn:
+    with patch("apis.futu.write_utils.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -119,7 +119,7 @@ def test_backfill_insider_holders_upserts():
 def test_backfill_overview_returns_0_on_empty():
     client = MagicMock()
     client.call.return_value = {}
-    with patch("apis.futu.backfill_shareholders.get_conn"):
+    with patch("apis.futu.write_utils.get_conn"):
         n = backfill_overview(client, "AAPL")
     assert n == 0
 
@@ -127,7 +127,7 @@ def test_backfill_overview_returns_0_on_empty():
 def test_backfill_insider_trades_returns_0_on_empty():
     client = MagicMock()
     client.call.return_value = []
-    with patch("apis.futu.backfill_shareholders.get_conn"):
+    with patch("apis.futu.write_utils.get_conn"):
         n = backfill_insider_trades(client, "AAPL")
     assert n == 0
 

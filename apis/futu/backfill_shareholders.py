@@ -9,14 +9,11 @@
 from __future__ import annotations
 
 import json
-import logging
 from datetime import date
 
-from core.db_client import get_conn
 from apis.futu.client import clean_date, get_client, to_futu_code
 from apis.futu.concurrency import run_streams, ticker_stream
-
-log = logging.getLogger(__name__)
+from apis.futu.write_utils import upsert_rows
 
 
 def backfill_overview(client, ticker: str) -> int:
@@ -47,21 +44,14 @@ def backfill_overview(client, ticker: str) -> int:
     if not rows:
         return 0
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO us_shareholders_overview "
-                "(ticker, period_text, holder_category, holder_name, holder_pct, "
-                " holder_id, raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  holder_pct=VALUES(holder_pct), holder_id=VALUES(holder_id), "
-                "  raw_payload=VALUES(raw_payload)",
-                rows,
-            )
-        conn.commit()
-    log.info(f"us_shareholders_overview {ticker}: {len(rows)} rows")
-    return len(rows)
+    return upsert_rows(
+        "us_shareholders_overview",
+        ["ticker", "period_text", "holder_category", "holder_name", "holder_pct",
+         "holder_id", "raw_payload"],
+        rows,
+        ["holder_pct", "holder_id", "raw_payload"],
+        ticker=ticker,
+    )
 
 
 def backfill_holding_changes(client, ticker: str) -> int:
@@ -90,22 +80,14 @@ def backfill_holding_changes(client, ticker: str) -> int:
     if not rows:
         return 0
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO us_holding_changes "
-                "(ticker, period_text, holder_id, holder_name, holder_type, "
-                " share_change_num, shares_change_price, share_ratio, holding_date, raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  share_change_num=VALUES(share_change_num), "
-                "  shares_change_price=VALUES(shares_change_price), "
-                "  share_ratio=VALUES(share_ratio), raw_payload=VALUES(raw_payload)",
-                rows,
-            )
-        conn.commit()
-    log.info(f"us_holding_changes {ticker}: {len(rows)} rows")
-    return len(rows)
+    return upsert_rows(
+        "us_holding_changes",
+        ["ticker", "period_text", "holder_id", "holder_name", "holder_type",
+         "share_change_num", "shares_change_price", "share_ratio", "holding_date", "raw_payload"],
+        rows,
+        ["share_change_num", "shares_change_price", "share_ratio", "raw_payload"],
+        ticker=ticker,
+    )
 
 
 def backfill_institutional(client, ticker: str) -> int:
@@ -128,23 +110,15 @@ def backfill_institutional(client, ticker: str) -> int:
         json.dumps(data, ensure_ascii=False, default=str),
     )
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO us_institutional "
-                "(ticker, period_text, institution_quantity, institution_qty_change, "
-                " holder_quantity, holder_qty_change, holder_pct, holder_pct_change, "
-                " update_time, raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  institution_quantity=VALUES(institution_quantity), "
-                "  holder_quantity=VALUES(holder_quantity), holder_pct=VALUES(holder_pct), "
-                "  raw_payload=VALUES(raw_payload)",
-                row,
-            )
-        conn.commit()
-    log.info(f"us_institutional {ticker}: 1 row")
-    return 1
+    return upsert_rows(
+        "us_institutional",
+        ["ticker", "period_text", "institution_quantity", "institution_qty_change",
+         "holder_quantity", "holder_qty_change", "holder_pct", "holder_pct_change",
+         "update_time", "raw_payload"],
+        [row],
+        ["institution_quantity", "holder_quantity", "holder_pct", "raw_payload"],
+        ticker=ticker,
+    )
 
 
 def backfill_insider_holders(client, ticker: str) -> int:
@@ -176,22 +150,15 @@ def backfill_insider_holders(client, ticker: str) -> int:
     if not rows:
         return 0
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO us_insider_holders "
-                "(ticker, holder_id, holder_name, title, holder_quantity, holder_pct, "
-                " all_count, insider_total_count, insider_bought_count, insider_sold_count, "
-                " snapshot_date, raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  holder_quantity=VALUES(holder_quantity), holder_pct=VALUES(holder_pct), "
-                "  all_count=VALUES(all_count), raw_payload=VALUES(raw_payload)",
-                rows,
-            )
-        conn.commit()
-    log.info(f"us_insider_holders {ticker}: {len(rows)} rows")
-    return len(rows)
+    return upsert_rows(
+        "us_insider_holders",
+        ["ticker", "holder_id", "holder_name", "title", "holder_quantity", "holder_pct",
+         "all_count", "insider_total_count", "insider_bought_count", "insider_sold_count",
+         "snapshot_date", "raw_payload"],
+        rows,
+        ["holder_quantity", "holder_pct", "all_count", "raw_payload"],
+        ticker=ticker,
+    )
 
 
 def backfill_insider_trades(client, ticker: str) -> int:
@@ -226,23 +193,16 @@ def backfill_insider_trades(client, ticker: str) -> int:
     if not rows:
         return 0
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO us_insider_trades "
-                "(ticker, holder_id, min_trade_date, holder_name, title, "
-                " transaction_type, trade_shares, min_price, max_price, "
-                " security_holder_quantity, security_description, source_group_name, "
-                " raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  trade_shares=VALUES(trade_shares), min_price=VALUES(min_price), "
-                "  max_price=VALUES(max_price), raw_payload=VALUES(raw_payload)",
-                rows,
-            )
-        conn.commit()
-    log.info(f"us_insider_trades {ticker}: {len(rows)} rows")
-    return len(rows)
+    return upsert_rows(
+        "us_insider_trades",
+        ["ticker", "holder_id", "min_trade_date", "holder_name", "title",
+         "transaction_type", "trade_shares", "min_price", "max_price",
+         "security_holder_quantity", "security_description", "source_group_name",
+         "raw_payload"],
+        rows,
+        ["trade_shares", "min_price", "max_price", "raw_payload"],
+        ticker=ticker,
+    )
 
 
 def backfill_all(tickers: list[str], force: bool = False) -> dict:

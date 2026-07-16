@@ -14,7 +14,7 @@ def test_backfill_earnings_upserts_pub_date():
         "pub_time_str": ["2026-04-30 17:00:00"],
         "pub_trading_day_str": ["2026-04-30"],
     })
-    with patch("apis.futu.backfill_earnings.get_conn") as mock_conn:
+    with patch("apis.futu.write_utils.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
