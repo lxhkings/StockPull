@@ -58,7 +58,7 @@ def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Op
 
     # 先用 AAPL 测试 yfinance 是否已更新最近数据
     last_trading = last_us_trading_date()
-    test_df, status = probe_daily(last_trading)
+    status = probe_daily(last_trading)
 
     if status == "rate_limit":
         log.warning("[AAPL] yfinance 被限速，跳过本次增量更新，稍后重试")

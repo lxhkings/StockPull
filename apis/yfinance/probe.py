@@ -9,6 +9,7 @@ import pandas as pd
 
 from config import YF_TIMEOUT
 from apis.yfinance.client import download_with_retry
+from apis.yfinance.normalize import lower_ohlc_columns
 
 log = logging.getLogger(__name__)
 
@@ -25,99 +26,79 @@ INTERVAL_LOOKBACK_DAYS: dict[str, int] = {
 }
 
 
-def probe_daily(target_date: date) -> tuple[Optional[pd.DataFrame], str]:
-    """
-    测试 AAPL 是否有目标日期数据，判断 yfinance 是否已更新
-
-    Returns:
-        (DataFrame, status) 其中 status 为:
-        - "ok": 有目标日期数据
-        - "rate_limit": 被限速
-        - "error": 其他错误
-        - "no_data": 空/无目标日
-    """
-    end_dt = target_date + timedelta(days=1)
-    start_dt = target_date - timedelta(days=5)
-
-    try:
-        df = download_with_retry(
-            tickers="AAPL",
-            start=start_dt.strftime("%Y-%m-%d"),
-            end=end_dt.strftime("%Y-%m-%d"),
-            interval="1d",
-            group_by="column",
-            threads=False,
-            timeout=30,
-            context="[AAPL probe] ",
-        )
-        if df is None or df.empty:
-            return None, "no_data"
-
-        df = df.reset_index()
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        df.columns = [str(c).lower() for c in df.columns]
-
-        if "date" not in df.columns and "datetime" in df.columns:
-            df = df.rename(columns={"datetime": "date"})
-        if "date" not in df.columns and "index" in df.columns:
-            df = df.rename(columns={"index": "date"})
-
-        df["date"] = pd.to_datetime(df["date"]).dt.date
-        if target_date in df["date"].values:
-            return df, "ok"
-        return None, "no_data"
-    except Exception as e:
-        err_msg = str(e)
-        if "RateLimit" in err_msg or "Too Many Requests" in err_msg:
-            log.warning(f"[AAPL] yfinance 被限速: {e}")
-            return None, "rate_limit"
-        log.warning(f"[AAPL] 测试请求失败: {e}")
-        return None, "error"
+def _is_rate_limit(exc: BaseException) -> bool:
+    msg = str(exc)
+    return "RateLimit" in msg or "Too Many Requests" in msg
 
 
-def probe_weekly(target_monday: date) -> tuple[Optional[pd.DataFrame], str]:
-    """Test if yfinance has weekly data for the week starting target_monday.
-
-    Returns:
-        (DataFrame, status) 其中 status 为:
-        - "ok": 有目标周一数据
-        - "rate_limit": 被限速
-        - "error": 其他错误
-        - "no_data": 空/无目标周
-    """
-    start = target_monday - timedelta(days=14)
-    end = target_monday + timedelta(days=7)
+def _probe_has_date(
+    *,
+    interval: str,
+    start: date,
+    end: date,
+    target: date,
+    context: str,
+) -> str:
+    """Download AAPL OHLCV window; return ok if target date present."""
     try:
         df = download_with_retry(
             tickers="AAPL",
             start=start.strftime("%Y-%m-%d"),
             end=end.strftime("%Y-%m-%d"),
-            interval="1wk",
+            interval=interval,
             group_by="column",
             threads=False,
-            timeout=30,
-            context="[AAPL weekly probe] ",
+            timeout=YF_TIMEOUT,
+            context=context,
         )
         if df is None or df.empty:
-            return None, "no_data"
-        df = df.reset_index()
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        df.columns = [str(c).lower() for c in df.columns]
-        if "date" not in df.columns and "datetime" in df.columns:
-            df = df.rename(columns={"datetime": "date"})
-        df["date"] = pd.to_datetime(df["date"]).dt.date
-        if target_monday in df["date"].values:
-            return df, "ok"
-        return None, "no_data"
+            return "no_data"
+
+        df = lower_ohlc_columns(df.reset_index())
+        if "date" not in df.columns:
+            for cand in ("datetime", "index"):
+                if cand in df.columns:
+                    df = df.rename(columns={cand: "date"})
+                    break
+        if "date" not in df.columns:
+            return "no_data"
+
+        dates = pd.to_datetime(df["date"]).dt.date
+        if target in set(dates):
+            return "ok"
+        return "no_data"
     except Exception as e:
-        err_msg = str(e)
-        if "RateLimit" in err_msg or "Too Many Requests" in err_msg:
-            log.warning(f"[AAPL weekly] yfinance 被限速: {e}")
-            return None, "rate_limit"
-        log.warning(f"[AAPL weekly] 测试请求失败: {e}")
-        return None, "error"
+        if _is_rate_limit(e):
+            log.warning(f"{context}yfinance 被限速: {e}")
+            return "rate_limit"
+        log.warning(f"{context}测试请求失败: {e}")
+        return "error"
+
+
+def probe_daily(target_date: date) -> str:
+    """Test whether yfinance has daily bars for target_date (AAPL probe)."""
+    end_dt = target_date + timedelta(days=1)
+    start_dt = target_date - timedelta(days=5)
+    return _probe_has_date(
+        interval="1d",
+        start=start_dt,
+        end=end_dt,
+        target=target_date,
+        context="[AAPL probe] ",
+    )
+
+
+def probe_weekly(target_monday: date) -> str:
+    """Test whether yfinance has weekly bar for week starting target_monday."""
+    start = target_monday - timedelta(days=14)
+    end = target_monday + timedelta(days=7)
+    return _probe_has_date(
+        interval="1wk",
+        start=start,
+        end=end,
+        target=target_monday,
+        context="[AAPL weekly probe] ",
+    )
 
 
 def probe_intraday(interval: str) -> tuple[Optional[date], str]:
@@ -155,8 +136,7 @@ def probe_intraday(interval: str) -> tuple[Optional[date], str]:
         return latest, "ok"
 
     except Exception as e:
-        err_msg = str(e)
-        if "RateLimit" in err_msg or "Too Many Requests" in err_msg:
+        if _is_rate_limit(e):
             log.warning(f"[AAPL {interval}] yfinance 被限速: {e}")
             return None, "rate_limit"
         log.error(f"[AAPL {interval}] 测试失败: {e}")

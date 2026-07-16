@@ -71,7 +71,7 @@ def test_update_weekly_batch_empty_returns_empty():
 def test_update_weekly_batch_rate_limit_skips_all():
     from apis.yfinance.prices_us_weekly import update_weekly_batch
     with patch("apis.yfinance.prices_us_weekly._last_us_weekly_date", return_value=date(2026, 5, 11)), \
-         patch("apis.yfinance.prices_us_weekly.probe_weekly", return_value=(None, "rate_limit")):
+         patch("apis.yfinance.prices_us_weekly.probe_weekly", return_value="rate_limit"):
         result = update_weekly_batch(["AAPL", "MSFT"])
     assert result == {"AAPL": "error: rate_limit", "MSFT": "error: rate_limit"}
 
@@ -79,7 +79,7 @@ def test_update_weekly_batch_rate_limit_skips_all():
 def test_update_weekly_batch_no_data_skips_all():
     from apis.yfinance.prices_us_weekly import update_weekly_batch
     with patch("apis.yfinance.prices_us_weekly._last_us_weekly_date", return_value=date(2026, 5, 11)), \
-         patch("apis.yfinance.prices_us_weekly.probe_weekly", return_value=(None, "no_data")):
+         patch("apis.yfinance.prices_us_weekly.probe_weekly", return_value="no_data"):
         result = update_weekly_batch(["AAPL"])
     assert result == {"AAPL": "error: no_data"}
 
@@ -87,7 +87,7 @@ def test_update_weekly_batch_no_data_skips_all():
 def test_update_weekly_batch_test_error_skips_all():
     from apis.yfinance.prices_us_weekly import update_weekly_batch
     with patch("apis.yfinance.prices_us_weekly._last_us_weekly_date", return_value=date(2026, 5, 11)), \
-         patch("apis.yfinance.prices_us_weekly.probe_weekly", return_value=(None, "error")):
+         patch("apis.yfinance.prices_us_weekly.probe_weekly", return_value="error"):
         result = update_weekly_batch(["AAPL"])
     assert result == {"AAPL": "error: test_failed"}
 

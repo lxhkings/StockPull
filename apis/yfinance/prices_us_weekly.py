@@ -69,7 +69,7 @@ def update_weekly_batch(tickers: List[str], full_rebase: bool = False) -> Dict[s
         return {}
 
     target_monday = _last_us_weekly_date()
-    _, status = probe_weekly(target_monday)
+    status = probe_weekly(target_monday)
 
     if status == "rate_limit":
         log.warning("[AAPL weekly] yfinance 被限速，跳过本次周线更新")
