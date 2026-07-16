@@ -304,14 +304,21 @@ MariaDB 时区设置：`+08:00`（每连接设置）。
 主轴：**按上游 API 分包（`apis/*`）+ 编排（`jobs/*`）+ 共享组件（`core/` / `modules/`）**。
 
 ```
-main.py / config.py
-  └── jobs/pipeline.py           # MarketModule + Pipeline 流程编排
-        ├── jobs/market_us.py    # 美股：apis.static + apis.yfinance
-        ├── jobs/market_cn.py    # A股：apis.tushare
-        └── jobs/market_hk.py    # 港股：apis.static + apis.yfinance
+main.py                          # 薄入口：NO_PROXY / logging / parser dispatch + re-export
+config.py
+cli/                             # CLI 解析与命令实现
+  parser.py / deprecate.py
+  commands_prices.py / commands_tushare.py / commands_futu.py
+  commands_db.py / commands_meta.py / commands_common.py
+
+jobs/pipeline.py                 # MarketModule + Pipeline 流程编排
+  jobs/market_us.py              # 美股：apis.static + apis.yfinance
+  jobs/market_cn.py              # A股：apis.tushare
+  jobs/market_hk.py              # 港股：apis.static + apis.yfinance
 
 apis/yfinance/                   # 全部 yfinance SDK 调用
   client.py                      # 限速+重试（download_with_retry）
+  prices_batch.py                # 日/周 batch 参数化共用
   prices_us.py / prices_hk.py    # 美/港日线
   prices_us_weekly.py            # 美股周线（1wk → prices_weekly）
   prices_intraday.py             # 美股分钟线（15m/60m → prices_intraday）
@@ -320,12 +327,14 @@ apis/yfinance/                   # 全部 yfinance SDK 调用
 
 apis/tushare/                    # 全部 tushare SDK 调用
   client.py / budget.py / orchestrator.py
+  prices_cn_batch.py             # 日/周 batch 参数化共用
   prices_cn.py / prices_cn_weekly.py
   etf_cn.py
   backfill_* / transform_* / derive_periodic.py
 
 apis/futu/                       # 全部 Futu OpenAPI 调用
   client.py / concurrency.py / orchestrator.py
+  write_utils.py                 # upsert / 分页共用 helper
   backfill_* / snapshot_*
 
 apis/static/                     # 成分股「源适配」only（写表走 modules.index_base）
@@ -340,7 +349,6 @@ core/                            # 纯组件（无表语义）
   db_client.py / http_utils.py / retry_utils.py
   batch_utils.py / local_buffer.py / trading_calendar.py
 ```
-
 **依赖方向：** `jobs → apis → core/modules`；`apis` 禁止 import `jobs`；`jobs` 禁止直接 import 上游 SDK；禁止跨 `apis` 子包互引。
 
 每个市场模块遵循 `MarketModule` 协议（`jobs/pipeline.py`）：

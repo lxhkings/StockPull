@@ -57,7 +57,7 @@ uv run main.py tushare flush                           # 本地缓冲重放到 N
 
 Three-market daily-K ingest (US/CN/HK) into shared MariaDB on Synology NAS (192.168.8.9:3306).
 
-**主轴：`apis/*`（按上游 API）+ `jobs/*`（编排）+ `core/`/`modules/`（共享组件）。**
+**主轴：`apis/*`（按上游 API）+ `jobs/*`（编排）+ `cli/`（命令）+ `core/`/`modules/`（共享组件）。**
 
 **Pipeline flow** (`jobs/pipeline.py`):
 1. `update_index()` — snapshot index constituents, detect added/removed
@@ -110,7 +110,8 @@ Three-market daily-K ingest (US/CN/HK) into shared MariaDB on Synology NAS (192.
 **分层与依赖方向（强制）：**
 
 ```
-main.py     → jobs, apis.*.orchestrator, core, modules, config
+main.py     → cli, jobs, apis.*.orchestrator, core, modules, config
+cli/*       → jobs, apis.*.orchestrator, core, modules, config  ❌ 上游 SDK
 jobs/*      → apis.*, core, modules, config   ❌ yfinance/tushare/futu SDK
 apis/<src>/*→ core, modules, config, 同包内   ❌ 跨 apis 互引；❌ import jobs
 core/*      → stdlib / 第三方 / config        ❌ jobs, apis, modules
@@ -119,6 +120,7 @@ modules/*   → core, config                    ❌ jobs, apis
 
 | 层 | 入口 | 扩展点模式 | 客户端/限速层 |
 |---|---|---|---|
+| `cli/` | `cli/parser.py` + `cli/commands_*.py` | 新命令 MUST 进对应 `commands_*`；`main.py` 仅 dispatch / re-export | — |
 | `apis/yfinance` | 各 `prices_*.py` / `client.py` | 新 yf 接口 MUST 放本包；调用 MUST 走 `apis.yfinance.client`（限速+重试） | `apis/yfinance/client.py` |
 | `apis/tushare` | `apis/tushare/orchestrator.py`（phase: lists→prices→derive→financial→valuation…） | 新回填域 MUST 新建 `backfill_<domain>.py`（+ 可选 `transform_*`），挂 orchestrator | `client.py` + `budget.py` |
 | `apis/futu` | `apis/futu/orchestrator.py`（`run_sync(scope)` 分发表） | 新域 MUST 新建 `backfill_*` / `snapshot_*`，在 orchestrator `want()` 挂 scope | `client.py` + `concurrency.py`；缓冲 `core/local_buffer.py` |

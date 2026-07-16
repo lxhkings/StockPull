@@ -1,7 +1,7 @@
 # 结构债清理（性能非主目标）— 设计文档
 
 **日期:** 2026-07-16  
-**状态:** 已批准（brainstorming §1–§6）  
+**状态:** 已实现（P0–P4）— 完成日 2026-07-16  
 **范围:** P0–P4 结构债 / 可维护性；行为与 CLI 契约尽量不变  
 **来源:** `/brainstorming` — 主目标 B；方案 1 全做  
 **前置:** API 中心化、CLI 二级命令、probe/normalize 抽取、code-review residual/probe cleanup 已落地  
