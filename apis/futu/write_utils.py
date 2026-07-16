@@ -44,14 +44,33 @@ def paginate_call(
     page_num: int = 50,
     **kwargs: Any,
 ) -> list:
+    """Paginate Futu APIs that use ``next_key`` / ``num`` style pagination.
+
+    Only for next_key / num style APIs. Do **not** use for size-based pagers
+    (e.g. snapshot batch loops that stop when ``len < PAGE_NUM``).
+
+    Response shapes:
+    - ``dict``: read ``list_key`` items and follow ``next_key`` until empty or ``"-1"``.
+    - ``list``: treat as a single-page payload (the list itself is the page contents);
+      return it with no further pages.
+    - other: raise ``TypeError`` (avoids silent empty results from coerced ``{}``).
+    """
     out: list = []
     next_key = None
     while True:
         data = client.call(method, code, next_key=next_key, num=page_num, **kwargs)
-        payload = data if isinstance(data, dict) else {}
-        chunk = payload.get(list_key, []) or []
+        if isinstance(data, list):
+            # Single-page list response; no further pagination.
+            out.extend(data)
+            break
+        if not isinstance(data, dict):
+            raise TypeError(
+                f"paginate_call expected dict or list from {method}, "
+                f"got {type(data).__name__}"
+            )
+        chunk = data.get(list_key, []) or []
         out.extend(chunk)
-        next_key = payload.get("next_key", "-1")
+        next_key = data.get("next_key", "-1")
         if not chunk or next_key == "-1":
             break
     return out

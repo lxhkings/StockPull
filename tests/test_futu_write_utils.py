@@ -46,3 +46,28 @@ def test_paginate_call_stops_on_empty_or_sentinel():
     )
     assert [i["id"] for i in items] == [1, 2]
     assert client.call.call_count == 2
+
+
+def test_paginate_call_list_shaped_single_response():
+    """List payload = single-page contents; no further pages / no silent empty."""
+    from apis.futu.write_utils import paginate_call
+
+    client = MagicMock()
+    client.call.return_value = [{"id": 1}, {"id": 2}]
+    items = paginate_call(
+        client, "get_foo", "US.AAPL", list_key="item_list", page_num=50
+    )
+    assert [i["id"] for i in items] == [1, 2]
+    assert client.call.call_count == 1
+
+
+def test_paginate_call_non_dict_non_list_raises():
+    from apis.futu.write_utils import paginate_call
+
+    client = MagicMock()
+    client.call.return_value = "unexpected"
+    try:
+        paginate_call(client, "get_foo", "US.AAPL", list_key="item_list")
+        assert False, "expected TypeError"
+    except TypeError as e:
+        assert "dict or list" in str(e)
