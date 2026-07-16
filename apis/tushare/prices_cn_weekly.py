@@ -1,60 +1,27 @@
-# apis.tushare/prices_cn_weekly.py
 """A-share weekly-K updater via Tushare (pre-adjusted, qfq).
 
-与 prices_cn.py 完全对称，差异：
-- pro_bar(freq="W") 拉取周线
-- 写入 prices_weekly 表
-- sync_log data_type = "price_weekly"
+Thin entry: builds CnPriceSpec and delegates to run_cn_equity_batch.
+保留 _normalize_pro_bar / _save_weekly_prices_batch / SYNC_DATA_TYPE 供单测。
 """
 from __future__ import annotations
 
-import logging
-from datetime import date, timedelta
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
-import pandas as pd
-from tqdm import tqdm
-
-from config import TUSHARE_BACKFILL_START
-from core.db_client import get_conn
-from modules.sync_log import get_last_sync, get_last_sync_map
-from modules.price_write import flush_prices_and_sync
-from core.http_utils import to_float, to_int
-from core.trading_calendar import last_cn_trading_date
-from apis.tushare.client import get_client
-
-log = logging.getLogger(__name__)
+from apis.tushare.prices_cn_batch import (
+    CnPriceSpec,
+    normalize_pro_bar,
+    run_cn_equity_batch,
+)
 
 SYNC_DATA_TYPE = "price_weekly"
-BATCH_COMMIT_SIZE = 50
 
 
-def _normalize_pro_bar(df: pd.DataFrame) -> pd.DataFrame:
-    if df is None or df.empty:
-        return pd.DataFrame()
-    out = pd.DataFrame({
-        "date":   pd.to_datetime(df["trade_date"], format="%Y%m%d").dt.date,
-        "open":   df["open"].apply(to_float),
-        "high":   df["high"].apply(to_float),
-        "low":    df["low"].apply(to_float),
-        "close":  df["close"].apply(to_float),
-        "volume": df["vol"].apply(to_int),
-    })
-    return out.sort_values("date").reset_index(drop=True)
-
-
-def _fetch_one(ticker: str, start: str, end: str) -> pd.DataFrame:
-    """tushare pro_bar 单ticker周线拉取。start/end格式YYYYMMDD。"""
-    client = get_client()
-    df_raw = client.pro_bar(ts_code=ticker, adj="qfq", start_date=start, end_date=end, freq="W")
-    return _normalize_pro_bar(df_raw)
+def _normalize_pro_bar(df):
+    return normalize_pro_bar(df)
 
 
 def _save_weekly_prices_batch(conn, rows: List[Tuple]) -> int:
-    """批量写入prices_weekly表，不commit（由调用者控制）。
-
-    保留给单测断言表名；批 flush 走 flush_prices_and_sync(price_table=...).
-    """
+    """Kept for unit test table-name assertion."""
     sql = """
         INSERT INTO prices_weekly (ticker, date, open, high, low, close, volume)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -65,82 +32,6 @@ def _save_weekly_prices_batch(conn, rows: List[Tuple]) -> int:
     with conn.cursor() as cur:
         cur.executemany(sql, rows)
     return len(rows)
-
-
-def _flush_batch(conn, prices_buf: List[Tuple], sync_buf: List[Tuple]):
-    """批量commit prices_weekly + sync_log。"""
-    flush_prices_and_sync(
-        conn, prices_buf, sync_buf, on_duplicate=True, price_table="prices_weekly"
-    )
-
-
-def _process_tickers_batched(
-    conn, tickers: List[str], last_trading: date,
-    full_rebase: bool, result: Dict[str, str],
-    progress_label: str = "补缺",
-    years: Optional[int] = None,
-) -> Tuple[List[Tuple], List[Tuple]]:
-    """批量处理ticker，返回未flush的buffer。"""
-    prices_buf: List[Tuple] = []
-    sync_buf: List[Tuple] = []
-
-    for t in tqdm(tickers, desc=f"[cn weekly] {progress_label}", unit="ticker"):
-        try:
-            if full_rebase:
-                if years:
-                    start_date = last_trading - timedelta(days=365 * years)
-                    start = start_date.strftime("%Y%m%d")
-                else:
-                    start = TUSHARE_BACKFILL_START
-            else:
-                last = get_last_sync(conn, t, SYNC_DATA_TYPE)
-                if last:
-                    start = (last + timedelta(days=1)).strftime("%Y%m%d")
-                else:
-                    start = TUSHARE_BACKFILL_START
-            end = last_trading.strftime("%Y%m%d")
-
-            df = _fetch_one(t, start, end)
-            if df.empty:
-                if end == date.today().strftime("%Y%m%d"):
-                    sync_buf.append((t, SYNC_DATA_TYPE, date.today(), 0, "error", "tushare: no data"))
-                    result[t] = "no_data"
-                else:
-                    result[t] = "skip"
-                if len(sync_buf) >= BATCH_COMMIT_SIZE:
-                    _flush_batch(conn, prices_buf, sync_buf)
-                    prices_buf.clear()
-                    sync_buf.clear()
-                continue
-
-            for _, r in df.iterrows():
-                prices_buf.append((
-                    t, r["date"],
-                    to_float(r["open"]), to_float(r["high"]),
-                    to_float(r["low"]), to_float(r["close"]),
-                    to_int(r["volume"]),
-                ))
-            new_last = df["date"].max()
-            rows_count = len(df)
-            sync_buf.append((t, SYNC_DATA_TYPE, new_last, rows_count, "ok", ""))
-            result[t] = "ok"
-
-            if len(sync_buf) >= BATCH_COMMIT_SIZE:
-                _flush_batch(conn, prices_buf, sync_buf)
-                prices_buf.clear()
-                sync_buf.clear()
-
-        except Exception as e:
-            _flush_batch(conn, prices_buf, sync_buf)
-            prices_buf.clear()
-            sync_buf.clear()
-            sync_buf.append((t, SYNC_DATA_TYPE, date.today(), 0, "error", str(e)[:500]))
-            _flush_batch(conn, [], sync_buf)
-            sync_buf.clear()
-            log.error(f"[{t}] {progress_label}失败: {e}")
-            result[t] = f"error: {e}"
-
-    return prices_buf, sync_buf
 
 
 def update_weekly_batch(
@@ -157,52 +48,13 @@ def update_weekly_batch(
 
     Returns: {ticker: status}
     """
-    if not tickers:
-        return {}
-
-    last_trading = last_cn_trading_date()
-    result: Dict[str, str] = {}
-
-    conn = get_conn()
-    try:
-        new_tickers = []
-        pending_tickers = []
-
-        last_map = {} if full_rebase else get_last_sync_map(conn, tickers, SYNC_DATA_TYPE)
-        for t in tickers:
-            if full_rebase:
-                pending_tickers.append(t)
-                continue
-            last = last_map.get(t)
-            if last is None:
-                new_tickers.append(t)
-            elif last < last_trading:
-                pending_tickers.append(t)
-
-        log.info(f"[cn weekly] 总数={len(tickers)}, new={len(new_tickers)}, pending={len(pending_tickers)}")
-
-        if new_tickers:
-            log.info(f"[cn weekly] {len(new_tickers)} 新ticker需回填历史")
-            buf_p, buf_s = _process_tickers_batched(
-                conn, new_tickers, last_trading,
-                full_rebase=True, result=result,
-                progress_label="回填", years=years,
-            )
-            _flush_batch(conn, buf_p, buf_s)
-
-        if pending_tickers:
-            log.info(f"[cn weekly] {len(pending_tickers)} ticker需增量补缺")
-            buf_p, buf_s = _process_tickers_batched(
-                conn, pending_tickers, last_trading,
-                full_rebase=full_rebase, result=result,
-                progress_label="补缺" if not full_rebase else "回填",
-                years=years if full_rebase else None,
-            )
-            _flush_batch(conn, buf_p, buf_s)
-
-        if not new_tickers and not pending_tickers:
-            log.info(f"[cn weekly] 所有ticker已同步到 {last_trading}")
-
-        return result
-    finally:
-        conn.close()
+    spec = CnPriceSpec(
+        label="cn weekly",
+        freq="W",
+        data_type="price_weekly",
+        price_table="prices_weekly",
+        on_duplicate=True,
+    )
+    return run_cn_equity_batch(
+        tickers, spec=spec, full_rebase=full_rebase, years=years
+    )

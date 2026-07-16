@@ -73,10 +73,10 @@ def test_update_weekly_batch_empty():
 def test_update_weekly_batch_all_already_synced():
     """All tickers already at last_trading: skips without fetching."""
     from apis.tushare.prices_cn_weekly import update_weekly_batch
-    with patch("apis.tushare.prices_cn_weekly.last_cn_trading_date",
+    with patch("apis.tushare.prices_cn_batch.last_cn_trading_date",
                return_value=date(2026, 5, 16)), \
-         patch("apis.tushare.prices_cn_weekly.get_conn") as mock_conn_fn, \
-         patch("apis.tushare.prices_cn_weekly.get_last_sync_map",
+         patch("apis.tushare.prices_cn_batch.get_conn") as mock_conn_fn, \
+         patch("apis.tushare.prices_cn_batch.get_last_sync_map",
                return_value={"600519.SH": date(2026, 5, 16),
                              "000001.SZ": date(2026, 5, 16)}):
         mock_conn = MagicMock()
@@ -90,17 +90,17 @@ def test_update_weekly_batch_new_tickers_trigger_full_backfill():
     from apis.tushare.prices_cn_weekly import update_weekly_batch
     from config import TUSHARE_BACKFILL_START
 
-    with patch("apis.tushare.prices_cn_weekly.last_cn_trading_date",
+    with patch("apis.tushare.prices_cn_batch.last_cn_trading_date",
                return_value=date(2026, 5, 16)), \
-         patch("apis.tushare.prices_cn_weekly.get_conn") as mock_conn_fn, \
-         patch("apis.tushare.prices_cn_weekly.get_last_sync_map",
+         patch("apis.tushare.prices_cn_batch.get_conn") as mock_conn_fn, \
+         patch("apis.tushare.prices_cn_batch.get_last_sync_map",
                return_value={"600519.SH": None}), \
-         patch("apis.tushare.prices_cn_weekly._fetch_one", return_value=pd.DataFrame({
+         patch("apis.tushare.prices_cn_batch._fetch_one", return_value=pd.DataFrame({
              "date": [date(2026, 5, 16)],
              "open": [100.0], "high": [105.0], "low": [99.0],
              "close": [103.0], "volume": [1_000_000],
          })) as mock_fetch, \
-         patch("apis.tushare.prices_cn_weekly._flush_batch"):
+         patch("apis.tushare.prices_cn_batch._flush_batch"):
         mock_conn = MagicMock()
         mock_conn_fn.return_value = mock_conn
         result = update_weekly_batch(["600519.SH"])
