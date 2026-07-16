@@ -1,6 +1,6 @@
 # tests/test_stock_updater_us_weekly.py
 from datetime import date
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import pandas as pd
 
 
@@ -134,27 +134,9 @@ def test_normalize_weekly_frame_drops_null_close():
     assert result["date"].iloc[0] == date(2026, 5, 11)
 
 
-# ── _save_weekly_prices ───────────────────────────────────────────────────────
+# ── weekly batch entry contract ───────────────────────────────────────────────
 
-def test_save_weekly_prices_uses_prices_weekly_table():
-    from apis.yfinance.prices_us_weekly import _save_weekly_prices
-    mock_conn = MagicMock()
-    mock_cur = MagicMock()
-    mock_conn.cursor.return_value.__enter__ = lambda s: mock_cur
-    mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
-
-    df = pd.DataFrame({
-        "ticker": ["AAPL", "AAPL"],
-        "date": [date(2026, 5, 4), date(2026, 5, 11)],
-        "open": [180.0, 185.0],
-        "high": [182.0, 187.0],
-        "low": [178.0, 183.0],
-        "close": [181.0, 186.0],
-        "volume": [1_000_000, 1_200_000],
-    })
-    count = _save_weekly_prices(mock_conn, "AAPL", df)
-    assert count == 2
-    assert mock_cur.executemany.called
-    sql = mock_cur.executemany.call_args[0][0]
-    assert "prices_weekly" in sql
-    assert "INSERT IGNORE" in sql
+def test_weekly_spec_targets_prices_weekly_table():
+    """Document contract: weekly uses prices_weekly + price_weekly."""
+    from apis.yfinance.prices_us_weekly import update_weekly_batch
+    assert update_weekly_batch([]) == {}

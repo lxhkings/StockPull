@@ -1,232 +1,31 @@
-"""US equity daily prices via yfinance (incremental by sync_log).
+"""US equity daily prices via yfinance (incremental by sync_log)."""
+from __future__ import annotations
 
-Writes prices table; batch entry for pipeline. INSERT IGNORE on (ticker, date).
-"""
+from datetime import timedelta
+from typing import Dict, List, Optional
 
-import time
-import random
-import logging
-import pandas as pd
-from datetime import timedelta, date
-from typing import Optional, List, Dict
-
-from core.batch_utils import chunked
-
-from config import (
-    HISTORY_YEARS_US as HISTORY_YEARS,
-    START_DATE_US,
-    YF_BATCH_SIZE, YF_RETRY_COUNT, YF_TIMEOUT,
-    YF_LOOKBACK_DAYS, YF_THREADS,
-    YF_BATCH_DELAY_BASE, YF_BATCH_DELAY_JITTER,
-)
-from core.db_client import get_conn
-from modules.sync_log import get_last_sync_map, set_sync_error
-from modules.price_write import flush_prices_and_sync
-from core.http_utils import to_float, to_int
 from core.trading_calendar import last_us_trading_date
-from apis.yfinance.client import download_with_retry
-from apis.yfinance.normalize import normalize_daily_frame
 from apis.yfinance.probe import probe_daily
-from apis.yfinance.ticker_utils import to_yfinance_us
-
-log = logging.getLogger(__name__)
+from apis.yfinance.prices_batch import UsPriceSpec, run_us_equity_batch
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 批量入口（pipeline 用）
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-def update_prices_batch(tickers: List[str], full_rebase: bool = False, years: Optional[int] = None) -> Dict[str, str]:
-    """
-    批量增量拉取一组 ticker 的行情，写入 prices 表
+def update_prices_batch(
+    tickers: List[str], full_rebase: bool = False, years: Optional[int] = None
+) -> Dict[str, str]:
+    def _end_exclusive(target):
+        return target + timedelta(days=1)
 
-    Args:
-        tickers: DB 形式 ticker 列表
-        full_rebase: True 时强制从历史起点拉取（忽略 sync_log）
-        years: 指定历史年数（None 时使用 config 默认值）
-
-    Returns:
-        {ticker: "ok" | "no_data" | "error: <msg>"}
-    """
-    if not tickers:
-        return {}
-
-    # 先用 AAPL 测试 yfinance 是否已更新最近数据
-    last_trading = last_us_trading_date()
-    status = probe_daily(last_trading)
-
-    if status == "rate_limit":
-        log.warning("[AAPL] yfinance 被限速，跳过本次增量更新，稍后重试")
-        return {t: "error: rate_limit" for t in tickers}
-    elif status == "no_data":
-        log.warning(f"[AAPL] yfinance 暂无 {last_trading} 数据（市场未开或未更新），跳过本次增量更新")
-        return {t: "error: no_data" for t in tickers}
-    elif status == "error":
-        log.warning("[AAPL] 测试请求失败，跳过本次增量更新")
-        return {t: "error: test_failed" for t in tickers}
-
-    log.info(f"[AAPL] yfinance 已有 {last_trading} 数据，开始批量下载")
-
-    result = {}
-    conn = get_conn()
-    try:
-        if full_rebase:
-            # full_rebase: 所有 ticker 从历史起点开始拉取
-            actual_years = years if years else HISTORY_YEARS
-            log.info(f"[batch] rebase: {len(tickers)} ticker 拉取 {actual_years} 年历史")
-            batches = list(chunked(tickers, YF_BATCH_SIZE))
-            for idx, batch in enumerate(batches, 1):
-                _download_and_save(conn, batch, None, result, years=actual_years)
-                if idx < len(batches):
-                    delay = YF_BATCH_DELAY_BASE + random.uniform(-YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER)
-                    log.debug(f"[batch] 等待 {delay:.1f}s 后继续")
-                    time.sleep(delay)
-        else:
-            # 增量模式：区分新 ticker 和已同步 ticker
-            new_tickers = []
-            pending_tickers = []  # 需要增量更新的 ticker
-            pending_start = None
-
-            # 增量窗口上限：不超过 YF_LOOKBACK_DAYS 天前
-            lookback_floor = last_trading - timedelta(days=YF_LOOKBACK_DAYS)
-
-            last_map = get_last_sync_map(conn, tickers, "price")
-            for t in tickers:
-                last = last_map.get(t)
-                if last is None:
-                    new_tickers.append(t)
-                elif last < last_trading:
-                    # 只有未同步到最新交易日的 ticker 才需要更新
-                    start_dt = max(last + timedelta(days=1), lookback_floor)
-                    pending_tickers.append(t)
-                    if pending_start is None or start_dt < pending_start:
-                        pending_start = start_dt
-                # 已同步到 last_trading 的 ticker 跳过
-
-            # 新 ticker 回填历史
-            if new_tickers:
-                log.info(f"[batch] {len(new_tickers)} 新 ticker 需回填 {HISTORY_YEARS} 年历史")
-                batches_new = list(chunked(new_tickers, YF_BATCH_SIZE))
-                for idx, batch_new in enumerate(batches_new, 1):
-                    _download_and_save(conn, batch_new, None, result)
-                    if idx < len(batches_new):
-                        delay = YF_BATCH_DELAY_BASE + random.uniform(-YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER)
-                        log.debug(f"[batch] 等待 {delay:.1f}s 后继续")
-                        time.sleep(delay)
-
-            # 待更新 ticker 增量同步
-            if pending_tickers:
-                log.info(f"[batch] {len(pending_tickers)} ticker 需增量更新（从 {pending_start} 到 {last_trading}，窗口上限 {YF_LOOKBACK_DAYS} 天）")
-                batches_pending = list(chunked(pending_tickers, YF_BATCH_SIZE))
-                for idx, batch_pending in enumerate(batches_pending, 1):
-                    _download_and_save(conn, batch_pending, pending_start, result)
-                    if idx < len(batches_pending):
-                        delay = YF_BATCH_DELAY_BASE + random.uniform(-YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER)
-                        log.debug(f"[batch] 等待 {delay:.1f}s 后继续")
-                        time.sleep(delay)
-            else:
-                log.info(f"[batch] 所有 ticker 已同步到 {last_trading}，无需增量更新")
-
-        return result
-    finally:
-        conn.close()
-
-
-def _download_and_save(conn, tickers: List[str], start_date: Optional[date], result: Dict[str, str], years: Optional[int] = None) -> None:
-    """下载一批 ticker 数据并保存到数据库"""
-    if not tickers:
-        return
-
-    # start_date 为 None 表示新 ticker，从历史起点到最近收盘日
-    if start_date is None:
-        last_trading = last_us_trading_date()
-        if years:
-            # 指定年数，从 last_trading 往回推算
-            start_date = last_trading - timedelta(days=365 * years)
-        else:
-            # 默认从 START_DATE_US 开始（2010-01-01）
-            start_date = date.fromisoformat(START_DATE_US)
-
-    # end_dt 设为最近收盘日 + 1 天（yfinance end 参数不包含该日期）
-    last_trading = last_us_trading_date()
-    end_dt = last_trading + timedelta(days=1)
-    yf_symbols = [to_yfinance_us(t) for t in tickers]
-
-    log.info(f"[batch] 下载 {len(tickers)} 只股票, 日期范围: {start_date} ~ {last_trading}")
-
-    try:
-        df = download_with_retry(
-            tickers=yf_symbols,
-            start=start_date.strftime("%Y-%m-%d"),
-            end=end_dt.strftime("%Y-%m-%d"),
-            interval="1d",
-            threads=YF_THREADS,
-            timeout=YF_TIMEOUT,
-            retry_count=YF_RETRY_COUNT,
-            repair=False,
-            context="[batch] ",
-        )
-    except Exception as last_exc:
-        msg = f"yfinance batch failed after {YF_RETRY_COUNT} retries: {last_exc}"
-        log.error(msg)
-        for t in tickers:
-            set_sync_error(conn, t, "price", msg)
-            result[t] = f"error: {last_exc}"
-        return
-
-    top_level = set()
-    if df is not None and not df.empty and isinstance(df.columns, pd.MultiIndex):
-        top_level = set(df.columns.get_level_values(0))
-
-    price_rows: list = []
-    sync_rows: list = []
-    ok_tickers: list = []
-
-    for t in tickers:
-        yf_t = to_yfinance_us(t)
-        if yf_t not in top_level:
-            log.warning(f"[{t}] yfinance: ticker not in response, 无数据")
-            set_sync_error(conn, t, "price", "yfinance: ticker not in response")
-            result[t] = "no_data"
-            continue
-        sub = df[yf_t]
-        normalized = normalize_daily_frame(t, sub)
-        if normalized.empty:
-            log.warning(f"[{t}] yfinance: empty frame, 无数据")
-            set_sync_error(conn, t, "price", "yfinance: empty frame")
-            result[t] = "no_data"
-            continue
-        rows = _price_rows_from_df(normalized)
-        new_last = normalized["date"].max()
-        price_rows.extend(rows)
-        sync_rows.append((t, "price", new_last, len(rows), "ok", ""))
-        ok_tickers.append(t)
-        result[t] = "ok"
-        log.info(f"[{t}] 写入 {len(rows)} 条，最新={new_last}")
-
-    if price_rows or sync_rows:
-        try:
-            flush_prices_and_sync(conn, price_rows, sync_rows, on_duplicate=False)
-        except Exception as e:
-            log.error(f"[batch] 写库失败: {e}")
-            for t in ok_tickers:
-                set_sync_error(conn, t, "price", str(e))
-                result[t] = f"error: {e}"
-
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 内部工具
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-def _price_rows_from_df(df: pd.DataFrame) -> list:
-    """DataFrame → price row tuples for flush_prices_and_sync."""
-    return [
-        (
-            r.ticker,
-            r.date,
-            to_float(getattr(r, "open", None)),
-            to_float(getattr(r, "high", None)),
-            to_float(getattr(r, "low", None)),
-            to_float(r.close),
-            to_int(getattr(r, "volume", None)),
-        )
-        for r in df.itertuples(index=False)
-    ]
+    spec = UsPriceSpec(
+        label="batch",
+        interval="1d",
+        data_type="price",
+        price_table="prices",
+        probe=probe_daily,
+        target_date=last_us_trading_date,
+        end_exclusive=_end_exclusive,
+        on_duplicate=False,
+        support_years=True,
+    )
+    return run_us_equity_batch(
+        tickers, spec=spec, full_rebase=full_rebase, years=years
+    )
