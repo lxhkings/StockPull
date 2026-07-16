@@ -65,7 +65,8 @@ def test_tushare_flush_replays_pending():
 
 
 def test_tushare_full_forces_start_from_backfill_start():
-    with patch("main.cmd_tushare_backfill", return_value=0) as backfill:
+    # cmd_tushare_full lives in cli.commands_tushare and resolves cmd_tushare_backfill there
+    with patch("cli.commands_tushare.cmd_tushare_backfill", return_value=0) as backfill:
         rc = cmd_tushare_full(scope="all", market="cn", dry_run=False)
 
     assert rc == 0
