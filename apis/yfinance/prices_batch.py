@@ -240,7 +240,8 @@ def run_us_equity_batch(
                     )
                     if idx < len(batches_pending):
                         _sleep_between_batches(spec.label)
-            else:
+
+            if not new_tickers and not pending_tickers:
                 log.info(f"[{spec.label}] 全部已同步到 {target}")
 
         return result

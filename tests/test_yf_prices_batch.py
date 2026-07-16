@@ -102,3 +102,61 @@ def test_probe_rate_limit_skips_without_download():
         result = run_us_equity_batch(["AAPL"], spec=spec)
     assert result == {"AAPL": "error: rate_limit"}
     assert called["dl"] is False
+
+
+def test_all_synced_log_only_when_new_and_pending_empty(caplog):
+    """有 new 无 pending 时不得误报「全部已同步」；双空才报。"""
+    import logging
+    from datetime import date as d, timedelta
+    from apis.yfinance.prices_batch import UsPriceSpec, run_us_equity_batch
+
+    target = d(2026, 7, 10)
+
+    def make_spec():
+        return UsPriceSpec(
+            label="batch",
+            interval="1d",
+            data_type="price",
+            price_table="prices",
+            probe=lambda x: "ok",
+            target_date=lambda: target,
+            end_exclusive=lambda x: x + timedelta(days=1),
+            on_duplicate=False,
+            support_years=True,
+        )
+
+    mock_conn = MagicMock()
+
+    # Case A: only new (last=None) → must NOT log 全部已同步
+    with patch("apis.yfinance.prices_batch.get_conn", return_value=mock_conn), \
+         patch("apis.yfinance.prices_batch.get_last_sync_map",
+               return_value={"AAPL": None}), \
+         patch("apis.yfinance.prices_batch._download_and_save"), \
+         patch("apis.yfinance.prices_batch.YF_BATCH_SIZE", 40), \
+         caplog.at_level(logging.INFO, logger="apis.yfinance.prices_batch"):
+        run_us_equity_batch(["AAPL"], spec=make_spec(), full_rebase=False)
+    assert not any("全部已同步" in r.message for r in caplog.records)
+
+    caplog.clear()
+
+    # Case B: all already at target → MUST log 全部已同步
+    with patch("apis.yfinance.prices_batch.get_conn", return_value=mock_conn), \
+         patch("apis.yfinance.prices_batch.get_last_sync_map",
+               return_value={"AAPL": target}), \
+         patch("apis.yfinance.prices_batch._download_and_save") as mock_dl, \
+         patch("apis.yfinance.prices_batch.YF_BATCH_SIZE", 40), \
+         caplog.at_level(logging.INFO, logger="apis.yfinance.prices_batch"):
+        result = run_us_equity_batch(["AAPL"], spec=make_spec(), full_rebase=False)
+    assert result == {}
+    assert mock_dl.call_count == 0
+    assert any("全部已同步" in r.message for r in caplog.records)
+
+    caplog.clear()
+
+    # Case C: rebase → must NOT log 全部已同步
+    with patch("apis.yfinance.prices_batch.get_conn", return_value=mock_conn), \
+         patch("apis.yfinance.prices_batch._download_and_save"), \
+         patch("apis.yfinance.prices_batch.YF_BATCH_SIZE", 40), \
+         caplog.at_level(logging.INFO, logger="apis.yfinance.prices_batch"):
+        run_us_equity_batch(["AAPL"], spec=make_spec(), full_rebase=True)
+    assert not any("全部已同步" in r.message for r in caplog.records)
