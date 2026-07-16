@@ -51,14 +51,14 @@ def incremental(tickers: list[str]) -> dict[str, str]:
 
 def update_index_price() -> int:
     """行业 ETF 后复权日线 → index_prices（index_id = ts_code）。无宽基指数价。"""
-    from apis.tushare.etf_cn import update_etf_prices
-    return update_etf_prices()
+    return rebase_etf(full_rebase=False)
 
 
 def rebase_etf(*, full_rebase: bool = True) -> int:
     """行业 ETF index_prices 全量/增量重灌。非 MarketModule；仅 CLI --etf-only。"""
     from apis.tushare.etf_cn import update_etf_prices
     return update_etf_prices(full_rebase=full_rebase)
+
 
 
 def rebase(

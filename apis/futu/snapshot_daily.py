@@ -8,12 +8,12 @@ import json
 import logging
 from datetime import date
 
-import pandas as pd
-
 from core.db_client import get_conn
+
 from config import FUTU_REFRESH_DAYS
 from apis.futu.client import get_client, to_futu_code, from_futu_code
 from core.batch_utils import chunked
+from core.http_utils import or_none
 from apis.futu.concurrency import batch_with_bisect, run_streams, ticker_stream
 from apis.futu.sync import fresh_tickers, mark_ok
 
@@ -23,9 +23,8 @@ SNAPSHOT_BATCH = 200   # get_market_snapshot 单次最多 400，留余量
 
 
 def _num(v):
-    if v is None or (isinstance(v, float) and pd.isna(v)):
-        return None
-    return v
+    return or_none(v)
+
 
 
 def _share_row(r, today: str) -> tuple:

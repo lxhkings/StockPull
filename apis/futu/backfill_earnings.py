@@ -8,9 +8,9 @@ from __future__ import annotations
 import json
 import logging
 
-import pandas as pd
-
 from core.db_client import get_conn, execute
+from core.http_utils import or_none
+
 from apis.futu.client import get_client, to_futu_code
 from apis.futu.concurrency import ticker_stream
 
@@ -33,7 +33,8 @@ PIT_BACKFILL_SQL = {
 
 def _date_part(s):
     """'2026-04-30 17:00:00' -> '2026-04-30'；空值返回 None。"""
-    if s is None or (isinstance(s, float) and pd.isna(s)):
+    s = or_none(s)
+    if s is None:
         return None
     s = str(s).strip()
     return s.split(" ")[0] if s else None
@@ -49,7 +50,8 @@ def backfill_earnings(client, ticker: str) -> int:
         period_text = r.get("period_text")
         if not period_text:
             continue
-        payload = {k: (None if pd.isna(v) else v) for k, v in r.items()}
+        payload = {k: or_none(v) for k, v in r.items()}
+
         rows.append((
             ticker,
             period_text,

@@ -21,8 +21,9 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from core.db_client import get_conn
-from core.http_utils import fetch_with_retry
+from core.http_utils import fetch_with_retry, or_none
 from modules.index_base import register_stocks, get_last_snapshot_date
+
 
 log = logging.getLogger(__name__)
 
@@ -244,7 +245,8 @@ def _parse_nport_holdings(xml_text: str, name_lookup: dict[str, str]) -> pd.Data
     df = pd.DataFrame(rows)
     # pandas 对全 None 列推断 float64（NaN），显式转为 Python None
     for col in df.columns:
-        df[col] = [None if pd.isna(v) else v for v in df[col]]
+        df[col] = [or_none(v) for v in df[col]]
+
     return df
 
 
