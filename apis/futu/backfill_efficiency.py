@@ -2,13 +2,10 @@
 from __future__ import annotations
 
 import json
-import logging
 
-from core.db_client import get_conn
 from apis.futu.client import clean_date, get_client, to_futu_code
 from apis.futu.concurrency import ticker_stream
-
-log = logging.getLogger(__name__)
+from apis.futu.write_utils import upsert_rows
 
 
 def backfill_efficiency(client, ticker: str) -> int:
@@ -41,23 +38,18 @@ def backfill_efficiency(client, ticker: str) -> int:
     if not rows:
         return 0
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO us_op_efficiency "
-                "(ticker, period_text, end_date, employee_num, employee_num_yoy, "
-                " income_per_capita, income_per_capita_yoy, profit_per_capita, "
-                " profit_per_capita_yoy, net_profit_per_capita, net_profit_per_capita_yoy, "
-                " currency_code, raw_payload) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  employee_num=VALUES(employee_num), income_per_capita=VALUES(income_per_capita), "
-                "  profit_per_capita=VALUES(profit_per_capita), raw_payload=VALUES(raw_payload)",
-                rows,
-            )
-        conn.commit()
-    log.info(f"us_op_efficiency {ticker}: {len(rows)} rows")
-    return len(rows)
+    return upsert_rows(
+        "us_op_efficiency",
+        [
+            "ticker", "period_text", "end_date", "employee_num", "employee_num_yoy",
+            "income_per_capita", "income_per_capita_yoy", "profit_per_capita",
+            "profit_per_capita_yoy", "net_profit_per_capita", "net_profit_per_capita_yoy",
+            "currency_code", "raw_payload",
+        ],
+        rows,
+        ["employee_num", "income_per_capita", "profit_per_capita", "raw_payload"],
+        ticker=ticker,
+    )
 
 
 def backfill_all(tickers: list[str], force: bool = False) -> dict:

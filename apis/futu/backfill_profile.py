@@ -1,14 +1,11 @@
 """公司元数据 backfill（月频）。EAV 模式：field_name / field_value。"""
 from __future__ import annotations
 
-import logging
 from datetime import date
 
-from core.db_client import get_conn
 from apis.futu.client import get_client, to_futu_code
 from apis.futu.concurrency import ticker_stream
-
-log = logging.getLogger(__name__)
+from apis.futu.write_utils import upsert_rows
 
 
 def backfill_profile(client, ticker: str) -> int:
@@ -36,19 +33,13 @@ def backfill_profile(client, ticker: str) -> int:
     if not rows:
         return 0
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO us_company_profile "
-                "(ticker, field_name, field_value, updated_at) "
-                "VALUES (%s,%s,%s,%s) "
-                "ON DUPLICATE KEY UPDATE "
-                "  field_value=VALUES(field_value), updated_at=VALUES(updated_at)",
-                rows,
-            )
-        conn.commit()
-    log.info(f"us_company_profile {ticker}: {len(rows)} fields")
-    return len(rows)
+    return upsert_rows(
+        "us_company_profile",
+        ["ticker", "field_name", "field_value", "updated_at"],
+        rows,
+        ["field_value", "updated_at"],
+        ticker=ticker,
+    )
 
 
 def backfill_all(tickers: list[str], force: bool = False) -> dict:

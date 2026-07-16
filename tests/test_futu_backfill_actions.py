@@ -13,7 +13,7 @@ def test_backfill_dividends_upserts_key_dates():
         "dividend_payable_date": "2026-02-13",
         "per_cash_div": 0.26,
     }]}
-    with patch("apis.futu.backfill_actions.get_conn") as mock_conn:
+    with patch("apis.futu.write_utils.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
@@ -34,7 +34,7 @@ def test_backfill_splits_paginates_and_upserts():
     p1 = {"split_list": [{"ex_date": "2020-08-31", "split_base": 1, "split_ert": 4}], "next_key": "1"}
     p2 = {"split_list": [{"ex_date": "2014-06-09", "split_base": 1, "split_ert": 7}], "next_key": "-1"}
     client.call.side_effect = [p1, p2]
-    with patch("apis.futu.backfill_actions.get_conn") as mock_conn:
+    with patch("apis.futu.write_utils.get_conn") as mock_conn:
         cur = MagicMock()
         mock_conn.return_value.__enter__ = lambda s: mock_conn.return_value
         mock_conn.return_value.cursor.return_value.__enter__ = lambda s: cur
