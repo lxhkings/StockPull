@@ -1,11 +1,11 @@
 """A-share weekly-K updater via Tushare (pre-adjusted, qfq).
 
 Thin entry: builds CnPriceSpec and delegates to run_cn_equity_batch.
-保留 _normalize_pro_bar / _save_weekly_prices_batch / SYNC_DATA_TYPE 供单测。
+保留 _normalize_pro_bar / SYNC_DATA_TYPE 供单测。
 """
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from apis.tushare.prices_cn_batch import (
     CnPriceSpec,
@@ -18,20 +18,6 @@ SYNC_DATA_TYPE = "price_weekly"
 
 def _normalize_pro_bar(df):
     return normalize_pro_bar(df)
-
-
-def _save_weekly_prices_batch(conn, rows: List[Tuple]) -> int:
-    """Kept for unit test table-name assertion."""
-    sql = """
-        INSERT INTO prices_weekly (ticker, date, open, high, low, close, volume)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE
-            open=VALUES(open), high=VALUES(high), low=VALUES(low),
-            close=VALUES(close), volume=VALUES(volume)
-    """
-    with conn.cursor() as cur:
-        cur.executemany(sql, rows)
-    return len(rows)
 
 
 def update_weekly_batch(

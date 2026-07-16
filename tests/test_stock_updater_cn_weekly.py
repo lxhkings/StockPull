@@ -44,25 +44,6 @@ def test_normalize_pro_bar_sorted_ascending():
     assert result["date"].iloc[1] == date(2026, 5, 18)
 
 
-# ── _save_weekly_prices_batch ─────────────────────────────────────────────────
-
-def test_save_weekly_prices_batch_uses_prices_weekly_table():
-    from apis.tushare.prices_cn_weekly import _save_weekly_prices_batch
-    mock_conn = MagicMock()
-    mock_cur = MagicMock()
-    mock_conn.cursor.return_value.__enter__ = lambda s: mock_cur
-    mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
-
-    rows = [("600519.SH", date(2026, 5, 15), 100.0, 105.0, 99.0, 103.0, 1_000_000)]
-    count = _save_weekly_prices_batch(mock_conn, rows)
-
-    assert count == 1
-    assert mock_cur.executemany.called
-    sql = mock_cur.executemany.call_args[0][0]
-    assert "prices_weekly" in sql
-    assert "ON DUPLICATE KEY UPDATE" in sql
-
-
 # ── update_weekly_batch ───────────────────────────────────────────────────────
 
 def test_update_weekly_batch_empty():

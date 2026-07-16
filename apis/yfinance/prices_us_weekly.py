@@ -20,12 +20,12 @@ def _last_us_weekly_date() -> date:
     return this_monday - timedelta(days=7)
 
 
-def update_weekly_batch(tickers: List[str], full_rebase: bool = False) -> Dict[str, str]:
+def build_us_weekly_spec() -> UsPriceSpec:
+    """Build weekly UsPriceSpec at call time (patches on this module still apply)."""
     def _end_exclusive(target: date) -> date:
         return target + timedelta(days=7)
 
-    # Build Spec at call time so patches on this module's probe_weekly / _last_us_weekly_date apply.
-    spec = UsPriceSpec(
+    return UsPriceSpec(
         label="weekly batch",
         interval="1wk",
         data_type="price_weekly",
@@ -36,4 +36,9 @@ def update_weekly_batch(tickers: List[str], full_rebase: bool = False) -> Dict[s
         on_duplicate=False,
         support_years=False,
     )
-    return run_us_equity_batch(tickers, spec=spec, full_rebase=full_rebase)
+
+
+def update_weekly_batch(tickers: List[str], full_rebase: bool = False) -> Dict[str, str]:
+    return run_us_equity_batch(
+        tickers, spec=build_us_weekly_spec(), full_rebase=full_rebase
+    )
