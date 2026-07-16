@@ -51,11 +51,6 @@ YF_THREADS       = False    # 单线程避免限速
 YF_BATCH_DELAY_BASE = 15.0  # batch 基础间隔 15 秒
 YF_BATCH_DELAY_JITTER = 3.0 # ±3 秒随机波动
 
-# A-share / HK source delays (akshare is sometimes flaky; serial)
-AKSHARE_RETRY_COUNT = 5
-AKSHARE_RETRY_DELAY = 3.0
-AKSHARE_REQUEST_DELAY = 1.5  # between per-stock calls
-
 # Index metadata. etf required by indices.etf_ticker NOT NULL.
 INDEX_CONFIG = {
     "SP500": {
@@ -67,7 +62,7 @@ INDEX_CONFIG = {
     },
     "HSI": {
         "name":   "恒生指数",
-        "source": "akshare",
+        "source": "csv",
         "etf":    "2800.HK",
         "market": "hk",
         "description": "盈富基金 Tracker Fund",

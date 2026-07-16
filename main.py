@@ -11,9 +11,8 @@ from typing import Any
 from cli.deprecate import rewrite_legacy_argv
 from cli.parser import build_parser
 
-# akshare/efinance (eastmoney.com) must bypass proxy — direct connect only.
-# yfinance (Yahoo Finance) should still go through proxy to avoid rate limits.
-# So we only add eastmoney domains to NO_PROXY, not "*".
+# Optional NO_PROXY for eastmoney/xueqiu hosts (legacy; primary feeds are
+# tushare/yfinance/futu). Do not set NO_PROXY=* — yfinance may need system proxy.
 _AKSHARE_NO_PROXY = "eastmoney.com,*.eastmoney.com,xueqiu.com,*.xueqiu.com"
 existing = os.environ.get("NO_PROXY", "")
 os.environ["NO_PROXY"] = ",".join(filter(None, [existing, _AKSHARE_NO_PROXY]))

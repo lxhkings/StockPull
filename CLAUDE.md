@@ -160,13 +160,11 @@ Secrets in `.env` (see `.env.example`). `DB_PASSWORD` and `TUSHARE_TOKEN` are re
 
 History depths in `config.py`: US=5yr, CN/HK=15yr from 2010-01-01.
 
-Retry/delay settings in `config.py`: `AKSHARE_RETRY_COUNT=5`, `AKSHARE_RETRY_DELAY=3.0`, `AKSHARE_REQUEST_DELAY=1.5`.
-
 Tushare rate limiting in `config.py`: `TUSHARE_RATE_INTERVAL=0.12` (每分钟最多 500 次).
 
 ## Network Notes
 
-The codebase clears proxy environment variables in `main.py` (sets `NO_PROXY=*`) to avoid macOS system proxy interference with akshare/efinance HTTP requests to eastmoney.com APIs.
+`main.py` 仅将 eastmoney/xueqiu 域名追加到 `NO_PROXY`（**不是** `NO_PROXY=*`），以免系统代理干扰遗留 HTTP 路径；主数据源为 tushare / yfinance / futu。yfinance 仍可走系统代理。
 
 ## Database
 
