@@ -163,7 +163,7 @@ def test_all_synced_log_only_when_new_and_pending_empty(caplog):
 
 
 def test_rebase_sleeps_between_batches_not_after_last():
-    """N batches → N-1 sleeps; empty tickers must not call download."""
+    """N batches → N-1 sleeps (no sleep after the last batch)."""
     from datetime import date as d
     from apis.yfinance.prices_batch import UsPriceSpec, run_us_equity_batch
 

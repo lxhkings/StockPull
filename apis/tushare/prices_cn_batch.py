@@ -50,6 +50,21 @@ def normalize_pro_bar(df: pd.DataFrame) -> pd.DataFrame:
     return out.sort_values("date").reset_index(drop=True)
 
 
+def _cn_history_start(last_trading: date, years: Optional[int]) -> str:
+    """Full-history window start (YYYYMMDD). Shared by fetch path and logs."""
+    if years:
+        return (last_trading - timedelta(days=365 * years)).strftime("%Y%m%d")
+    return TUSHARE_BACKFILL_START
+
+
+def _price_rows_from_normalized(ticker: str, df: pd.DataFrame) -> List[Tuple]:
+    """Build DB rows from normalize_pro_bar output (no second to_float)."""
+    return [
+        (ticker, r.date, r.open, r.high, r.low, r.close, r.volume)
+        for r in df.itertuples(index=False)
+    ]
+
+
 def _fetch_one(client, ticker: str, start: str, end: str, freq: str) -> pd.DataFrame:
     """tushare pro_bar 单 ticker 拉取。start/end 格式 YYYYMMDD。"""
     df_raw = client.pro_bar(
@@ -98,11 +113,7 @@ def _process_tickers_batched(
     for t in tqdm(tickers, desc=f"[{spec.label}] {progress_label}", unit="ticker"):
         try:
             if full_rebase:
-                if years:
-                    start_date = last_trading - timedelta(days=365 * years)
-                    start = start_date.strftime("%Y%m%d")
-                else:
-                    start = TUSHARE_BACKFILL_START
+                start = _cn_history_start(last_trading, years)
             else:
                 last = last_map.get(t)
                 if last:
@@ -127,16 +138,7 @@ def _process_tickers_batched(
                     sync_buf.clear()
                 continue
 
-            for _, r in df.iterrows():
-                prices_buf.append((
-                    t,
-                    r["date"],
-                    r["open"],
-                    r["high"],
-                    r["low"],
-                    r["close"],
-                    r["volume"],
-                ))
+            prices_buf.extend(_price_rows_from_normalized(t, df))
             new_last = df["date"].max()
             rows_count = len(df)
             sync_buf.append((t, spec.data_type, new_last, rows_count, "ok", ""))
@@ -210,12 +212,7 @@ def run_cn_equity_batch(
         if new_tickers:
             # new 路径内部 full_rebase=True：与 CLI rebase 不同，仅表示忽略
             # sync_log、从 backfill 起点拉全量（见 _process_tickers_batched）。
-            if years:
-                start_disp = (
-                    last_trading - timedelta(days=365 * years)
-                ).strftime("%Y%m%d")
-            else:
-                start_disp = TUSHARE_BACKFILL_START
+            start_disp = _cn_history_start(last_trading, years)
             log.info(
                 f"[{spec.label}] {len(new_tickers)} 新ticker需回填 "
                 f"from {start_disp}"
