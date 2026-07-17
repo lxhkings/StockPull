@@ -1,4 +1,4 @@
-"""Tests for apis/yfinance/prices_intraday.py"""
+"""Tests for apis/yfinance/prices_intraday.py + prices_intraday_batch.py"""
 
 from datetime import date, datetime
 from unittest.mock import MagicMock, patch
@@ -26,6 +26,16 @@ def test_sync_type():
     from apis.yfinance.prices_intraday import _sync_type
     assert _sync_type("15m") == "intraday_15m"
     assert _sync_type("1h") == "intraday_60m"
+
+
+def test_build_intraday_spec():
+    from apis.yfinance.prices_intraday_batch import build_intraday_spec
+    spec = build_intraday_spec("1h")
+    assert spec.interval == "1h"
+    assert spec.yf_interval == "60m"
+    assert spec.data_type == "intraday_60m"
+    assert spec.lookback_days == 730
+    assert "1h" in spec.label
 
 
 def test_to_yfinance_us_dot_to_dash():
@@ -67,7 +77,7 @@ def test_normalize_frame_empty():
     assert list(result.columns) == ["ticker", "interval", "datetime", "open", "high", "low", "close", "volume"]
 
 
-# ─── _save_rows ───────────────────────────────────────────────────────────────
+# ─── save_rows ────────────────────────────────────────────────────────────────
 
 def test_save_rows_executes_insert():
     df = pd.DataFrame({
@@ -123,72 +133,72 @@ def _make_yf_multiindex_df(symbol: str) -> pd.DataFrame:
     return df
 
 
-@patch("apis.yfinance.prices_intraday.get_conn")
-@patch("apis.yfinance.prices_intraday.get_last_sync")
-@patch("apis.yfinance.prices_intraday.set_sync_ok")
-@patch("apis.yfinance.prices_intraday.set_sync_error")
+_BATCH = "apis.yfinance.prices_intraday_batch"
+
+
+@patch(f"{_BATCH}.get_conn")
+@patch(f"{_BATCH}.get_last_sync_map")
+@patch(f"{_BATCH}.set_sync_ok")
+@patch(f"{_BATCH}.set_sync_error")
 @patch("apis.yfinance.client.yf.download")
-@patch("apis.yfinance.prices_intraday.get_index_tickers")
-@patch("apis.yfinance.prices_intraday.probe_intraday")
+@patch(f"{_BATCH}.get_index_tickers")
+@patch(f"{_BATCH}.probe_intraday")
 def test_update_intraday_calls_yf_download(
-    mock_test_aapl, mock_get_index, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
+    mock_test_aapl, mock_get_index, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync_map, mock_get_conn
 ):
-    # AAPL 测试返回成功
     mock_test_aapl.return_value = (date(2026, 5, 15), "ok")
-    # SP500 + RUSSELL1000 两次调用；并集后为 ["AAPL"]
     mock_get_index.return_value = ["AAPL"]
-    mock_get_last_sync.return_value = None  # 首次：全量拉取
+    mock_get_last_sync_map.return_value = {"AAPL": None}
     mock_get_conn.return_value = MagicMock()
     mock_yf_download.return_value = _make_yf_multiindex_df("AAPL")
 
-    with patch("apis.yfinance.prices_intraday._save_rows", return_value=2):
+    with patch(f"{_BATCH}.save_rows", return_value=2):
         from apis.yfinance.prices_intraday import update_intraday
         result = update_intraday("15m")
 
     assert result["AAPL"] == "ok"
-    # AAPL 测试被 mock，不调用 yf.download；只有批量下载调用 1 次
     mock_yf_download.assert_called_once()
     assert mock_yf_download.call_args[1]["interval"] == "15m"
+    mock_get_last_sync_map.assert_called_once()
 
 
-@patch("apis.yfinance.prices_intraday.get_conn")
-@patch("apis.yfinance.prices_intraday.get_last_sync")
-@patch("apis.yfinance.prices_intraday.set_sync_ok")
-@patch("apis.yfinance.prices_intraday.set_sync_error")
+@patch(f"{_BATCH}.get_conn")
+@patch(f"{_BATCH}.get_last_sync_map")
+@patch(f"{_BATCH}.set_sync_ok")
+@patch(f"{_BATCH}.set_sync_error")
 @patch("apis.yfinance.client.yf.download")
-@patch("apis.yfinance.prices_intraday.get_index_tickers")
-@patch("apis.yfinance.prices_intraday.probe_intraday")
+@patch(f"{_BATCH}.get_index_tickers")
+@patch(f"{_BATCH}.probe_intraday")
 def test_update_intraday_full_rebase_ignores_sync_log(
-    mock_test_aapl, mock_get_index, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
+    mock_test_aapl, mock_get_index, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync_map, mock_get_conn
 ):
-    """full_rebase=True must not call get_last_sync — all tickers start from floor_date."""
-    # AAPL 测试返回成功
+    """full_rebase=True must not call get_last_sync_map — all tickers start from floor_date."""
     mock_test_aapl.return_value = (date(2026, 5, 15), "ok")
     mock_get_index.return_value = ["AAPL"]
-    mock_get_last_sync.return_value = date.today()  # would be "already up to date" in normal mode
+    mock_get_last_sync_map.return_value = {"AAPL": date.today()}
     mock_get_conn.return_value = MagicMock()
     mock_yf_download.return_value = _make_yf_multiindex_df("AAPL")
 
-    with patch("apis.yfinance.prices_intraday._save_rows", return_value=2):
+    with patch(f"{_BATCH}.save_rows", return_value=2):
         from apis.yfinance.prices_intraday import update_intraday
         result = update_intraday("1h", full_rebase=True)
 
-    mock_get_last_sync.assert_not_called()
+    mock_get_last_sync_map.assert_not_called()
     assert result["AAPL"] == "ok"
-    # AAPL 测试被 mock，只有批量下载调用 1 次
     mock_yf_download.assert_called_once()
     assert mock_yf_download.call_args[1]["interval"] == "60m"
 
 
-@patch("apis.yfinance.prices_intraday.get_conn")
-@patch("apis.yfinance.prices_intraday.get_last_sync")
-@patch("apis.yfinance.prices_intraday.get_index_tickers")
-@patch("apis.yfinance.prices_intraday.probe_intraday")
-def test_update_intraday_skips_up_to_date_ticker(mock_test_aapl, mock_get_index, mock_get_last_sync, mock_get_conn):
-    # AAPL 测试返回成功，日期匹配
+@patch(f"{_BATCH}.get_conn")
+@patch(f"{_BATCH}.get_last_sync_map")
+@patch(f"{_BATCH}.get_index_tickers")
+@patch(f"{_BATCH}.probe_intraday")
+def test_update_intraday_skips_up_to_date_ticker(
+    mock_test_aapl, mock_get_index, mock_get_last_sync_map, mock_get_conn
+):
     mock_test_aapl.return_value = (date(2026, 5, 15), "ok")
     mock_get_index.return_value = ["AAPL"]
-    mock_get_last_sync.return_value = date(2026, 5, 15)  # 已同步到最新
+    mock_get_last_sync_map.return_value = {"AAPL": date(2026, 5, 15)}
     mock_get_conn.return_value = MagicMock()
 
     with patch("apis.yfinance.client.yf.download") as mock_dl:
@@ -196,35 +206,56 @@ def test_update_intraday_skips_up_to_date_ticker(mock_test_aapl, mock_get_index,
         result = update_intraday("15m")
 
     assert result["AAPL"] == "ok"
-    # AAPL 测试被 mock，已同步 ticker 不调用批量下载
     mock_dl.assert_not_called()
 
 
-@patch("apis.yfinance.prices_intraday.get_conn")
-@patch("apis.yfinance.prices_intraday.get_last_sync")
-@patch("apis.yfinance.prices_intraday.set_sync_ok")
-@patch("apis.yfinance.prices_intraday.set_sync_error")
+@patch(f"{_BATCH}.get_conn")
+@patch(f"{_BATCH}.get_last_sync_map")
+@patch(f"{_BATCH}.set_sync_ok")
+@patch(f"{_BATCH}.set_sync_error")
 @patch("apis.yfinance.client.yf.download")
-@patch("apis.yfinance.prices_intraday.get_index_tickers")
-@patch("apis.yfinance.prices_intraday.probe_intraday")
+@patch(f"{_BATCH}.probe_intraday")
+def test_update_intraday_accepts_explicit_tickers(
+    mock_test_aapl, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync_map, mock_get_conn
+):
+    """tickers= 跳过 default_universe / get_index_tickers。"""
+    mock_test_aapl.return_value = (date(2026, 5, 15), "ok")
+    mock_get_last_sync_map.return_value = {"MSFT": None}
+    mock_get_conn.return_value = MagicMock()
+    mock_yf_download.return_value = _make_yf_multiindex_df("MSFT")
+
+    with patch(f"{_BATCH}.save_rows", return_value=2), \
+         patch(f"{_BATCH}.get_index_tickers") as mock_idx:
+        from apis.yfinance.prices_intraday import update_intraday
+        result = update_intraday("15m", tickers=["MSFT"])
+
+    assert result["MSFT"] == "ok"
+    mock_idx.assert_not_called()
+
+
+@patch(f"{_BATCH}.get_conn")
+@patch(f"{_BATCH}.get_last_sync_map")
+@patch(f"{_BATCH}.set_sync_ok")
+@patch(f"{_BATCH}.set_sync_error")
+@patch("apis.yfinance.client.yf.download")
+@patch(f"{_BATCH}.get_index_tickers")
+@patch(f"{_BATCH}.probe_intraday")
 def test_update_intraday_floor_within_yahoo_window(
-    mock_test_aapl, mock_get_index, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync, mock_get_conn
+    mock_test_aapl, mock_get_index, mock_yf_download, mock_set_error, mock_set_ok, mock_get_last_sync_map, mock_get_conn
 ):
     """floor_date 必须以 today 为基准，否则 latest_date<today 时 start 落在 730 天窗口外被拒。"""
     from datetime import timedelta
 
-    # latest_date 比 today 早，模拟非交易日/未收盘
     latest = date.today() - timedelta(days=3)
     mock_test_aapl.return_value = (latest, "ok")
     mock_get_index.return_value = ["AAPL"]
     mock_get_conn.return_value = MagicMock()
     mock_yf_download.return_value = _make_yf_multiindex_df("AAPL")
 
-    with patch("apis.yfinance.prices_intraday._save_rows", return_value=2):
+    with patch(f"{_BATCH}.save_rows", return_value=2):
         from apis.yfinance.prices_intraday import update_intraday
         update_intraday("1h", full_rebase=True)
 
-    # 1h lookback=730，start 必须 = today-729，而非 latest-729
     expected_start = (date.today() - timedelta(days=729)).strftime("%Y-%m-%d")
     assert mock_yf_download.call_args[1]["start"] == expected_start
 
@@ -238,7 +269,8 @@ def test_update_intraday_rejects_unsupported_interval():
 # ─── CLI ──────────────────────────────────────────────────────────────────────
 
 def test_cli_intraday_all():
-    with patch("apis.yfinance.prices_intraday.update_intraday") as mock_update:
+    with patch("apis.yfinance.prices_intraday.update_intraday") as mock_update, \
+         patch("jobs.market_us.list_active_tickers", return_value=["AAPL"]):
         mock_update.return_value = {"AAPL": "ok"}
         import main
         ret = main.main(["intraday"])
@@ -250,27 +282,36 @@ def test_cli_intraday_all():
 
 
 def test_cli_intraday_single_interval():
-    with patch("apis.yfinance.prices_intraday.update_intraday") as mock_update:
+    with patch("apis.yfinance.prices_intraday.update_intraday") as mock_update, \
+         patch("jobs.market_us.list_active_tickers", return_value=["AAPL"]):
         mock_update.return_value = {"AAPL": "ok"}
         import main
         ret = main.main(["intraday", "--interval", "15m"])
     assert ret == 0
-    mock_update.assert_called_once_with("15m", full_rebase=False)
+    mock_update.assert_called_once_with(
+        "15m", full_rebase=False, tickers=["AAPL"]
+    )
 
 
 def test_cli_intraday_rebase_flag():
-    with patch("apis.yfinance.prices_intraday.update_intraday") as mock_update:
+    with patch("apis.yfinance.prices_intraday.update_intraday") as mock_update, \
+         patch("jobs.market_us.list_active_tickers", return_value=["AAPL"]):
         mock_update.return_value = {"AAPL": "ok"}
         import main
         ret = main.main(["intraday", "--interval", "1h", "--rebase"])
     assert ret == 0
-    mock_update.assert_called_once_with("1h", full_rebase=True)
+    mock_update.assert_called_once_with(
+        "1h", full_rebase=True, tickers=["AAPL"]
+    )
 
 
 def test_cli_intraday_no_rebase_flag_default():
-    with patch("apis.yfinance.prices_intraday.update_intraday") as mock_update:
+    with patch("apis.yfinance.prices_intraday.update_intraday") as mock_update, \
+         patch("jobs.market_us.list_active_tickers", return_value=["AAPL"]):
         mock_update.return_value = {"AAPL": "ok"}
         import main
         ret = main.main(["intraday", "--interval", "1h"])
     assert ret == 0
-    mock_update.assert_called_once_with("1h", full_rebase=False)
+    mock_update.assert_called_once_with(
+        "1h", full_rebase=False, tickers=["AAPL"]
+    )

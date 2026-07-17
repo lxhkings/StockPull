@@ -34,8 +34,8 @@ def test_probe_intraday_other_exception_is_error(mock_dl):
     assert status == "error"
 
 
-@patch("apis.yfinance.prices_intraday.get_index_tickers")
-@patch("apis.yfinance.prices_intraday.probe_intraday")
+@patch("apis.yfinance.prices_intraday_batch.get_index_tickers")
+@patch("apis.yfinance.prices_intraday_batch.probe_intraday")
 def test_update_intraday_skips_on_rate_limit(mock_probe, mock_tickers):
     from apis.yfinance.prices_intraday import update_intraday
 

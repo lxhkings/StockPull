@@ -7,8 +7,6 @@ and call run_us_equity_batch. Never run daily+weekly in one call.
 from __future__ import annotations
 
 import logging
-import random
-import time
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Callable, Dict, List, Optional
@@ -18,8 +16,6 @@ import pandas as pd
 from config import (
     HISTORY_YEARS_US,
     START_DATE_US,
-    YF_BATCH_DELAY_BASE,
-    YF_BATCH_DELAY_JITTER,
     YF_BATCH_SIZE,
     YF_LOOKBACK_DAYS,
     YF_RETRY_COUNT,
@@ -31,11 +27,15 @@ from core.db_client import get_conn
 from core.http_utils import to_float, to_int
 from modules.price_write import flush_prices_and_sync
 from modules.sync_log import get_last_sync_map, set_sync_error
+from apis.yfinance.batch_delay import sleep_between_batches
 from apis.yfinance.client import download_with_retry
 from apis.yfinance.normalize import normalize_daily_frame
 from apis.yfinance.ticker_utils import to_yfinance_us
 
 log = logging.getLogger(__name__)
+
+# Tests patch this name on prices_batch; keep as local alias of shared sleep.
+_sleep_between_batches = sleep_between_batches
 
 
 @dataclass(frozen=True)
@@ -64,14 +64,6 @@ def price_rows_from_df(df: pd.DataFrame) -> list:
         )
         for r in df.itertuples(index=False)
     ]
-
-
-def _sleep_between_batches(label: str) -> None:
-    delay = YF_BATCH_DELAY_BASE + random.uniform(
-        -YF_BATCH_DELAY_JITTER, YF_BATCH_DELAY_JITTER
-    )
-    log.debug(f"[{label}] 等待 {delay:.1f}s 后继续")
-    time.sleep(delay)
 
 
 def _download_and_save(

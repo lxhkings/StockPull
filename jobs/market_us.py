@@ -110,9 +110,13 @@ def intraday(
     """Pull intraday (15m / 1h) into prices_intraday.
 
     Default intervals = SUPPORTED_INTERVALS（与 CLI prices intraday 一致）。
+    Universe = list_active_tickers()（与 daily/weekly 默认宇宙一致）。
     """
     from apis.yfinance.prices_intraday import update_intraday, SUPPORTED_INTERVALS
+    tickers = list_active_tickers()
     result: dict[str, str] = {}
     for ivl in (intervals or SUPPORTED_INTERVALS):
-        result.update(update_intraday(ivl, full_rebase=full_rebase))
+        result.update(
+            update_intraday(ivl, full_rebase=full_rebase, tickers=tickers)
+        )
     return result
